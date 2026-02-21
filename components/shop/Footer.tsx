@@ -1,7 +1,15 @@
 import Image from "next/image";
 import Link from "next/link";
+import { prisma } from "@/lib/prisma";
 
-export function Footer() {
+export async function Footer() {
+  const rows = await prisma.siteSetting
+    .findMany({ where: { key: { in: ["footer_phone", "footer_email"] } } })
+    .catch(() => []);
+
+  const phone = rows.find((r) => r.key === "footer_phone")?.value ?? "+45 XX XX XX XX";
+  const email = rows.find((r) => r.key === "footer_email")?.value ?? "shop@vorbassebk.dk";
+
   return (
     <footer className="bg-secondary text-white mt-16">
       {/* Main footer */}
@@ -9,8 +17,8 @@ export function Footer() {
         {/* Left — contact */}
         <div className="text-sm space-y-1">
           <p className="font-bold text-base mb-3">VBK Shoppen</p>
-          <p className="text-white/70">Telefon: +45 XX XX XX XX</p>
-          <p className="text-white/70">Email: shop@vorbassebk.dk</p>
+          <p className="text-white/70">Telefon: {phone}</p>
+          <p className="text-white/70">Email: {email}</p>
           <div className="pt-3 flex flex-col gap-1 text-white/60">
             <Link href="/handelsbetingelser" className="hover:text-primary transition-colors">
               Handelsbetingelser

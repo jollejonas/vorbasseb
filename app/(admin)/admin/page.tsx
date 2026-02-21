@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/utils";
 import Link from "next/link";
-import { Package, ShoppingBag, Users, Newspaper } from "lucide-react";
+import { Package, ShoppingBag, Users, Newspaper, Settings } from "lucide-react";
 
 export const metadata: Metadata = { title: "Admin" };
 
@@ -69,11 +69,12 @@ export default async function AdminPage() {
       </div>
 
       {/* Quick links */}
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="grid md:grid-cols-4 gap-4">
         {[
           { href: "/admin/produkter", label: "Produkter", icon: Package },
           { href: "/admin/ordrer", label: "Ordrer", icon: ShoppingBag },
           { href: "/admin/nyheder", label: "Nyheder", icon: Newspaper },
+          { href: "/admin/indstillinger", label: "Indstillinger", icon: Settings },
         ].map((l) => (
           <Link
             key={l.href}

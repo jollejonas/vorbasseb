@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { calcShipping } from "@/lib/utils";
 import type { CartItem } from "@/components/shop/CartProvider";
-
-const MEMBER_DISCOUNT = 0.1; // 10%
 
 export async function POST(req: NextRequest) {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -15,6 +12,14 @@ export async function POST(req: NextRequest) {
   if (!items || items.length === 0) {
     return NextResponse.json({ error: "Tom kurv" }, { status: 400 });
   }
+
+  // Read shipping rules and member discount from DB (fall back to defaults)
+  const cfg = await prisma.siteSetting
+    .findMany({ where: { key: { in: ["shipping_flat_ore", "shipping_free_ore", "member_discount_pct"] } } })
+    .catch(() => []);
+  const flatOre = parseInt(cfg.find((s) => s.key === "shipping_flat_ore")?.value ?? "4900");
+  const freeOre = parseInt(cfg.find((s) => s.key === "shipping_free_ore")?.value ?? "49900");
+  const discountPct = parseInt(cfg.find((s) => s.key === "member_discount_pct")?.value ?? "10");
 
   // Check if user is an active member (for discount)
   let isMember = false;
@@ -29,7 +34,7 @@ export async function POST(req: NextRequest) {
     (s, i) => s + (i.price + (i.customizationFee ?? 0)) * i.quantity,
     0,
   );
-  const shipping = calcShipping(subtotal);
+  const shipping = subtotal >= freeOre ? 0 : flatOre;
 
   // Build Stripe line items
   const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = items.map(
@@ -62,13 +67,13 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Apply 10% member discount via Stripe coupon
+  // Apply member discount via Stripe coupon (percentage read from DB)
   let discounts: Stripe.Checkout.SessionCreateParams["discounts"] = undefined;
   if (isMember) {
     const coupon = await stripe.coupons.create({
-      percent_off: MEMBER_DISCOUNT * 100,
+      percent_off: discountPct,
       duration: "once",
-      name: "Fanklubsrabat 10%",
+      name: `Fanklubsrabat ${discountPct}%`,
     });
     discounts = [{ coupon: coupon.id }];
   }

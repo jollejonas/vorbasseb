@@ -95,20 +95,21 @@ enum Plan {
 }
 
 model Product {
-  id               String   @id @default(cuid())
+  id               String      @id @default(cuid())
   name             String
-  slug             String   @unique
-  description      String   @db.Text
+  slug             String      @unique
+  description      String      @db.Text
   category         Category
   price            Int // øre (DKK × 100)
   customizationFee Int? // øre, kun for trøjer med tryk
-  membersOnly      Boolean  @default(false)
-  published        Boolean  @default(true)
-  featured         Boolean  @default(false)
+  membersOnly      Boolean     @default(false)
+  published        Boolean     @default(true)
+  featured         Boolean     @default(false)
   images           String[] // Cloudinary URLs
   skus             SKU[]
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  heroSlides       HeroSlide[]
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
 }
 
 enum Category {
@@ -178,11 +179,53 @@ model Address {
 }
 
 model NewsPost {
-  id          String    @id @default(cuid())
+  id          String      @id @default(cuid())
   title       String
-  slug        String    @unique
-  content     String    @db.Text
+  slug        String      @unique
+  content     String      @db.Text
   publishedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  heroSlides  HeroSlide[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+// ─── Site configuration ────────────────────────────────────────────────────
+
+model SiteSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+enum SlideType {
+  CUSTOM
+  LATEST_NEWS
+  LATEST_PRODUCT
+}
+
+model HeroSlide {
+  id             String    @id @default(cuid())
+  type           SlideType
+  position       Int
+  enabled        Boolean   @default(true)
+
+  // CUSTOM slide fields
+  heading        String?
+  subheading     String?
+  body           String?   @db.Text
+  imageUrl       String?
+  ctaLabel       String?
+  ctaHref        String?
+  overlayOpacity Int       @default(40) // 0–100
+
+  // Optional pin overrides for LATEST_NEWS / LATEST_PRODUCT
+  overrideNewsId    String?
+  overrideNews      NewsPost? @relation(fields: [overrideNewsId], references: [id], onDelete: SetNull)
+  overrideProductId String?
+  overrideProduct   Product?  @relation(fields: [overrideProductId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([position])
 }
