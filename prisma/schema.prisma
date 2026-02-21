@@ -112,8 +112,9 @@ model Product {
 }
 
 enum Category {
-  TROJE    // Trøjer
-  TRAENING // Træning
+  SPILLERTOJ  // Spillertøj
+  BLAEDNING   // Beklædning
+  MERCHANDISE // Merchandise
 }
 
 model SKU {

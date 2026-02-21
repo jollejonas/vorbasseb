@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   const products = await prisma.product.findMany({
     where: {
       published: true,
-      ...(category ? { category: category as "TROJE" | "TRAENING" } : {}),
+      ...(category ? { category: category as "SPILLERTOJ" | "BLAEDNING" | "MERCHANDISE" } : {}),
       ...(featured === "true" ? { featured: true } : {}),
       // Non-members can still see member products (just can't buy them)
       ...(q

@@ -22,8 +22,12 @@ export default async function ProductPage({ params }: Props) {
 
   if (!product) notFound();
 
-  const categoryLabel =
-    product.category === "TROJE" ? "Trøjer" : "Træning";
+  const CATEGORY_LABELS: Record<string, string> = {
+    SPILLERTOJ: "Spillertøj",
+    BLAEDNING: "Beklædning",
+    MERCHANDISE: "Merchandise",
+  };
+  const categoryLabel = CATEGORY_LABELS[product.category] ?? product.category;
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-10">
@@ -34,7 +38,7 @@ export default async function ProductPage({ params }: Props) {
         </a>{" "}
         /{" "}
         <a
-          href={`/butik?kategori=${product.category === "TROJE" ? "troje" : "traening"}`}
+          href={`/butik?kategori=${product.category}`}
           className="hover:text-secondary"
         >
           {categoryLabel}

@@ -1,15 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { ShoppingCart, Menu, X, Star } from "lucide-react";
 import { useCart } from "./CartProvider";
 import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 
 const navLinks = [
-  { href: "/butik", label: "Butik" },
-  { href: "/nyheder", label: "Nyheder" },
-  { href: "/fanklub", label: "Fanklub" },
+  { href: "/nyheder", label: "NYHEDER" },
+  { href: "/butik?kategori=SPILLERTOJ", label: "SPILLERTØJ" },
+  { href: "/butik?kategori=BLAEDNING", label: "BEKLÆDNING" },
+  { href: "/butik?kategori=MERCHANDISE", label: "MERCHANDISE" },
 ];
 
 export function Header() {
@@ -24,14 +26,16 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 bg-secondary text-white shadow-md">
       <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-16">
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 font-bold text-lg">
-          <span className="text-primary">VBK</span>
-          <span className="hidden sm:inline">Shop</span>
+        {/* Brand */}
+        <Link href="/" className="flex items-center gap-3 shrink-0">
+          <span className="text-xl tracking-tight">
+            <span className="font-black text-primary">VBK</span>
+            <span className="font-light italic text-white">Shoppen</span>
+          </span>
         </Link>
 
         {/* Desktop nav */}
-        <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
+        <nav className="hidden md:flex items-center gap-6 text-xs font-bold tracking-widest">
           {navLinks.map((l) => (
             <Link
               key={l.href}
@@ -46,12 +50,12 @@ export function Header() {
               href="/admin"
               className="text-primary hover:text-primary-dark transition-colors"
             >
-              Admin
+              ADMIN
             </Link>
           )}
         </nav>
 
-        {/* Actions */}
+        {/* Actions + logo */}
         <div className="flex items-center gap-3">
           {isMember && (
             <span className="hidden sm:flex items-center gap-1 text-xs bg-primary text-secondary font-semibold px-2 py-0.5 rounded-full">
@@ -60,9 +64,12 @@ export function Header() {
           )}
 
           {session ? (
-            <div className="hidden md:flex items-center gap-3 text-sm">
+            <div className="hidden md:flex items-center gap-3 text-xs">
               <Link href="/mine-ordrer" className="hover:text-primary">
                 Mine ordrer
+              </Link>
+              <Link href="/konto" className="hover:text-primary">
+                Konto
               </Link>
               <button
                 onClick={() => signOut({ callbackUrl: "/" })}
@@ -74,7 +81,7 @@ export function Header() {
           ) : (
             <Link
               href="/login"
-              className="hidden md:inline text-sm hover:text-primary"
+              className="hidden md:inline text-xs hover:text-primary"
             >
               Log ind
             </Link>
@@ -92,6 +99,17 @@ export function Header() {
             )}
           </Link>
 
+          {/* Club logo */}
+          <Link href="/" className="hidden md:block shrink-0">
+            <Image
+              src="/logo.png"
+              alt="Vorbasse Boldklub"
+              width={40}
+              height={40}
+              className="rounded-full"
+            />
+          </Link>
+
           {/* Mobile menu toggle */}
           <button
             className="md:hidden"
@@ -105,7 +123,7 @@ export function Header() {
 
       {/* Mobile menu */}
       {menuOpen && (
-        <div className="md:hidden bg-secondary-dark border-t border-white/10 px-4 py-4 flex flex-col gap-4 text-sm font-medium">
+        <div className="md:hidden bg-secondary-dark border-t border-white/10 px-4 py-4 flex flex-col gap-4 text-sm font-bold tracking-wider">
           {navLinks.map((l) => (
             <Link
               key={l.href}
@@ -122,7 +140,7 @@ export function Header() {
               onClick={() => setMenuOpen(false)}
               className="text-primary"
             >
-              Admin
+              ADMIN
             </Link>
           )}
           <hr className="border-white/20" />
@@ -131,20 +149,20 @@ export function Header() {
               <Link
                 href="/mine-ordrer"
                 onClick={() => setMenuOpen(false)}
-                className="hover:text-primary"
+                className="hover:text-primary font-normal"
               >
                 Mine ordrer
               </Link>
               <Link
                 href="/konto"
                 onClick={() => setMenuOpen(false)}
-                className="hover:text-primary"
+                className="hover:text-primary font-normal"
               >
                 Konto
               </Link>
               <button
                 onClick={() => signOut({ callbackUrl: "/" })}
-                className="text-left hover:text-primary"
+                className="text-left hover:text-primary font-normal"
               >
                 Log ud
               </button>
@@ -154,14 +172,14 @@ export function Header() {
               <Link
                 href="/login"
                 onClick={() => setMenuOpen(false)}
-                className="hover:text-primary"
+                className="hover:text-primary font-normal"
               >
                 Log ind
               </Link>
               <Link
                 href="/registrer"
                 onClick={() => setMenuOpen(false)}
-                className="hover:text-primary"
+                className="hover:text-primary font-normal"
               >
                 Opret konto
               </Link>

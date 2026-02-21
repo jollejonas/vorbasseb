@@ -10,11 +10,8 @@ export function ProductCard({ product }: { product: ProductWithSkus }) {
   const inStock = product.skus.some((s) => s.stock > 0);
 
   return (
-    <Link
-      href={`/butik/${product.slug}`}
-      className="group block bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow"
-    >
-      <div className="relative aspect-square bg-surface overflow-hidden">
+    <div className="group flex flex-col bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-shadow">
+      <Link href={`/butik/${product.slug}`} className="block relative aspect-square bg-gray-50 overflow-hidden">
         {product.images[0] ? (
           <Image
             src={product.images[0]}
@@ -24,7 +21,7 @@ export function ProductCard({ product }: { product: ProductWithSkus }) {
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-300 text-4xl font-bold">
+          <div className="w-full h-full flex items-center justify-center text-gray-200 text-4xl font-black">
             VBK
           </div>
         )}
@@ -42,14 +39,22 @@ export function ProductCard({ product }: { product: ProductWithSkus }) {
             </span>
           </div>
         )}
-      </div>
+      </Link>
 
-      <div className="p-3">
-        <h3 className="font-medium text-sm truncate">{product.name}</h3>
-        <p className="text-secondary font-bold mt-1">
-          {formatPrice(product.price)}
-        </p>
+      <div className="p-4 flex flex-col gap-3">
+        <div>
+          <h3 className="font-bold text-secondary text-sm leading-tight">{product.name}</h3>
+          <p className="text-secondary/80 font-semibold mt-1 text-sm">
+            Pris {formatPrice(product.price)}
+          </p>
+        </div>
+        <Link
+          href={`/butik/${product.slug}`}
+          className="block text-center bg-secondary text-primary font-black text-xs tracking-widest py-2.5 rounded-lg hover:bg-secondary-dark transition-colors"
+        >
+          KØB HER
+        </Link>
       </div>
-    </Link>
+    </div>
   );
 }

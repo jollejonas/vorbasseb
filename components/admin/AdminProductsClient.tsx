@@ -8,8 +8,9 @@ import type { Product, SKU } from "@prisma/client";
 type ProductWithSkus = Product & { skus: SKU[] };
 
 const CATEGORY_LABELS: Record<string, string> = {
-  TROJE: "Trøjer",
-  TRAENING: "Træning",
+  SPILLERTOJ: "Spillertøj",
+  BLAEDNING: "Beklædning",
+  MERCHANDISE: "Merchandise",
 };
 
 export function AdminProductsClient({ products }: { products: ProductWithSkus[] }) {
