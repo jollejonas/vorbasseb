@@ -4,6 +4,11 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/utils";
 import { OrderStatusSelect } from "@/components/admin/OrderStatusSelect";
+import type { Prisma } from "@prisma/client";
+
+type OrderWithItems = Prisma.OrderGetPayload<{
+  include: { items: { include: { sku: { include: { product: true } } } } };
+}>;
 
 export const metadata: Metadata = { title: "Ordrer – Admin" };
 
@@ -50,7 +55,7 @@ export default async function AdminOrdrerPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {orders.map((order) => (
+            {orders.map((order: OrderWithItems) => (
               <tr key={order.id}>
                 <td className="py-4 pr-4 text-gray-500 whitespace-nowrap">
                   {new Intl.DateTimeFormat("da-DK").format(
