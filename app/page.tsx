@@ -1,65 +1,121 @@
-import Image from "next/image";
+import Link from "next/link";
+import { prisma } from "@/lib/prisma";
+import { ProductGrid } from "@/components/shop/ProductGrid";
+import { NewsCard } from "@/components/shop/NewsCard";
+import { Star, ShoppingBag, ArrowRight } from "lucide-react";
 
-export default function Home() {
+export default async function HomePage() {
+  const [featuredProducts, latestNews] = await Promise.all([
+    prisma.product
+      .findMany({
+        where: { published: true, featured: true },
+        include: { skus: true },
+        take: 6,
+        orderBy: { createdAt: "desc" },
+      })
+      .catch(() => []),
+    prisma.newsPost
+      .findMany({
+        where: { publishedAt: { lte: new Date() } },
+        take: 3,
+        orderBy: { publishedAt: "desc" },
+      })
+      .catch(() => []),
+  ]);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <>
+      {/* Hero */}
+      <section className="bg-secondary text-white">
+        <div className="max-w-6xl mx-auto px-4 py-20 md:py-28 flex flex-col items-center text-center">
+          <div className="inline-flex items-center gap-2 bg-primary/20 text-primary px-4 py-1.5 rounded-full text-sm font-semibold mb-6">
+            <ShoppingBag size={16} /> Officiel VBK Shop
+          </div>
+          <h1 className="text-4xl md:text-6xl font-bold leading-tight mb-6">
+            Vorbasse Boldklub
+            <br />
+            <span className="text-primary">Merchandise</span>
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-lg text-white/70 max-w-xl mb-8">
+            Støt dit hold med officielle trøjer og træningsudstyr. Bliv
+            fanklubsmedlem og spar 10% på alle køb.
           </p>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Link
+              href="/butik"
+              className="flex items-center gap-2 bg-primary text-secondary font-bold px-8 py-3 rounded-xl hover:bg-primary-dark transition"
+            >
+              Se butikken <ArrowRight size={18} />
+            </Link>
+            <Link
+              href="/fanklub"
+              className="flex items-center gap-2 bg-white/10 text-white font-semibold px-8 py-3 rounded-xl hover:bg-white/20 transition border border-white/20"
+            >
+              <Star size={18} className="text-primary" /> Bliv fanklubsmedlem
+            </Link>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+      </section>
+
+      {/* Featured products */}
+      {featuredProducts.length > 0 && (
+        <section className="max-w-6xl mx-auto px-4 py-16">
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-2xl font-bold">Udvalgte produkter</h2>
+            <Link
+              href="/butik"
+              className="text-sm text-secondary underline hover:text-secondary-dark"
+            >
+              Se alle →
+            </Link>
+          </div>
+          <ProductGrid products={featuredProducts} />
+        </section>
+      )}
+
+      {/* News */}
+      {latestNews.length > 0 && (
+        <section className="bg-surface py-16">
+          <div className="max-w-6xl mx-auto px-4">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-2xl font-bold">Seneste nyheder</h2>
+              <Link
+                href="/nyheder"
+                className="text-sm text-secondary underline hover:text-secondary-dark"
+              >
+                Alle nyheder →
+              </Link>
+            </div>
+            <div className="grid md:grid-cols-3 gap-6">
+              {latestNews.map((post) => (
+                <NewsCard key={post.id} post={post} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Fan club CTA */}
+      <section className="max-w-6xl mx-auto px-4 py-16">
+        <div className="bg-secondary rounded-2xl p-10 text-white text-center">
+          <Star
+            size={40}
+            className="text-primary mx-auto mb-4"
+            fill="currentColor"
+          />
+          <h2 className="text-3xl font-bold mb-3">Bliv fanklubsmedlem</h2>
+          <p className="text-white/70 max-w-lg mx-auto mb-6">
+            Få 10% rabat på alle køb, adgang til eksklusivt merchandise og støt
+            Vorbasse Boldklub direkte med dit abonnement.
+          </p>
+          <Link
+            href="/fanklub"
+            className="inline-flex items-center gap-2 bg-primary text-secondary font-bold px-8 py-3 rounded-xl hover:bg-primary-dark transition"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            Se fanklubsfordele <ArrowRight size={18} />
+          </Link>
         </div>
-      </main>
-    </div>
+      </section>
+    </>
   );
 }

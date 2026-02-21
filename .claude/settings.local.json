@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pkill:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(powershell.exe -Command \"Set-Location ''C:\\\\Dev\\\\vorbasseb''; npx prisma migrate dev --name init 2>&1\")",
+      "Bash(powershell.exe -Command \"Test-NetConnection -ComputerName db.dsqxqgxbedlaortvjify.supabase.co -Port 5432 2>&1\")",
+      "Bash(powershell.exe -Command \"Resolve-DnsName db.dsqxqgxbedlaortvjify.supabase.co -Type A 2>&1\")"
+    ]
+  }
+}
