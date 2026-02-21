@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed": "dotenv -e .env -- ts-node --transpile-only prisma/seed.ts"
+    "seed": "dotenv -e .env -- ts-node --transpile-only prisma/seed.ts",
+    "postinstall": "prisma generate"
   },
   "prisma": {
     "seed": "dotenv -e .env -- ts-node --transpile-only prisma/seed.ts"

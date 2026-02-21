@@ -4,12 +4,6 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/utils";
 import { OrderStatusSelect } from "@/components/admin/OrderStatusSelect";
-import type { Prisma } from "@prisma/client";
-
-type OrderWithItems = Prisma.OrderGetPayload<{
-  include: { items: { include: { sku: { include: { product: true } } } } };
-}>;
-
 export const metadata: Metadata = { title: "Ordrer – Admin" };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -33,6 +27,8 @@ export default async function AdminOrdrerPage() {
     },
     orderBy: { createdAt: "desc" },
   });
+
+  type OrderWithItems = (typeof orders)[number];
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10">
