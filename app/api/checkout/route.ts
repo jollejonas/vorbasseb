@@ -5,11 +5,10 @@ import { prisma } from "@/lib/prisma";
 import { calcShipping } from "@/lib/utils";
 import type { CartItem } from "@/components/shop/CartProvider";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-
 const MEMBER_DISCOUNT = 0.1; // 10%
 
 export async function POST(req: NextRequest) {
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
   const session = await auth();
   const { items }: { items: CartItem[] } = await req.json();
 
