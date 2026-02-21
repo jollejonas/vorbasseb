@@ -20,7 +20,6 @@
     "@prisma/client": "^7.4.1",
     "@react-email/components": "^1.0.8",
     "bcryptjs": "^3.0.3",
-    "cloudinary": "^2.9.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.575.0",
     "next": "16.1.6",
