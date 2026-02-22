@@ -115,9 +115,10 @@ model Product {
   category         Category?   @relation(fields: [categoryId], references: [id])
   price            Int // øre (DKK × 100)
   customizationFee Int? // øre, kun for trøjer med tryk
-  membersOnly      Boolean     @default(false)
-  published        Boolean     @default(true)
-  featured         Boolean     @default(false)
+  membersOnly          Boolean     @default(false)
+  membersEarlyAccess   Boolean     @default(false)
+  published            Boolean     @default(true)
+  featured             Boolean     @default(false)
   images           String[] // Cloudinary URLs
   skus             SKU[]
   heroSlides       HeroSlide[]
@@ -203,6 +204,7 @@ model NewsPost {
   slug        String      @unique
   content     String      @db.Text
   coverImage  String?
+  membersOnly Boolean     @default(false)
   publishedAt DateTime?
   heroSlides  HeroSlide[]
   createdAt   DateTime    @default(now())

@@ -29,6 +29,7 @@ export function ProductForm({ product }: { product?: ProductWithSkus }) {
     product?.customizationFee ? (product.customizationFee / 100).toFixed(2) : ""
   );
   const [membersOnly, setMembersOnly] = useState(product?.membersOnly ?? false);
+  const [membersEarlyAccess, setMembersEarlyAccess] = useState(product?.membersEarlyAccess ?? false);
   const [published, setPublished] = useState(product?.published ?? true);
   const [featured, setFeatured] = useState(product?.featured ?? false);
   const [description, setDescription] = useState(product?.description ?? "");
@@ -132,6 +133,7 @@ export function ProductForm({ product }: { product?: ProductWithSkus }) {
           ? Math.round(parseFloat(customizationFeeKr) * 100)
           : null,
         membersOnly,
+        membersEarlyAccess,
         published,
         featured,
         description,
@@ -275,6 +277,7 @@ export function ProductForm({ product }: { product?: ProductWithSkus }) {
               { label: "Udgivet", checked: published, set: setPublished },
               { label: "Fremhævet på forsiden", checked: featured, set: setFeatured },
               { label: "Kun for medlemmer", checked: membersOnly, set: setMembersOnly },
+              { label: "Tidlig adgang for medlemmer", checked: membersEarlyAccess, set: setMembersEarlyAccess },
             ] as { label: string; checked: boolean; set: (v: boolean) => void }[]
           ).map(({ label, checked, set }) => (
             <label

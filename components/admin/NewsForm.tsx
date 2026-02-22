@@ -17,6 +17,7 @@ export function NewsForm({ post }: { post?: NewsPost }) {
   const [slugChanged, setSlugChanged] = useState(false);
   const [content, setContent] = useState(post?.content ?? "");
   const [coverImage, setCoverImage] = useState(post?.coverImage ?? "");
+  const [membersOnly, setMembersOnly] = useState(post?.membersOnly ?? false);
   const [published, setPublished] = useState(!!post?.publishedAt);
   const [saving, setSaving] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -71,6 +72,7 @@ export function NewsForm({ post }: { post?: NewsPost }) {
         slug,
         content,
         coverImage: coverImage || null,
+        membersOnly,
         publishedAt: published ? (post?.publishedAt ?? new Date().toISOString()) : null,
       };
 
@@ -176,8 +178,8 @@ export function NewsForm({ post }: { post?: NewsPost }) {
         />
       </div>
 
-      {/* Publish toggle */}
-      <div>
+      {/* Flags */}
+      <div className="flex flex-wrap gap-6">
         <label className="flex items-center gap-2 cursor-pointer select-none">
           <input
             type="checkbox"
@@ -187,11 +189,15 @@ export function NewsForm({ post }: { post?: NewsPost }) {
           />
           <span className="text-sm font-medium">Udgiv nu</span>
         </label>
-        <p className="text-xs text-gray-400 mt-1 ml-6">
-          {published
-            ? "Nyheden vil være synlig på siden."
-            : "Nyheden gemmes som kladde og er ikke synlig."}
-        </p>
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={membersOnly}
+            onChange={(e) => setMembersOnly(e.target.checked)}
+            className="w-4 h-4 accent-secondary"
+          />
+          <span className="text-sm font-medium">Kun for fanklubsmedlemmer</span>
+        </label>
       </div>
 
       {/* Actions */}

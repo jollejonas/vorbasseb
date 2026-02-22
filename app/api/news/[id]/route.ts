@@ -21,6 +21,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       slug: body.slug,
       content: body.content,
       coverImage: body.coverImage ?? null,
+      membersOnly: body.membersOnly ?? false,
       publishedAt: body.publishedAt ? new Date(body.publishedAt) : null,
     },
   });

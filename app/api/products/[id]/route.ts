@@ -37,6 +37,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
         price: body.price,
         customizationFee: body.customizationFee ?? null,
         membersOnly: body.membersOnly,
+        membersEarlyAccess: body.membersEarlyAccess ?? false,
         published: body.published,
         featured: body.featured,
         images: body.images,

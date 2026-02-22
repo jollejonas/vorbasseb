@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
       price: body.price,
       customizationFee: body.customizationFee ?? null,
       membersOnly: body.membersOnly ?? false,
+      membersEarlyAccess: body.membersEarlyAccess ?? false,
       published: body.published ?? true,
       featured: body.featured ?? false,
       images: body.images ?? [],
