@@ -17,11 +17,12 @@ export function RegisterForm() {
     const name = fd.get("name") as string;
     const email = fd.get("email") as string;
     const password = fd.get("password") as string;
+    const newsletterConsent = fd.get("newsletterConsent") === "on";
 
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ name, email, password, newsletterConsent }),
     });
 
     if (!res.ok) {
@@ -80,6 +81,15 @@ export function RegisterForm() {
           className="w-full border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
         />
       </div>
+
+      <label className="flex items-start gap-3 text-sm text-gray-600 cursor-pointer">
+        <input
+          name="newsletterConsent"
+          type="checkbox"
+          className="mt-0.5 accent-secondary"
+        />
+        <span>Jeg vil gerne modtage nyhedsbreve fra VBK Shoppen</span>
+      </label>
 
       <button
         type="submit"

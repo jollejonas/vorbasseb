@@ -33,6 +33,7 @@ export default async function KontoPage() {
       id: true,
       name: true,
       email: true,
+      newsletterConsent: true,
       subscription: true,
     },
   });
@@ -49,7 +50,7 @@ export default async function KontoPage() {
       {/* Profile card */}
       <div className="border border-gray-100 rounded-2xl p-6 mb-6">
         <h2 className="text-base font-semibold mb-5">Profil</h2>
-        <AccountClient name={user.name} email={user.email ?? ""} />
+        <AccountClient name={user.name} email={user.email ?? ""} newsletterConsent={user.newsletterConsent} />
       </div>
 
       {/* Fanclub card */}

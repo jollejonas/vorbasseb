@@ -1,0 +1,63 @@
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import { Resend } from "resend";
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+const FROM = process.env.RESEND_FROM_EMAIL ?? "noreply@vorbassebk.dk";
+const BATCH_SIZE = 50;
+
+export async function POST(req: NextRequest) {
+  const session = await auth();
+  // @ts-expect-error custom field
+  if (session?.user?.role !== "ADMIN") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { subject, html } = await req.json();
+  if (!subject || !html) {
+    return NextResponse.json({ error: "subject og html er påkrævet" }, { status: 400 });
+  }
+
+  const subscribers = await prisma.user.findMany({
+    where: { newsletterConsent: true },
+    select: { email: true, name: true },
+  });
+
+  if (subscribers.length === 0) {
+    return NextResponse.json({ sent: 0 });
+  }
+
+  const emailHtml = `
+    <!DOCTYPE html>
+    <html lang="da">
+    <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /></head>
+    <body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#1a1a1a">
+      ${html}
+      <hr style="margin-top:32px;border:none;border-top:1px solid #eee" />
+      <p style="font-size:12px;color:#888;margin-top:16px">
+        Du modtager denne e-mail fordi du har tilmeldt dig nyhedsbrevet fra VBK Shoppen.
+        Du kan til enhver tid afmelde dig på din <a href="${process.env.NEXT_PUBLIC_APP_URL ?? "https://vorbassebk.dk"}/konto" style="color:#888">kontside</a>.
+      </p>
+      <p style="font-size:12px;color:#888">Mvh. Vorbasse Boldklub</p>
+    </body>
+    </html>
+  `;
+
+  // Send in batches of 50
+  let sent = 0;
+  for (let i = 0; i < subscribers.length; i += BATCH_SIZE) {
+    const batch = subscribers.slice(i, i + BATCH_SIZE);
+    await resend.batch.send(
+      batch.map((s) => ({
+        from: FROM,
+        to: s.email,
+        subject,
+        html: emailHtml,
+      })),
+    );
+    sent += batch.length;
+  }
+
+  return NextResponse.json({ sent });
+}

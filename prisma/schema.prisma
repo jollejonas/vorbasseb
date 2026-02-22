@@ -9,15 +9,17 @@ datasource db {
 // ─── Auth.js (NextAuth v5) required models ────────────────────────────────
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  image         String?
-  passwordHash  String?
-  role          Role      @default(CUSTOMER)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                    String    @id @default(cuid())
+  name                  String?
+  email                 String    @unique
+  emailVerified         DateTime?
+  image                 String?
+  passwordHash          String?
+  role                  Role      @default(CUSTOMER)
+  newsletterConsent     Boolean   @default(false)
+  newsletterConsentAt   DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   accounts     Account[]
   sessions     Session[]

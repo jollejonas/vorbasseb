@@ -6,12 +6,15 @@ import { toast } from "sonner";
 type Props = {
   name: string | null;
   email: string;
+  newsletterConsent: boolean;
 };
 
-export function AccountClient({ name: initialName, email }: Props) {
+export function AccountClient({ name: initialName, email, newsletterConsent: initialConsent }: Props) {
   const [name, setName] = useState(initialName ?? "");
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [newsletterConsent, setNewsletterConsent] = useState(initialConsent);
+  const [savingNewsletter, setSavingNewsletter] = useState(false);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -32,6 +35,25 @@ export function AccountClient({ name: initialName, email }: Props) {
       toast.error(err instanceof Error ? err.message : "Noget gik galt");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleNewsletterToggle() {
+    setSavingNewsletter(true);
+    const newVal = !newsletterConsent;
+    try {
+      const res = await fetch("/api/account/newsletter-consent", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newsletterConsent: newVal }),
+      });
+      if (!res.ok) throw new Error();
+      setNewsletterConsent(newVal);
+      toast.success(newVal ? "Tilmeldt nyhedsbrev" : "Afmeldt nyhedsbrev");
+    } catch {
+      toast.error("Noget gik galt");
+    } finally {
+      setSavingNewsletter(false);
     }
   }
 
@@ -88,6 +110,26 @@ export function AccountClient({ name: initialName, email }: Props) {
             </button>
           </div>
         )}
+      </div>
+
+      <div>
+        <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-2">
+          Nyhedsbrev
+        </p>
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={newsletterConsent}
+            onChange={handleNewsletterToggle}
+            disabled={savingNewsletter}
+            className="accent-secondary w-4 h-4"
+          />
+          <span className="text-sm text-gray-700">
+            {newsletterConsent
+              ? "Du modtager nyhedsbreve fra VBK Shoppen"
+              : "Modtag nyhedsbreve fra VBK Shoppen"}
+          </span>
+        </label>
       </div>
     </div>
   );
