@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { slugify } from "@/lib/utils";
+import { TipTapEditor } from "@/components/admin/TipTapEditor";
 import type { NewsPost } from "@prisma/client";
 
 export function NewsForm({ post }: { post?: NewsPost }) {
@@ -13,13 +14,53 @@ export function NewsForm({ post }: { post?: NewsPost }) {
   const [title, setTitle] = useState(post?.title ?? "");
   const [slug, setSlug] = useState(post?.slug ?? "");
   const [slugManual, setSlugManual] = useState(isEdit);
+  const [slugChanged, setSlugChanged] = useState(false);
   const [content, setContent] = useState(post?.content ?? "");
+  const [coverImage, setCoverImage] = useState(post?.coverImage ?? "");
   const [published, setPublished] = useState(!!post?.publishedAt);
   const [saving, setSaving] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const widgetRef = useRef<any>(null);
 
   useEffect(() => {
     if (!slugManual) setSlug(slugify(title));
   }, [title, slugManual]);
+
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.src = "https://upload-widget.cloudinary.com/global/all.js";
+    script.async = true;
+    document.head.appendChild(script);
+    return () => { document.head.removeChild(script); };
+  }, []);
+
+  function openCoverImageWidget() {
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = process.env.NEXT_PUBLIC_UPLOAD_PRESET;
+    if (!cloudName || !uploadPreset) {
+      toast.error("Cloudinary er ikke konfigureret (mangler env-variabler)");
+      return;
+    }
+    if (!widgetRef.current) {
+      // @ts-expect-error cloudinary global from CDN
+      widgetRef.current = window.cloudinary?.createUploadWidget(
+        {
+          cloudName,
+          uploadPreset,
+          multiple: false,
+          resourceType: "image",
+          folder: "vbk-nyheder",
+          clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
+          maxFileSize: 5000000,
+        },
+        (error: unknown, result: { event: string; info: { secure_url: string } }) => {
+          if (error) { toast.error("Upload fejlede"); return; }
+          if (result.event === "success") setCoverImage(result.info.secure_url);
+        }
+      );
+    }
+    widgetRef.current?.open();
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -29,7 +70,8 @@ export function NewsForm({ post }: { post?: NewsPost }) {
         title,
         slug,
         content,
-        publishedAt: published ? new Date().toISOString() : null,
+        coverImage: coverImage || null,
+        publishedAt: published ? (post?.publishedAt ?? new Date().toISOString()) : null,
       };
 
       const url = isEdit ? `/api/news/${post.id}` : "/api/news";
@@ -56,7 +98,8 @@ export function NewsForm({ post }: { post?: NewsPost }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
+    <form onSubmit={handleSubmit} className="space-y-6 max-w-3xl">
+      {/* Title */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Titel <span className="text-red-500">*</span>
@@ -71,6 +114,7 @@ export function NewsForm({ post }: { post?: NewsPost }) {
         />
       </div>
 
+      {/* Slug */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Slug <span className="text-red-500">*</span>
@@ -81,32 +125,58 @@ export function NewsForm({ post }: { post?: NewsPost }) {
           onChange={(e) => {
             setSlug(e.target.value);
             setSlugManual(true);
+            if (isEdit && post?.publishedAt) setSlugChanged(true);
           }}
           required
           className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary font-mono"
         />
-        <p className="text-xs text-gray-400 mt-1">
-          URL: /nyheder/{slug || "..."}
-        </p>
+        <p className="text-xs text-gray-400 mt-1">URL: /nyheder/{slug || "..."}</p>
+        {slugChanged && isEdit && post?.publishedAt && (
+          <p className="text-xs text-amber-600 mt-1 font-medium">
+            ⚠️ Advarsel: Ændring af slug på en udgivet nyhed bryder eksisterende URL&apos;er og links.
+          </p>
+        )}
       </div>
 
+      {/* Cover image */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-gray-700 mb-2">Forsidebillede</label>
+        {coverImage ? (
+          <div className="relative inline-block">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={coverImage} alt="Cover" className="h-40 rounded-lg object-cover border" />
+            <button
+              type="button"
+              onClick={() => setCoverImage("")}
+              className="absolute top-1 right-1 bg-white/90 rounded-full w-6 h-6 text-sm text-red-600 hover:bg-white font-bold leading-none"
+            >
+              ×
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={openCoverImageWidget}
+            className="flex items-center gap-2 border-2 border-dashed border-gray-300 rounded-lg px-4 py-3 text-sm text-gray-500 hover:border-secondary hover:text-secondary transition"
+          >
+            <span className="text-lg leading-none">+</span> Upload forsidebillede
+          </button>
+        )}
+      </div>
+
+      {/* Content (TipTap) */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
           Indhold <span className="text-red-500">*</span>
         </label>
-        <textarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          required
-          rows={12}
-          className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary resize-y font-mono"
-          placeholder="Skriv nyheden her... Markdown understøttes."
+        <TipTapEditor
+          content={content}
+          onChange={setContent}
+          placeholder="Skriv nyheden her..."
         />
-        <p className="text-xs text-gray-400 mt-1">
-          Markdown understøttes: **fed**, *kursiv*, ## overskrift, - liste
-        </p>
       </div>
 
+      {/* Publish toggle */}
       <div>
         <label className="flex items-center gap-2 cursor-pointer select-none">
           <input
@@ -119,11 +189,12 @@ export function NewsForm({ post }: { post?: NewsPost }) {
         </label>
         <p className="text-xs text-gray-400 mt-1 ml-6">
           {published
-            ? "Nyheden vil være synlig på siden med det samme."
+            ? "Nyheden vil være synlig på siden."
             : "Nyheden gemmes som kladde og er ikke synlig."}
         </p>
       </div>
 
+      {/* Actions */}
       <div className="flex gap-3 pt-2 border-t">
         <button
           type="submit"

@@ -17,6 +17,13 @@ const SLIDE_IDS = {
   product: "seed-slide-product-003",
 };
 
+const CATEGORY_IDS = {
+  spillertoj: "seed-cat-spillertoj-001",
+  traeningtoj: "seed-cat-traeningtoj-01",
+  fritidstoj: "seed-cat-fritidstoj-001",
+  tilbehor: "seed-cat-tilbehor-0001",
+};
+
 async function main() {
   // ── Admin user ──────────────────────────────────────────────────────────
   const password = "Admin1234!";
@@ -50,6 +57,22 @@ async function main() {
   }
   console.log("✅ Site settings seeded");
 
+  // ── Categories ───────────────────────────────────────────────────────────
+  const categoriesData = [
+    { id: CATEGORY_IDS.spillertoj, name: "Spillertøj", slug: "spillertoj", position: 0 },
+    { id: CATEGORY_IDS.traeningtoj, name: "Træningstøj", slug: "traeningtoj", position: 1 },
+    { id: CATEGORY_IDS.fritidstoj, name: "Fritidstøj", slug: "fritidstoj", position: 2 },
+    { id: CATEGORY_IDS.tilbehor, name: "Tilbehør", slug: "tilbehor", position: 3 },
+  ];
+  for (const cat of categoriesData) {
+    await prisma.category.upsert({
+      where: { id: cat.id },
+      update: { name: cat.name, position: cat.position },
+      create: cat,
+    });
+  }
+  console.log("✅ Categories seeded");
+
   // ── Products ─────────────────────────────────────────────────────────────
   const products = [
     {
@@ -57,7 +80,7 @@ async function main() {
       name: "Spillertrøje 2025",
       description:
         "Den officielle Vorbasse Boldklub spillertrøje for sæson 2025. Lavet i åndbart, fugtafvisende materiale med klubbens farver og logo. Perfekt til kampdagen eller hverdagsbrug.",
-      category: "SPILLERTOJ" as const,
+      categoryId: CATEGORY_IDS.spillertoj,
       price: 49900,
       customizationFee: 7500,
       published: true,
@@ -76,7 +99,7 @@ async function main() {
       name: "Træningstrøje VBK",
       description:
         "Komfortabel træningstrøje til Vorbasse Boldklubs spillere og trænere. Let materiale der holder dig kold under intens træning. Disponibel i klubbens farver.",
-      category: "BLAEDNING" as const,
+      categoryId: CATEGORY_IDS.traeningtoj,
       price: 29900,
       customizationFee: null,
       published: true,
@@ -94,7 +117,7 @@ async function main() {
       name: "VBK Halstørklæde",
       description:
         "Hold varmen på tribunen med VBK's officielle halstørklæde i klubbens farver gul og blå. Et must-have for alle fans.",
-      category: "MERCHANDISE" as const,
+      categoryId: CATEGORY_IDS.tilbehor,
       price: 14900,
       customizationFee: null,
       published: true,
@@ -107,7 +130,7 @@ async function main() {
       name: "VBK Kasket",
       description:
         "Klassisk snapback-kasket med broderet VBK-logo. Justerbar størrelse passer alle. Perfekt til at vise din støtte til holdet.",
-      category: "MERCHANDISE" as const,
+      categoryId: CATEGORY_IDS.tilbehor,
       price: 12900,
       customizationFee: null,
       published: true,
@@ -120,21 +143,17 @@ async function main() {
   const seededProducts: Record<string, string> = {}; // slug → id
   for (const p of products) {
     const { skus, ...productData } = p;
-    const existing = await prisma.product.findUnique({ where: { slug: p.slug }, select: { id: true } });
-    if (existing) {
-      seededProducts[p.slug] = existing.id;
-      console.log(`  ↳ Product already exists: ${p.name}`);
-      continue;
-    }
-    const created = await prisma.product.create({
-      data: {
+    const upserted = await prisma.product.upsert({
+      where: { slug: p.slug },
+      update: { categoryId: productData.categoryId },
+      create: {
         ...productData,
         skus: { create: skus },
       },
-      select: { id: true },
+      select: { id: true, name: true },
     });
-    seededProducts[p.slug] = created.id;
-    console.log(`  ↳ Created product: ${p.name}`);
+    seededProducts[p.slug] = upserted.id;
+    console.log(`  ↳ Upserted product: ${upserted.name}`);
   }
   console.log("✅ Products seeded");
 

@@ -9,9 +9,10 @@ import { useSession, signOut } from "next-auth/react";
 
 const navLinks = [
   { href: "/nyheder", label: "NYHEDER" },
-  { href: "/butik?kategori=SPILLERTOJ", label: "SPILLERTØJ" },
-  { href: "/butik?kategori=BLAEDNING", label: "BEKLÆDNING" },
-  { href: "/butik?kategori=MERCHANDISE", label: "MERCHANDISE" },
+  { href: "/butik?kategori=spillertoj", label: "SPILLERTØJ" },
+  { href: "/butik?kategori=traeningtoj", label: "TRÆNINGSTØJ" },
+  { href: "/butik?kategori=fritidstoj", label: "FRITIDSTØJ" },
+  { href: "/butik?kategori=tilbehor", label: "TILBEHØR" },
 ];
 
 export function Header() {

@@ -12,7 +12,7 @@ export default async function AdminProdukterPage() {
   if (session?.user?.role !== "ADMIN") redirect("/");
 
   const products = await prisma.product.findMany({
-    include: { skus: true },
+    include: { skus: true, category: true },
     orderBy: { createdAt: "desc" },
   });
 

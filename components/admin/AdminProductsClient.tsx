@@ -3,15 +3,9 @@
 import Image from "next/image";
 import { toast } from "sonner";
 import { formatPrice } from "@/lib/utils";
-import type { Product, SKU } from "@prisma/client";
+import type { Product, SKU, Category } from "@prisma/client";
 
-type ProductWithSkus = Product & { skus: SKU[] };
-
-const CATEGORY_LABELS: Record<string, string> = {
-  SPILLERTOJ: "Spillertøj",
-  BLAEDNING: "Beklædning",
-  MERCHANDISE: "Merchandise",
-};
+type ProductWithSkus = Product & { skus: SKU[]; category: Category | null };
 
 export function AdminProductsClient({ products }: { products: ProductWithSkus[] }) {
   async function togglePublished(product: ProductWithSkus) {
@@ -81,7 +75,7 @@ export function AdminProductsClient({ products }: { products: ProductWithSkus[] 
                 </div>
               </td>
               <td className="py-4 pr-4 text-gray-600">
-                {CATEGORY_LABELS[p.category] ?? p.category}
+                {p.category?.name ?? "—"}
               </td>
               <td className="py-4 pr-4 font-medium">{formatPrice(p.price)}</td>
               <td className="py-4 pr-4">

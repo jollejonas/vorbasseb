@@ -16,7 +16,7 @@ export default async function RedigerProduktPage({ params }: Props) {
   const { id } = await params;
   const product = await prisma.product.findUnique({
     where: { id },
-    include: { skus: { orderBy: { size: "asc" } } },
+    include: { skus: { orderBy: { size: "asc" } }, category: true },
   });
 
   if (!product) notFound();

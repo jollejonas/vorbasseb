@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import Image from "next/image";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -36,7 +37,20 @@ export default async function NyhedsartikelPage({ params }: Props) {
       </nav>
 
       <p className="text-sm text-gray-400 mb-2">{date}</p>
-      <h1 className="text-3xl font-bold mb-8">{post.title}</h1>
+      <h1 className="text-3xl font-bold mb-6">{post.title}</h1>
+
+      {post.coverImage && (
+        <div className="relative aspect-video w-full rounded-2xl overflow-hidden mb-8">
+          <Image
+            src={post.coverImage}
+            alt={post.title}
+            fill
+            className="object-cover"
+            sizes="(max-width: 768px) 100vw, 672px"
+            priority
+          />
+        </div>
+      )}
 
       <div
         className="prose prose-gray max-w-none"

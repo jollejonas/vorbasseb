@@ -33,7 +33,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
         name: body.name,
         slug: body.slug,
         description: body.description,
-        category: body.category,
+        categoryId: body.categoryId ?? null,
         price: body.price,
         customizationFee: body.customizationFee ?? null,
         membersOnly: body.membersOnly,

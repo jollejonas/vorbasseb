@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   const products = await prisma.product.findMany({
     where: {
       published: true,
-      ...(category ? { category: category as "SPILLERTOJ" | "BLAEDNING" | "MERCHANDISE" } : {}),
+      ...(category ? { category: { slug: category } } : {}),
       ...(featured === "true" ? { featured: true } : {}),
       // Non-members can still see member products (just can't buy them)
       ...(q
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
           }
         : {}),
     },
-    include: { skus: true },
+    include: { skus: true, category: true },
     orderBy: { createdAt: "desc" },
   });
 
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
       name: body.name,
       slug: body.slug,
       description: body.description,
-      category: body.category,
+      categoryId: body.categoryId ?? null,
       price: body.price,
       customizationFee: body.customizationFee ?? null,
       membersOnly: body.membersOnly ?? false,
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
         create: body.skus ?? [],
       },
     },
-    include: { skus: true },
+    include: { skus: true, category: true },
   });
 
   return NextResponse.json(product, { status: 201 });

@@ -20,6 +20,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       title: body.title,
       slug: body.slug,
       content: body.content,
+      coverImage: body.coverImage ?? null,
       publishedAt: body.publishedAt ? new Date(body.publishedAt) : null,
     },
   });

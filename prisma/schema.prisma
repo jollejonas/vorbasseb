@@ -94,12 +94,23 @@ enum Plan {
   YEARLY
 }
 
+model Category {
+  id       String    @id @default(cuid())
+  name     String
+  slug     String    @unique
+  position Int
+  products Product[]
+
+  @@index([position])
+}
+
 model Product {
   id               String      @id @default(cuid())
   name             String
   slug             String      @unique
   description      String      @db.Text
-  category         Category
+  categoryId       String?
+  category         Category?   @relation(fields: [categoryId], references: [id])
   price            Int // øre (DKK × 100)
   customizationFee Int? // øre, kun for trøjer med tryk
   membersOnly      Boolean     @default(false)
@@ -110,12 +121,6 @@ model Product {
   heroSlides       HeroSlide[]
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
-}
-
-enum Category {
-  SPILLERTOJ  // Spillertøj
-  BLAEDNING   // Beklædning
-  MERCHANDISE // Merchandise
 }
 
 model SKU {
@@ -183,6 +188,7 @@ model NewsPost {
   title       String
   slug        String      @unique
   content     String      @db.Text
+  coverImage  String?
   publishedAt DateTime?
   heroSlides  HeroSlide[]
   createdAt   DateTime    @default(now())

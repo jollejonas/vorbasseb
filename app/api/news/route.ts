@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
       title: body.title,
       slug,
       content: body.content,
+      coverImage: body.coverImage ?? null,
       publishedAt: body.publishedAt ? new Date(body.publishedAt) : null,
     },
   });

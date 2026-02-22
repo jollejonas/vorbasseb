@@ -4,20 +4,14 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { slugify } from "@/lib/utils";
-import type { Product, SKU } from "@prisma/client";
+import type { Product, SKU, Category } from "@prisma/client";
 
-type ProductWithSkus = Product & { skus: SKU[] };
+type ProductWithSkus = Product & { skus: SKU[]; category: Category | null };
 type SkuRow = { id?: string; size: string; stock: number };
 
 const ADULT_SIZES = ["XS", "S", "M", "L", "XL", "XXL"];
 const KIDS_SIZES = ["116", "128", "140", "152", "164"];
 const ALL_SIZES = [...ADULT_SIZES, ...KIDS_SIZES];
-
-const CATEGORY_OPTIONS = [
-  { value: "SPILLERTOJ", label: "Spillertøj" },
-  { value: "BLAEDNING", label: "Beklædning" },
-  { value: "MERCHANDISE", label: "Merchandise" },
-];
 
 export function ProductForm({ product }: { product?: ProductWithSkus }) {
   const router = useRouter();
@@ -26,7 +20,8 @@ export function ProductForm({ product }: { product?: ProductWithSkus }) {
   const [name, setName] = useState(product?.name ?? "");
   const [slug, setSlug] = useState(product?.slug ?? "");
   const [slugManual, setSlugManual] = useState(isEdit);
-  const [category, setCategory] = useState<string>(product?.category ?? "SPILLERTOJ");
+  const [categoryId, setCategoryId] = useState<string>(product?.categoryId ?? "");
+  const [categories, setCategories] = useState<Category[]>([]);
   const [priceKr, setPriceKr] = useState(
     product ? (product.price / 100).toFixed(2) : ""
   );
@@ -48,6 +43,17 @@ export function ProductForm({ product }: { product?: ProductWithSkus }) {
   useEffect(() => {
     if (!slugManual) setSlug(slugify(name));
   }, [name, slugManual]);
+
+  useEffect(() => {
+    fetch("/api/categories")
+      .then((r) => r.json())
+      .then((data: Category[]) => {
+        setCategories(data);
+        if (!categoryId && data.length > 0) setCategoryId(data[0].id);
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const script = document.createElement("script");
@@ -120,7 +126,7 @@ export function ProductForm({ product }: { product?: ProductWithSkus }) {
       const payload = {
         name,
         slug,
-        category,
+        categoryId: categoryId || null,
         price: Math.round(priceVal * 100),
         customizationFee: customizationFeeKr
           ? Math.round(parseFloat(customizationFeeKr) * 100)
@@ -197,16 +203,17 @@ export function ProductForm({ product }: { product?: ProductWithSkus }) {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Kategori <span className="text-red-500">*</span>
+            Kategori
           </label>
           <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
             className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
           >
-            {CATEGORY_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
+            <option value="">Ingen kategori</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
               </option>
             ))}
           </select>
