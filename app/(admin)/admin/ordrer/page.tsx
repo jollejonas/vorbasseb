@@ -3,16 +3,9 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/utils";
-import { OrderStatusSelect } from "@/components/admin/OrderStatusSelect";
-export const metadata: Metadata = { title: "Ordrer – Admin" };
+import { AdminOrderActions } from "@/components/admin/AdminOrderActions";
 
-const STATUS_LABELS: Record<string, string> = {
-  PENDING: "Afventer",
-  PAID: "Betalt",
-  SHIPPED: "Afsendt",
-  DELIVERED: "Leveret",
-  REFUNDED: "Refunderet",
-};
+export const metadata: Metadata = { title: "Ordrer – Admin" };
 
 export default async function AdminOrdrerPage() {
   const session = await auth();
@@ -47,7 +40,7 @@ export default async function AdminOrdrerPage() {
               <th className="pb-3 pr-4 font-medium">Kunde</th>
               <th className="pb-3 pr-4 font-medium">Produkter</th>
               <th className="pb-3 pr-4 font-medium">Total</th>
-              <th className="pb-3 font-medium">Status</th>
+              <th className="pb-3 font-medium">Status / Handling</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -65,8 +58,7 @@ export default async function AdminOrdrerPage() {
                   <ul className="space-y-0.5">
                     {order.items.map((item) => (
                       <li key={item.id} className="text-gray-600">
-                        {item.quantity}× {item.sku.product.name} ({item.sku.size}
-                        )
+                        {item.quantity}× {item.sku.product.name} ({item.sku.size})
                       </li>
                     ))}
                   </ul>
@@ -75,10 +67,12 @@ export default async function AdminOrdrerPage() {
                   {formatPrice(order.total)}
                 </td>
                 <td className="py-4">
-                  <OrderStatusSelect
+                  <AdminOrderActions
                     orderId={order.id}
-                    currentStatus={order.status}
-                    labels={STATUS_LABELS}
+                    initialStatus={order.status}
+                    initialTrackingNumber={order.trackingNumber}
+                    initialRefunded={order.refunded}
+                    deliveryMethod={order.deliveryMethod}
                   />
                 </td>
               </tr>

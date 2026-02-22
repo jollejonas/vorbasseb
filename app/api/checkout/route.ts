@@ -7,11 +7,13 @@ import type { CartItem } from "@/components/shop/CartProvider";
 export async function POST(req: NextRequest) {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
   const session = await auth();
-  const { items }: { items: CartItem[] } = await req.json();
+  const { items, deliveryMethod = "SHIPPING" }: { items: CartItem[]; deliveryMethod?: "SHIPPING" | "PICKUP" } = await req.json();
 
   if (!items || items.length === 0) {
     return NextResponse.json({ error: "Tom kurv" }, { status: 400 });
   }
+
+  const isPickup = deliveryMethod === "PICKUP";
 
   // Read shipping rules and member discount from DB (fall back to defaults)
   const cfg = await prisma.siteSetting
@@ -34,7 +36,8 @@ export async function POST(req: NextRequest) {
     (s, i) => s + (i.price + (i.customizationFee ?? 0)) * i.quantity,
     0,
   );
-  const shipping = subtotal >= freeOre ? 0 : flatOre;
+  // Pickup = always free; shipping = free above threshold
+  const shipping = isPickup ? 0 : subtotal >= freeOre ? 0 : flatOre;
 
   // Build Stripe line items
   const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = items.map(
@@ -99,11 +102,12 @@ export async function POST(req: NextRequest) {
       ),
       shippingFee: String(shipping),
       isMember: String(isMember),
+      deliveryMethod,
     },
     success_url: `${baseUrl}/ordre-bekraeftelse?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${baseUrl}/kurv`,
     billing_address_collection: "required",
-    shipping_address_collection: { allowed_countries: ["DK"] },
+    ...(isPickup ? {} : { shipping_address_collection: { allowed_countries: ["DK"] } }),
     locale: "da",
   });
 

@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
 async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
   if (session.mode !== "payment") return;
 
-  const { userId, cartJson, shippingFee, isMember } = session.metadata ?? {};
+  const { userId, cartJson, shippingFee, isMember, deliveryMethod } = session.metadata ?? {};
   if (!cartJson) return;
 
   type CartMeta = {
@@ -75,6 +75,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
             subtotal - discountApplied + Number(shippingFee ?? 0),
           discountApplied,
           shippingFee: Number(shippingFee ?? 0),
+          deliveryMethod: deliveryMethod === "PICKUP" ? "PICKUP" : "SHIPPING",
           items: {
             create: items.map((i) => ({
               skuId: i.skuId,

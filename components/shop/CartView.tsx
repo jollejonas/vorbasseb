@@ -1,13 +1,17 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Trash2, Package, Truck } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useCart } from "./CartProvider";
 import { formatPrice, calcShipping } from "@/lib/utils";
 
+type DeliveryMethod = "SHIPPING" | "PICKUP";
+
 export function CartView() {
   const { items, removeItem, updateQty, subtotal, clearCart } = useCart();
+  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>("SHIPPING");
 
   if (items.length === 0) {
     return (
@@ -23,7 +27,7 @@ export function CartView() {
     );
   }
 
-  const shipping = calcShipping(subtotal);
+  const shipping = deliveryMethod === "PICKUP" ? 0 : calcShipping(subtotal);
   const total = subtotal + shipping;
 
   return (
@@ -105,6 +109,52 @@ export function CartView() {
         ))}
       </ul>
 
+      {/* Delivery method */}
+      <div className="bg-surface rounded-xl p-5">
+        <p className="text-sm font-semibold text-gray-700 mb-3">Leveringsmetode</p>
+        <div className="space-y-2">
+          <label className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition ${deliveryMethod === "SHIPPING" ? "border-secondary bg-white" : "border-gray-200 bg-white hover:border-gray-300"}`}>
+            <input
+              type="radio"
+              name="delivery"
+              value="SHIPPING"
+              checked={deliveryMethod === "SHIPPING"}
+              onChange={() => setDeliveryMethod("SHIPPING")}
+              className="accent-secondary"
+            />
+            <Truck size={18} className="text-secondary shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium">Levering til din adresse</p>
+              <p className="text-xs text-gray-500">
+                {calcShipping(subtotal) === 0
+                  ? "Gratis fragt (over 499 kr)"
+                  : `${formatPrice(calcShipping(subtotal))} — gratis ved køb over 499 kr`}
+              </p>
+            </div>
+            {calcShipping(subtotal) === 0 && (
+              <span className="text-xs text-green-600 font-semibold">Gratis</span>
+            )}
+          </label>
+
+          <label className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition ${deliveryMethod === "PICKUP" ? "border-secondary bg-white" : "border-gray-200 bg-white hover:border-gray-300"}`}>
+            <input
+              type="radio"
+              name="delivery"
+              value="PICKUP"
+              checked={deliveryMethod === "PICKUP"}
+              onChange={() => setDeliveryMethod("PICKUP")}
+              className="accent-secondary"
+            />
+            <Package size={18} className="text-secondary shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium">Afhentning ved klubben</p>
+              <p className="text-xs text-gray-500">Vorbasse Stadion — vi giver besked når din ordre er klar</p>
+            </div>
+            <span className="text-xs text-green-600 font-semibold">Gratis</span>
+          </label>
+        </div>
+      </div>
+
       {/* Summary */}
       <div className="bg-surface rounded-xl p-5 space-y-3">
         <div className="flex justify-between text-sm">
@@ -117,11 +167,6 @@ export function CartView() {
             {shipping === 0 ? "Gratis" : formatPrice(shipping)}
           </span>
         </div>
-        {shipping > 0 && (
-          <p className="text-xs text-gray-500">
-            Gratis fragt ved køb over {formatPrice(49900)}
-          </p>
-        )}
         <div className="flex justify-between font-bold text-lg border-t pt-3">
           <span>Total</span>
           <span>{formatPrice(total)}</span>
@@ -136,20 +181,20 @@ export function CartView() {
         >
           Ryd kurv
         </button>
-        <CheckoutButton />
+        <CheckoutButton deliveryMethod={deliveryMethod} />
       </div>
     </div>
   );
 }
 
-function CheckoutButton() {
+function CheckoutButton({ deliveryMethod }: { deliveryMethod: DeliveryMethod }) {
   const { items } = useCart();
 
   async function handleCheckout() {
     const res = await fetch("/api/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items }),
+      body: JSON.stringify({ items, deliveryMethod }),
     });
 
     if (!res.ok) {

@@ -133,29 +133,41 @@ model SKU {
 }
 
 model Order {
-  id              String      @id @default(cuid())
+  id              String         @id @default(cuid())
   userId          String?
-  user            User?       @relation(fields: [userId], references: [id])
+  user            User?          @relation(fields: [userId], references: [id])
   guestEmail      String?
-  status          OrderStatus @default(PENDING)
-  stripeSessionId String?     @unique
+  status          OrderStatus    @default(PENDING)
+  deliveryMethod  DeliveryMethod @default(SHIPPING)
+  stripeSessionId String?        @unique
   stripePaymentId String?
   total           Int // øre
-  discountApplied Int         @default(0) // øre
+  discountApplied Int            @default(0) // øre
   shippingFee     Int // øre
+  trackingNumber  String?
+  refunded        Boolean        @default(false)
+  cancelledAt     DateTime?
   items           OrderItem[]
   addressId       String?
-  shippingAddress Address?    @relation(fields: [addressId], references: [id])
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  shippingAddress Address?       @relation(fields: [addressId], references: [id])
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 }
 
 enum OrderStatus {
   PENDING
   PAID
   SHIPPED
+  AWAITING_PICKUP
+  PICKUP_READY
   DELIVERED
+  CANCELLED
   REFUNDED
+}
+
+enum DeliveryMethod {
+  SHIPPING
+  PICKUP
 }
 
 model OrderItem {
