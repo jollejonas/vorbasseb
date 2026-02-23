@@ -264,3 +264,36 @@ model NewsletterSubscriber {
   email     String   @id
   createdAt DateTime @default(now())
 }
+
+// ─── Sports ticker ─────────────────────────────────────────────────────────
+
+model FootballTeam {
+  id           String      @id @default(cuid())
+  name         String      @unique
+  logo         String?     // URL (e.g. from DBU website)
+  defaultVenue String?
+  homeMatches  ClubMatch[] @relation("HomeTeam")
+  awayMatches  ClubMatch[] @relation("AwayTeam")
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+model ClubMatch {
+  id         String        @id @default(cuid())
+  clubTeam   String        // "Herrer" | "Damer" | "Herrer2"
+  isUpcoming Boolean       // true = next game, false = latest result
+  league     String        @default("")
+  matchDate  DateTime?
+  homeTeamId String?
+  homeTeam   FootballTeam? @relation("HomeTeam", fields: [homeTeamId], references: [id], onDelete: SetNull)
+  homeScore  Int?          // null for upcoming
+  awayTeamId String?
+  awayTeam   FootballTeam? @relation("AwayTeam", fields: [awayTeamId], references: [id], onDelete: SetNull)
+  awayScore  Int?          // null for upcoming
+  venue      String        @default("")
+  enabled    Boolean       @default(true)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@unique([clubTeam, isUpcoming])
+}

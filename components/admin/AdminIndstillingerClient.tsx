@@ -24,12 +24,6 @@ const SETTING_LABELS: Record<string, string> = {
   shipping_free_ore: "Gratis fragt fra (øre)",
   member_discount_pct: "Fanklubsrabat (%)",
   delivery_banner: "Leveringsbanner tekst (tom = skjult)",
-  ticker_herrer_result: "Ticker – Herrer: seneste resultat",
-  ticker_herrer_next: "Ticker – Herrer: næste kamp",
-  ticker_damer_result: "Ticker – Damer: seneste resultat",
-  ticker_damer_next: "Ticker – Damer: næste kamp",
-  ticker_herrer2_result: "Ticker – Herrer 2: seneste resultat",
-  ticker_herrer2_next: "Ticker – Herrer 2: næste kamp",
 };
 
 const SETTING_KEYS = Object.keys(SETTING_LABELS);

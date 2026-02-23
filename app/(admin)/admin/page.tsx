@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/utils";
 import Link from "next/link";
-import { Package, ShoppingBag, Users, Newspaper, Settings, Mail, Tag } from "lucide-react";
+import { Package, ShoppingBag, Users, Newspaper, Settings, Mail, Tag, Trophy } from "lucide-react";
 
 export const metadata: Metadata = { title: "Admin" };
 
@@ -92,6 +92,7 @@ export default async function AdminPage() {
           { href: "/admin/nyhedsbrev", label: "Nyhedsbrev", icon: Mail },
           { href: "/admin/brugere", label: "Brugere", icon: Users },
           { href: "/admin/rabatkoder", label: "Rabatkoder", icon: Tag },
+          { href: "/admin/kampe", label: "Kampe", icon: Trophy },
           { href: "/admin/indstillinger", label: "Indstillinger", icon: Settings },
         ].map((l) => (
           <Link
