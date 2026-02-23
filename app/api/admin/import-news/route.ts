@@ -74,11 +74,14 @@ export async function GET(req: NextRequest) {
       }
       seen.add(slug);
 
-      // Try to get date from surrounding text
+      // Try to get date from surrounding text.
+      // Listing page uses "DD-MM-YYYY HH:MM:SS" format inside .theme_newsFolder_textWrap
       const card = $(el).closest('[class*="newsListItem"], article, .news-item, li').first();
       const cardText = (card.length ? card : $(el).parent()).text();
-      const dateMatch = cardText.match(/\d{1,2}\.\s+\w+\s+\d{4}/);
-      const date = dateMatch ? dateMatch[0] : "";
+      const rawDate = cardText.match(/(\d{2})-(\d{2})-(\d{4})/);
+      const date = rawDate
+        ? `${rawDate[1]}.${rawDate[2]}.${rawDate[3]}`
+        : (cardText.match(/\d{1,2}\.\s+\w+\s+\d{4}/) ?? [""])[0];
 
       articles.push({ title: text || slug, url: BASE_URL + href, date, slug });
       found++;
@@ -138,11 +141,16 @@ export async function POST(req: NextRequest) {
         .replace(/\?$/, "")
     : null;
 
+  // Extract title before removing chrome — the h1 lives inside .theme_newsItem_headerWrap
+  // which would be wiped by [class*='header'] below
+  const title =
+    $(".theme_newsItem_headerWrap h1").first().text().trim() ||
+    $("h1").first().text().trim() ||
+    $("h2").first().text().trim() ||
+    slug;
+
   // Remove navigation, header, footer, scripts, styles
   $("nav, header, footer, script, style, noscript, [class*='nav'], [class*='menu'], [class*='footer'], [class*='header'], [class*='breadcrumb'], [class*='social'], [class*='share']").remove();
-
-  // Extract title: first h1 or h2
-  const title = $("h1").first().text().trim() || $("h2").first().text().trim() || slug;
 
   // Extract date: find a paragraph matching the Danish date pattern
   let publishedAt: Date | null = null;
