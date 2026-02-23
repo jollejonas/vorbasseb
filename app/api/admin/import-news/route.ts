@@ -52,15 +52,27 @@ export async function GET(req: NextRequest) {
     const $ = cheerio.load(html);
     let found = 0;
 
-    // Find all links that match the article URL pattern for this year
+    // Find all links that match the article URL pattern for this year.
+    // Each article appears twice: once as an image link (empty text) and once
+    // as a title link — so we allow revisiting a slug to pick up the title.
     $(`a[href*="/nyheder/klub-nyheder/nyheder-${year}/"]`).each((_, el) => {
       const href = $(el).attr("href") ?? "";
       const slug = urlToSlug(href);
-      if (!slug || seen.has(slug)) return;
-      seen.add(slug);
 
-      // Try to get title from the link text or its children
-      const title = $(el).text().trim().replace(/\s+/g, " ") || slug;
+      // Skip year-overview pages (e.g. slug === "nyheder-2026")
+      if (!slug || /^nyheder-\d{4}$/.test(slug)) return;
+
+      const text = $(el).text().trim().replace(/\s+/g, " ");
+
+      if (seen.has(slug)) {
+        // Update title if this occurrence has the actual text
+        if (text) {
+          const existing = articles.find((a) => a.slug === slug);
+          if (existing) existing.title = text;
+        }
+        return;
+      }
+      seen.add(slug);
 
       // Try to get date from surrounding text
       const card = $(el).closest('[class*="newsListItem"], article, .news-item, li').first();
@@ -68,7 +80,7 @@ export async function GET(req: NextRequest) {
       const dateMatch = cardText.match(/\d{1,2}\.\s+\w+\s+\d{4}/);
       const date = dateMatch ? dateMatch[0] : "";
 
-      articles.push({ title, url: BASE_URL + href, date, slug });
+      articles.push({ title: text || slug, url: BASE_URL + href, date, slug });
       found++;
     });
 
