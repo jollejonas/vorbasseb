@@ -67,7 +67,7 @@ export function HeroCarousel({ slides }: Props) {
           {slides.map((slide) => (
             <div
               key={slide.id}
-              className="relative flex-[0_0_100%] min-w-0 min-h-[480px] md:min-h-[560px]"
+              className="relative flex-[0_0_100%] min-w-0 aspect-[5/2] min-h-[200px]"
             >
               {/* Background image */}
               {slide.imageUrl && (
@@ -75,41 +75,45 @@ export function HeroCarousel({ slides }: Props) {
                   src={slide.imageUrl}
                   alt={slide.heading}
                   fill
-                  className="object-cover object-center"
+                  className="object-cover object-top"
                   sizes="100vw"
                   priority
                 />
               )}
-              {/* Dark overlay — uses inline style so opacity is dynamic */}
+              {/* Bottom-up gradient */}
               <div
-                className="absolute inset-0 bg-secondary"
-                style={{ opacity: slide.overlayOpacity / 100 }}
+                className="absolute inset-0"
+                style={{
+                  background: `linear-gradient(to top, rgba(0,0,0,${Math.max(slide.overlayOpacity / 100, 0.88)}) 0%, rgba(0,0,0,0.65) 25%, rgba(0,0,0,0.2) 55%, transparent 100%)`,
+                }}
               />
 
-              {/* Content */}
-              <div className="relative max-w-6xl mx-auto px-4 py-20 md:py-32 h-full flex items-center">
-                <div className="flex flex-col items-start gap-3 max-w-xl">
-                  <h2 className="text-4xl md:text-6xl font-black uppercase leading-none tracking-tight">
-                    {slide.heading}
-                  </h2>
-                  {slide.subheading && (
-                    <p className="text-xl md:text-2xl font-light italic text-primary">
-                      {slide.subheading}
-                    </p>
-                  )}
-                  {slide.body && (
-                    <p className="text-white/70 text-sm md:text-base mt-1 max-w-sm leading-relaxed line-clamp-3">
-                      {slide.body}
-                    </p>
-                  )}
-                  {slide.ctaLabel && slide.ctaHref && (
-                    <Link
-                      href={slide.ctaHref}
-                      className="mt-3 flex items-center gap-2 bg-primary text-secondary font-black px-7 py-3 rounded-xl hover:bg-primary-dark transition text-sm tracking-wide"
-                    >
-                      {slide.ctaLabel} <ArrowRight size={16} />
-                    </Link>
-                  )}
+              {/* Content — pinned to bottom */}
+              <div className="absolute bottom-0 left-0 right-0">
+                <div className="max-w-6xl mx-auto px-6 pb-8 md:pb-10">
+                  <div className="max-w-lg flex flex-col items-start gap-2">
+                    {slide.subheading && (
+                      <p className="text-primary text-xs font-bold uppercase tracking-widest">
+                        {slide.subheading}
+                      </p>
+                    )}
+                    <h2 className="text-2xl md:text-4xl font-black uppercase leading-tight tracking-tight drop-shadow-lg line-clamp-2">
+                      {slide.heading}
+                    </h2>
+                    {slide.body && (
+                      <p className="text-white/80 text-sm leading-relaxed line-clamp-1 drop-shadow">
+                        {slide.body}
+                      </p>
+                    )}
+                    {slide.ctaLabel && slide.ctaHref && (
+                      <Link
+                        href={slide.ctaHref}
+                        className="mt-1 inline-flex items-center gap-2 bg-primary text-secondary font-black px-6 py-2.5 rounded-xl hover:bg-primary-dark transition text-sm tracking-wide"
+                      >
+                        {slide.ctaLabel} <ArrowRight size={16} />
+                      </Link>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

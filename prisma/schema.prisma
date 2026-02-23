@@ -246,6 +246,7 @@ model HeroSlide {
   ctaLabel       String?
   ctaHref        String?
   overlayOpacity Int       @default(40) // 0–100
+  newsCount      Int       @default(1)  // LATEST_NEWS: how many news posts to show as separate slides (1–5)
 
   // Optional pin overrides for LATEST_NEWS / LATEST_PRODUCT
   overrideNewsId    String?

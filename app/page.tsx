@@ -10,7 +10,7 @@ import { Star, ArrowRight } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const [heroSlides, latestNews, latestProduct, featuredProducts, newsSection] =
+  const [heroSlides, latestNewsList, latestProduct, featuredProducts, newsSection] =
     await Promise.all([
       prisma.heroSlide
         .findMany({
@@ -23,11 +23,12 @@ export default async function HomePage() {
         })
         .catch(() => []),
       prisma.newsPost
-        .findFirst({
+        .findMany({
           where: { publishedAt: { lte: new Date() } },
           orderBy: { publishedAt: "desc" },
+          take: 5,
         })
-        .catch(() => null),
+        .catch(() => []),
       prisma.product
         .findFirst({
           where: { published: true },
@@ -52,7 +53,7 @@ export default async function HomePage() {
         .catch(() => []),
     ]);
 
-  const resolvedSlides = resolveSlides(heroSlides, latestNews, latestProduct);
+  const resolvedSlides = resolveSlides(heroSlides, latestNewsList, latestProduct);
 
   return (
     <>

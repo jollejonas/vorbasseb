@@ -27,6 +27,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       ctaLabel: body.ctaLabel ?? null,
       ctaHref: body.ctaHref ?? null,
       overlayOpacity: body.overlayOpacity ?? 40,
+      newsCount: body.newsCount ?? 1,
       overrideNewsId: body.overrideNewsId || null,
       overrideProductId: body.overrideProductId || null,
     },

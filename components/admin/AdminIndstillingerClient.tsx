@@ -386,23 +386,44 @@ export function AdminIndstillingerClient({ settings, slides: initialSlides, allN
                       </>
                     )}
 
-                    {/* LATEST_NEWS pin */}
+                    {/* LATEST_NEWS controls */}
                     {slideForm.type === "LATEST_NEWS" && (
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Fastlås til specifik nyhed (valgfrit)
-                        </label>
-                        <select
-                          value={slideForm.overrideNewsId ?? ""}
-                          onChange={(e) => setSlideForm((f) => ({ ...f, overrideNewsId: e.target.value || null }))}
-                          className="w-full border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
-                        >
-                          <option value="">— Brug seneste (automatisk) —</option>
-                          {allNews.map((n) => (
-                            <option key={n.id} value={n.id}>{n.title}</option>
-                          ))}
-                        </select>
-                      </div>
+                      <>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Antal nyheder der vises (1–5)
+                          </label>
+                          <select
+                            value={slideForm.newsCount ?? 1}
+                            onChange={(e) => setSlideForm((f) => ({ ...f, newsCount: parseInt(e.target.value) }))}
+                            className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
+                          >
+                            {[1, 2, 3, 4, 5].map((n) => (
+                              <option key={n} value={n}>{n}</option>
+                            ))}
+                          </select>
+                          <p className="text-xs text-gray-400 mt-1">
+                            Genererer automatisk dette antal slides fra de seneste nyheder.
+                          </p>
+                        </div>
+                        {(slideForm.newsCount ?? 1) === 1 && (
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                              Fastlås til specifik nyhed (valgfrit)
+                            </label>
+                            <select
+                              value={slideForm.overrideNewsId ?? ""}
+                              onChange={(e) => setSlideForm((f) => ({ ...f, overrideNewsId: e.target.value || null }))}
+                              className="w-full border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
+                            >
+                              <option value="">— Brug seneste (automatisk) —</option>
+                              {allNews.map((n) => (
+                                <option key={n.id} value={n.id}>{n.title}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                      </>
                     )}
 
                     {/* LATEST_PRODUCT pin */}

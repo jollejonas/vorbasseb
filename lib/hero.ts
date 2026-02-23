@@ -6,6 +6,10 @@ export type HeroSlideWithRelations = HeroSlide & {
   overrideProduct: (Product & { skus: SKU[] }) | null;
 };
 
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
 export type ResolvedSlide = {
   id: string;
   heading: string;
@@ -25,7 +29,7 @@ const da = new Intl.DateTimeFormat("da-DK", {
 
 export function resolveSlides(
   slides: HeroSlideWithRelations[],
-  latestNews: NewsPost | null,
+  latestNewsList: NewsPost[],
   latestProduct: (Product & { skus: SKU[] }) | null
 ): ResolvedSlide[] {
   const result: ResolvedSlide[] = [];
@@ -48,18 +52,23 @@ export function resolveSlides(
     }
 
     if (slide.type === "LATEST_NEWS") {
-      const post = slide.overrideNews ?? latestNews;
-      if (!post) continue;
-      result.push({
-        id: slide.id,
-        heading: post.title,
-        subheading: post.publishedAt ? da.format(new Date(post.publishedAt)) : null,
-        body: post.content.slice(0, 200),
-        imageUrl: null,
-        ctaLabel: "Læs mere",
-        ctaHref: `/nyheder/${post.slug}`,
-        overlayOpacity: slide.overlayOpacity,
-      });
+      const count = Math.min(Math.max((slide.newsCount ?? 1), 1), 5);
+      const posts =
+        count === 1 && slide.overrideNews
+          ? [slide.overrideNews]
+          : latestNewsList.slice(0, count);
+      for (const post of posts) {
+        result.push({
+          id: `${slide.id}-${post.id}`,
+          heading: post.title,
+          subheading: post.publishedAt ? da.format(new Date(post.publishedAt)) : null,
+          body: stripHtml(post.content).slice(0, 200),
+          imageUrl: post.coverImage ?? null,
+          ctaLabel: "Læs mere",
+          ctaHref: `/nyheder/${post.slug}`,
+          overlayOpacity: slide.overlayOpacity,
+        });
+      }
       continue;
     }
 
