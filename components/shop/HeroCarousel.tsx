@@ -83,21 +83,21 @@ export function HeroCarousel({ slides }: Props) {
                 </div>
               )}
 
-              {/* Desktop: image in right 60%, mask fades it into the dark bg on both sides */}
+              {/* Desktop: image in right 40%, mask fades left edge into dark bg */}
               {slide.imageUrl && (
                 <div
-                  className="absolute top-0 right-0 h-full w-[60%] hidden md:block"
+                  className="absolute top-0 right-0 h-full w-[40%] hidden md:block"
                   style={{
-                    WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 22%, black 78%, transparent 100%)",
-                    maskImage: "linear-gradient(to right, transparent 0%, black 22%, black 78%, transparent 100%)",
+                    WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 25%, black 80%, transparent 100%)",
+                    maskImage: "linear-gradient(to right, transparent 0%, black 25%, black 80%, transparent 100%)",
                   }}
                 >
                   <Image
                     src={slide.imageUrl}
                     alt={slide.heading}
                     fill
-                    className="object-contain object-right object-top"
-                    sizes="60vw"
+                    className="object-cover object-center"
+                    sizes="40vw"
                     priority
                   />
                 </div>
