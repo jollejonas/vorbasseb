@@ -28,7 +28,7 @@ export default async function NyhedsartikelPage({ params }: Props) {
     : "";
 
   return (
-    <article className="max-w-2xl mx-auto px-4 py-10">
+    <article className="max-w-4xl mx-auto px-4 py-10">
       <nav className="text-sm text-gray-500 mb-6">
         <a href="/nyheder" className="hover:text-secondary">
           Nyheder
