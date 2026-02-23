@@ -143,34 +143,20 @@ export async function POST(req: NextRequest) {
     }
   });
 
-  // Extract body: all meaningful content elements, skip anything before the date
-  let pastMeta = false;
-  const bodyParts: string[] = [];
+  // Extract body: target the Umbraco article content area directly.
+  // Structure: .theme_newsItem > [headerWrap, imageWrap, content-div]
+  // Removing the header and image wraps leaves only the article text.
+  const articleRoot = $(".theme_newsItem").clone();
+  articleRoot.find(".theme_newsItem_headerWrap, .theme_newsItem_imageWrap").remove();
 
-  $("p, h2, h3, h4, h5, ul, ol, blockquote").each((_, el) => {
+  const bodyParts: string[] = [];
+  articleRoot.find("p, h2, h3, h4, h5, ul, ol, blockquote").each((_, el) => {
     const text = $(el).text().trim();
     if (!text) return;
-
-    // Once we've passed the date/author area, start collecting
-    if (!pastMeta) {
-      if (dateParagraphText && text.includes(dateParagraphText.slice(0, 15))) {
-        pastMeta = true;
-        return; // skip the date paragraph itself
-      }
-      // If no date found yet, skip short lines (author, category) and start after 50 chars
-      if (!dateParagraphText && text.length > 50) {
-        pastMeta = true;
-      } else {
-        return;
-      }
-    }
-
-    // Skip lines that look like navigation or share buttons (many short links)
+    // Skip nav-like elements (many links) and stub lines
     if ($(el).find("a").length > 4) return;
-    // Skip very short orphaned lines that are probably UI artifacts
     const tagName = (el as { tagName?: string }).tagName?.toLowerCase() ?? "";
     if (tagName === "p" && text.length < 4) return;
-
     bodyParts.push($.html(el) ?? "");
   });
 

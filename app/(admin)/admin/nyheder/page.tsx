@@ -12,7 +12,7 @@ export default async function AdminNyhederPage() {
   if (session?.user?.role !== "ADMIN") redirect("/");
 
   const posts = await prisma.newsPost.findMany({
-    orderBy: { createdAt: "desc" },
+    orderBy: { publishedAt: "desc" },
   });
 
   return (
