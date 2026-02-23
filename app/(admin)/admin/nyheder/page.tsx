@@ -24,12 +24,20 @@ export default async function AdminNyhederPage() {
           </a>
           <h1 className="text-3xl font-bold">Nyheder</h1>
         </div>
-        <a
-          href="/admin/nyheder/ny"
-          className="bg-primary text-secondary font-bold px-5 py-2 rounded-xl hover:bg-primary-dark transition text-sm"
-        >
-          + Ny nyhed
-        </a>
+        <div className="flex gap-2">
+          <a
+            href="/admin/nyheder/import"
+            className="border border-secondary text-secondary font-semibold px-4 py-2 rounded-xl hover:bg-secondary/5 transition text-sm"
+          >
+            Importer fra VBK
+          </a>
+          <a
+            href="/admin/nyheder/ny"
+            className="bg-primary text-secondary font-bold px-5 py-2 rounded-xl hover:bg-primary-dark transition text-sm"
+          >
+            + Ny nyhed
+          </a>
+        </div>
       </div>
       <AdminNewsClient posts={posts} />
     </div>
