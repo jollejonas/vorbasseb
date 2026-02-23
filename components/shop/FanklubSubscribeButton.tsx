@@ -26,7 +26,8 @@ export function FanklubSubscribeButton({
     });
 
     if (!res.ok) {
-      alert("Noget gik galt. Prøv igen.");
+      const body = await res.json().catch(() => ({}));
+      alert(`Fejl: ${body.error ?? "Ukendt fejl"}`);
       setLoading(false);
       return;
     }
