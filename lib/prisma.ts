@@ -10,6 +10,7 @@ function createPrismaClient() {
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false },
+    max: 1, // 1 connection per serverless instance avoids exhausting Supabase's limit
   });
   const adapter = new PrismaPg(pool);
   return new PrismaClient({ adapter });
@@ -17,4 +18,5 @@ function createPrismaClient() {
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+// Keep the singleton across hot-reloads in dev AND across invocations in the same serverless instance
+globalForPrisma.prisma = prisma;
