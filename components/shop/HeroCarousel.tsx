@@ -67,41 +67,56 @@ export function HeroCarousel({ slides }: Props) {
           {slides.map((slide) => (
             <div
               key={slide.id}
-              className="relative flex-[0_0_100%] min-w-0 aspect-[5/2] min-h-[200px]"
+              className="relative flex-[0_0_100%] min-w-0 bg-[#0a0f1e] text-white flex flex-col md:block md:h-[420px]"
             >
-              {/* Background image */}
+              {/* Mobile: image strip at top */}
               {slide.imageUrl && (
-                <Image
-                  src={slide.imageUrl}
-                  alt={slide.heading}
-                  fill
-                  className="object-cover object-top"
-                  sizes="100vw"
-                  priority
-                />
+                <div className="relative h-[170px] shrink-0 md:hidden">
+                  <Image
+                    src={slide.imageUrl}
+                    alt={slide.heading}
+                    fill
+                    className="object-cover object-center"
+                    sizes="100vw"
+                    priority
+                  />
+                </div>
               )}
-              {/* Bottom-up gradient */}
-              <div
-                className="absolute inset-0"
-                style={{
-                  background: `linear-gradient(to top, rgba(0,0,0,${Math.max(slide.overlayOpacity / 100, 0.88)}) 0%, rgba(0,0,0,0.65) 25%, rgba(0,0,0,0.2) 55%, transparent 100%)`,
-                }}
-              />
 
-              {/* Content — pinned to bottom */}
-              <div className="absolute bottom-0 left-0 right-0">
-                <div className="max-w-6xl mx-auto px-6 pb-8 md:pb-10">
-                  <div className="max-w-lg flex flex-col items-start gap-2">
+              {/* Desktop: image in right 60%, mask fades it into the dark bg on both sides */}
+              {slide.imageUrl && (
+                <div
+                  className="absolute top-0 right-0 h-full w-[60%] hidden md:block"
+                  style={{
+                    WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 22%, black 78%, transparent 100%)",
+                    maskImage: "linear-gradient(to right, transparent 0%, black 22%, black 78%, transparent 100%)",
+                  }}
+                >
+                  <Image
+                    src={slide.imageUrl}
+                    alt={slide.heading}
+                    fill
+                    className="object-contain object-right object-top"
+                    sizes="60vw"
+                    priority
+                  />
+                </div>
+              )}
+
+              {/* Content: flex-1 on mobile, vertically centered on desktop */}
+              <div className="flex-1 md:absolute md:inset-0 md:flex md:items-center relative px-5 py-6 md:py-0 md:px-0">
+                <div className="md:max-w-6xl md:mx-auto md:w-full md:px-8">
+                  <div className="max-w-sm flex flex-col items-start gap-2">
                     {slide.subheading && (
                       <p className="text-primary text-xs font-bold uppercase tracking-widest">
                         {slide.subheading}
                       </p>
                     )}
-                    <h2 className="text-2xl md:text-4xl font-black uppercase leading-tight tracking-tight drop-shadow-lg line-clamp-2">
+                    <h2 className="text-2xl md:text-4xl font-black uppercase leading-tight tracking-tight line-clamp-2">
                       {slide.heading}
                     </h2>
                     {slide.body && (
-                      <p className="text-white/80 text-sm leading-relaxed line-clamp-1 drop-shadow">
+                      <p className="text-white/80 text-sm leading-relaxed line-clamp-2">
                         {slide.body}
                       </p>
                     )}
@@ -126,21 +141,21 @@ export function HeroCarousel({ slides }: Props) {
         <>
           <button
             onClick={() => emblaApi?.scrollPrev()}
-            className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white rounded-full p-2 transition z-10"
+            className="hidden md:block absolute left-3 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white rounded-full p-2 transition z-10"
             aria-label="Forrige slide"
           >
             <ChevronLeft size={22} />
           </button>
           <button
             onClick={() => emblaApi?.scrollNext()}
-            className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white rounded-full p-2 transition z-10"
+            className="hidden md:block absolute right-3 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white rounded-full p-2 transition z-10"
             aria-label="Næste slide"
           >
             <ChevronRight size={22} />
           </button>
 
           {/* Dot indicators */}
-          <div className="absolute bottom-5 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+          <div className="hidden md:flex absolute bottom-5 left-1/2 -translate-x-1/2 gap-2 z-10">
             {slides.map((_, i) => (
               <button
                 key={i}
