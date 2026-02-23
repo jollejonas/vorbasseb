@@ -19,20 +19,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  switch (event.type) {
-    case "checkout.session.completed":
-      await handleCheckoutComplete(event.data.object as Stripe.Checkout.Session);
-      break;
-    case "customer.subscription.created":
-    case "customer.subscription.updated":
-      await handleSubscriptionUpdate(event.data.object as Stripe.Subscription);
-      break;
-    case "customer.subscription.deleted":
-      await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
-      break;
-    case "invoice.payment_failed":
-      await handlePaymentFailed(event.data.object as Stripe.Invoice);
-      break;
+  try {
+    switch (event.type) {
+      case "checkout.session.completed":
+        await handleCheckoutComplete(event.data.object as Stripe.Checkout.Session);
+        break;
+      case "customer.subscription.created":
+      case "customer.subscription.updated":
+        await handleSubscriptionUpdate(event.data.object as Stripe.Subscription);
+        break;
+      case "customer.subscription.deleted":
+        await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
+        break;
+      case "invoice.payment_failed":
+        await handlePaymentFailed(event.data.object as Stripe.Invoice);
+        break;
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[stripe webhook] handler error:", message);
+    // Return 200 so Stripe stops retrying; check Vercel logs for the actual error
+    return NextResponse.json({ received: true, handlerError: message });
   }
 
   return NextResponse.json({ received: true });
@@ -43,6 +50,12 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
 
   const { userId, cartJson, shippingFee, isMember, deliveryMethod } = session.metadata ?? {};
   if (!cartJson) return;
+
+  // Idempotency: skip if order already exists for this session
+  const existing = await prisma.order.findUnique({
+    where: { stripeSessionId: session.id },
+  });
+  if (existing) return;
 
   type CartMeta = {
     skuId: string;
