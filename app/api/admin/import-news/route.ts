@@ -113,9 +113,11 @@ export async function POST(req: NextRequest) {
 
   const slug = urlToSlug(articleUrl);
 
-  // Idempotency: skip if already imported
   const existing = await prisma.newsPost.findUnique({ where: { slug } });
-  if (existing) return NextResponse.json({ ok: true, id: existing.id, skipped: true });
+  // If already imported AND title looks correct (has spaces, not just the slug), skip
+  if (existing && existing.title !== slug && existing.title.includes(" ")) {
+    return NextResponse.json({ ok: true, id: existing.id, skipped: true });
+  }
 
   let html: string;
   try {
@@ -182,16 +184,18 @@ export async function POST(req: NextRequest) {
 
   const content = bodyParts.join("\n");
 
-  const post = await prisma.newsPost.create({
-    data: {
-      title,
-      slug,
-      content,
-      coverImage,
-      publishedAt: publishedAt ?? new Date(),
-      membersOnly: false,
-    },
-  });
+  const payload = {
+    title,
+    slug,
+    content,
+    coverImage,
+    publishedAt: publishedAt ?? existing?.publishedAt ?? new Date(),
+    membersOnly: false,
+  };
+
+  const post = existing
+    ? await prisma.newsPost.update({ where: { slug }, data: payload })
+    : await prisma.newsPost.create({ data: payload });
 
   return NextResponse.json({ ok: true, id: post.id });
 }
