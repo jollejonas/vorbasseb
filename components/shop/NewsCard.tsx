@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { NewsPost } from "@prisma/client";
 
 export function NewsCard({ post, horizontal = false }: { post: NewsPost; horizontal?: boolean }) {
@@ -19,11 +20,13 @@ export function NewsCard({ post, horizontal = false }: { post: NewsPost; horizon
         className="flex gap-0 bg-gray-50 rounded-xl overflow-hidden hover:shadow-md transition-shadow group border border-gray-200"
       >
         {post.coverImage && (
-          <div className="w-48 sm:w-64 shrink-0 overflow-hidden">
-            <img
+          <div className="relative w-48 sm:w-64 shrink-0 overflow-hidden">
+            <Image
               src={post.coverImage}
               alt={post.title}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              fill
+              className="object-cover group-hover:scale-105 transition-transform duration-300"
+              sizes="(max-width: 640px) 192px, 256px"
             />
           </div>
         )}
@@ -44,11 +47,13 @@ export function NewsCard({ post, horizontal = false }: { post: NewsPost; horizon
       className="flex flex-col bg-gray-50 rounded-xl overflow-hidden hover:shadow-md transition-shadow group border border-gray-200"
     >
       {post.coverImage && (
-        <div className="aspect-[16/8] w-full overflow-hidden">
-          <img
+        <div className="relative aspect-[16/8] w-full overflow-hidden">
+          <Image
             src={post.coverImage}
             alt={post.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            fill
+            className="object-cover group-hover:scale-105 transition-transform duration-300"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           />
         </div>
       )}

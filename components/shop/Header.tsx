@@ -25,7 +25,7 @@ export function Header() {
   const isMember = session?.user?.subscriptionStatus === "ACTIVE";
 
   return (
-    <header className="sticky top-0 z-50 bg-secondary text-white shadow-md">
+    <header className="sticky top-0 z-50 bg-[#0a0f1e] text-white shadow-md">
       <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-16">
         {/* Brand */}
         <Link href="/" className="flex items-center gap-3 shrink-0">
@@ -126,7 +126,7 @@ export function Header() {
 
       {/* Mobile menu */}
       {menuOpen && (
-        <div className="md:hidden bg-secondary-dark border-t border-white/10 px-4 py-4 flex flex-col gap-4 text-sm font-bold tracking-wider">
+        <div className="md:hidden bg-[#060b15] border-t border-white/10 px-4 py-4 flex flex-col gap-4 text-sm font-bold tracking-wider">
           {navLinks.map((l) => (
             <Link
               key={l.href}

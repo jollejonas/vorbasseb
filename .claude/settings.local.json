@@ -6,7 +6,21 @@
       "Bash(npx tsc:*)",
       "Bash(powershell.exe -Command \"Set-Location ''C:\\\\Dev\\\\vorbasseb''; npx prisma migrate dev --name init 2>&1\")",
       "Bash(powershell.exe -Command \"Test-NetConnection -ComputerName db.dsqxqgxbedlaortvjify.supabase.co -Port 5432 2>&1\")",
-      "Bash(powershell.exe -Command \"Resolve-DnsName db.dsqxqgxbedlaortvjify.supabase.co -Type A 2>&1\")"
+      "Bash(powershell.exe -Command \"Resolve-DnsName db.dsqxqgxbedlaortvjify.supabase.co -Type A 2>&1\")",
+      "Bash(powershell.exe -Command \"Set-Location ''C:\\\\Dev\\\\vorbasseb''; npx tsc --noEmit 2>&1\")",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)",
+      "Bash(npx prisma migrate dev:*)",
+      "Bash(npx prisma db push:*)",
+      "Bash(npx prisma generate:*)",
+      "Bash(npm run seed:*)",
+      "Bash(npx dotenv:*)",
+      "Bash(node:*)",
+      "WebFetch(domain:live-911-vorbasse-b-af-1912.umbraco-proxy.com)",
+      "WebFetch(domain:www.aabshoppen.dk)",
+      "WebFetch(domain:shop.wolves.co.uk)",
+      "WebFetch(domain:www.watfordfc.com)"
     ]
   }
 }

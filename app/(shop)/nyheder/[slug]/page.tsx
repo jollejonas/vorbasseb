@@ -1,6 +1,9 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
 import { prisma } from "@/lib/prisma";
+import { ShareButtons } from "@/components/shop/ShareButtons";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -39,18 +42,33 @@ export default async function NyhedsartikelPage({ params }: Props) {
       <h1 className="text-3xl font-bold mb-6">{post.title}</h1>
 
       {post.coverImage && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={post.coverImage}
-          alt={post.title}
-          className="w-full rounded-2xl mb-8"
-        />
+        <div className="relative w-full aspect-[16/9] rounded-2xl overflow-hidden mb-8">
+          <Image
+            src={post.coverImage}
+            alt={post.title}
+            fill
+            className="object-cover"
+            sizes="(max-width: 1024px) 100vw, 896px"
+            priority
+          />
+        </div>
       )}
 
       <div
         className="news-content"
         dangerouslySetInnerHTML={{ __html: post.content }}
       />
+
+      <ShareButtons slug={post.slug} title={post.title} />
+
+      <div className="mt-6">
+        <Link
+          href="/nyheder"
+          className="inline-flex items-center gap-2 text-sm text-secondary font-semibold hover:text-secondary-dark transition"
+        >
+          ← Alle nyheder
+        </Link>
+      </div>
     </article>
   );
 }

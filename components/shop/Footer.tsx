@@ -1,6 +1,18 @@
 import Image from "next/image";
 import Link from "next/link";
+import { Facebook } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { NewsletterForm } from "./NewsletterForm";
+
+function InstagramIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17.5" cy="6.5" r="0.5" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
 
 export async function Footer() {
   const rows = await prisma.siteSetting
@@ -14,7 +26,7 @@ export async function Footer() {
     <footer className="bg-secondary text-white mt-16">
       {/* Main footer */}
       <div className="max-w-6xl mx-auto px-4 py-10 grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
-        {/* Left — contact */}
+        {/* Left — contact + newsletter */}
         <div className="text-sm space-y-1">
           <p className="font-bold text-base mb-3">VBK Shoppen</p>
           <p className="text-white/70">Telefon: {phone}</p>
@@ -30,6 +42,7 @@ export async function Footer() {
               Privatlivs- og persondatapolitik
             </Link>
           </div>
+          <NewsletterForm />
         </div>
 
         {/* Centre — brand */}
@@ -41,15 +54,42 @@ export async function Footer() {
           <p className="text-xs text-white/50 mt-1">Officiel merchandise-butik</p>
         </div>
 
-        {/* Right — logo */}
-        <div className="flex justify-center md:justify-end">
+        {/* Right — logo + social */}
+        <div className="flex flex-col items-center md:items-end gap-4">
           <Image
             src="/logo.png"
             alt="Vorbasse Boldklub"
             width={90}
             height={90}
           />
+          <div className="flex items-center gap-3">
+            <a
+              href="https://www.facebook.com/vorbasseboldklub"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-white/60 hover:text-primary transition-colors"
+              aria-label="Facebook"
+            >
+              <Facebook size={20} />
+            </a>
+            <a
+              href="https://www.instagram.com/vorbasseboldklub/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-white/60 hover:text-primary transition-colors"
+              aria-label="Instagram"
+            >
+              <InstagramIcon size={20} />
+            </a>
+          </div>
         </div>
+      </div>
+
+      {/* Payment logos */}
+      <div className="border-t border-white/10">
+        <p className="text-center text-white/40 text-xs tracking-wide py-2">
+          MobilePay · Visa · Mastercard
+        </p>
       </div>
 
       {/* Yellow bottom strip */}

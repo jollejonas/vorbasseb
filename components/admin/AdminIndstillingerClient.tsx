@@ -23,6 +23,7 @@ const SETTING_LABELS: Record<string, string> = {
   shipping_flat_ore: "Fast fragtgebyr (øre)",
   shipping_free_ore: "Gratis fragt fra (øre)",
   member_discount_pct: "Fanklubsrabat (%)",
+  delivery_banner: "Leveringsbanner tekst (tom = skjult)",
 };
 
 const SETTING_KEYS = Object.keys(SETTING_LABELS);

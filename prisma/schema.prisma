@@ -259,3 +259,8 @@ model HeroSlide {
 
   @@index([position])
 }
+
+model NewsletterSubscriber {
+  email     String   @id
+  createdAt DateTime @default(now())
+}

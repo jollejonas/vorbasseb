@@ -45,14 +45,14 @@ export function ProductCard({ product }: { product: ProductWithSkus }) {
         <div>
           <h3 className="font-bold text-secondary text-sm leading-tight">{product.name}</h3>
           <p className="text-secondary/80 font-semibold mt-1 text-sm">
-            Pris {formatPrice(product.price)}
+            {formatPrice(product.price)}
           </p>
         </div>
         <Link
           href={`/butik/${product.slug}`}
           className="block text-center bg-secondary text-primary font-black text-xs tracking-widest py-2.5 rounded-lg hover:bg-secondary-dark transition-colors"
         >
-          KØB HER
+          Se produkt
         </Link>
       </div>
     </div>
