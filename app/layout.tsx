@@ -4,7 +4,7 @@ import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { Header } from "@/components/shop/Header";
 import { Footer } from "@/components/shop/Footer";
-import { DeliveryBanner } from "@/components/shop/DeliveryBanner";
+import { SportsTicker } from "@/components/shop/SportsTicker";
 import { CookieBanner } from "@/components/shop/CookieBanner";
 import { Toaster } from "sonner";
 
@@ -29,7 +29,7 @@ export default function RootLayout({
       <body>
         <Providers>
           <Header />
-          <DeliveryBanner />
+          <SportsTicker />
           <main className="min-h-screen">{children}</main>
           <Footer />
           <CookieBanner />

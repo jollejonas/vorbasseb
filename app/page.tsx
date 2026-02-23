@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { ProductCard } from "@/components/shop/ProductCard";
 import { NewsCard } from "@/components/shop/NewsCard";
 import { HeroCarousel } from "@/components/shop/HeroCarousel";
+import { DeliveryBanner } from "@/components/shop/DeliveryBanner";
 import { resolveSlides } from "@/lib/hero";
 import { Star, ArrowRight } from "lucide-react";
 
@@ -58,6 +59,7 @@ export default async function HomePage() {
   return (
     <>
       <HeroCarousel slides={resolvedSlides} />
+      <DeliveryBanner />
 
       {featuredProducts.length > 0 ? (
         <section className="bg-secondary py-16">
