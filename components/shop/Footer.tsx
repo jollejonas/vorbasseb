@@ -29,9 +29,9 @@ export async function Footer() {
         {/* Left — contact + newsletter */}
         <div className="text-sm space-y-1">
           <p className="font-bold text-base mb-3">VBK Shoppen</p>
-          <p className="text-white/70">Telefon: {phone}</p>
-          <p className="text-white/70">Email: {email}</p>
-          <div className="pt-3 flex flex-col gap-1 text-white/60">
+          <p className="text-white/90">Telefon: {phone}</p>
+          <p className="text-white/90">Email: {email}</p>
+          <div className="pt-3 flex flex-col gap-1 text-white/75">
             <Link href="/handelsbetingelser" className="hover:text-primary transition-colors">
               Handelsbetingelser
             </Link>
@@ -51,7 +51,7 @@ export async function Footer() {
             <span className="font-black text-primary">VBK</span>
             <span className="font-light italic text-white">Shoppen</span>
           </span>
-          <p className="text-xs text-white/50 mt-1">Officiel merchandise-butik</p>
+          <p className="text-xs text-white/60 mt-1">Officiel merchandise-butik</p>
         </div>
 
         {/* Right — logo + social */}
@@ -67,7 +67,7 @@ export async function Footer() {
               href="https://www.facebook.com/vorbasseboldklub"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-white/60 hover:text-primary transition-colors"
+              className="text-white/80 hover:text-primary transition-colors"
               aria-label="Facebook"
             >
               <Facebook size={20} />
@@ -76,7 +76,7 @@ export async function Footer() {
               href="https://www.instagram.com/vorbasseboldklub/"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-white/60 hover:text-primary transition-colors"
+              className="text-white/80 hover:text-primary transition-colors"
               aria-label="Instagram"
             >
               <InstagramIcon size={20} />
@@ -87,7 +87,7 @@ export async function Footer() {
 
       {/* Payment logos */}
       <div className="border-t border-white/10">
-        <p className="text-center text-white/40 text-xs tracking-wide py-2">
+        <p className="text-center text-white/60 text-xs tracking-wide py-2">
           MobilePay · Visa · Mastercard
         </p>
       </div>

@@ -116,12 +116,23 @@ export default async function ButikPage({ searchParams }: Props) {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-10">
-      <h1 className="text-3xl font-bold mb-1">Butik</h1>
-      <p className="text-gray-500 mb-6">
-        Officielt Vorbasse Boldklub merchandise
-      </p>
+    <div>
+      {/* Branded page header */}
+      <div className="bg-[#0a0f1e] text-white py-10 px-4">
+        <div className="max-w-7xl mx-auto">
+          <p className="text-primary text-xs font-bold uppercase tracking-widest mb-2">
+            Vorbasse Boldklub
+          </p>
+          <h1 className="text-4xl md:text-5xl font-black uppercase leading-none tracking-tight">
+            Butik
+          </h1>
+          <p className="text-white/70 text-sm mt-2">
+            Officielt Vorbasse Boldklub merchandise
+          </p>
+        </div>
+      </div>
 
+    <div className="max-w-7xl mx-auto px-4 py-10">
       {/* Search bar */}
       <form method="GET" className="flex gap-2 mb-6 max-w-xl">
         <input
@@ -208,6 +219,7 @@ export default async function ButikPage({ searchParams }: Props) {
           )}
         </div>
       </div>
+    </div>
     </div>
   );
 }
