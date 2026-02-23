@@ -7,6 +7,8 @@ import { HeroCarousel } from "@/components/shop/HeroCarousel";
 import { resolveSlides } from "@/lib/hero";
 import { Star, ArrowRight } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const [heroSlides, latestNews, latestProduct, featuredProducts, newsSection] =
     await Promise.all([

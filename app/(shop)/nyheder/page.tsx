@@ -2,6 +2,7 @@ import { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { NewsCard } from "@/components/shop/NewsCard";
 
+export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Nyheder" };
 
 export default async function NyhederPage() {
