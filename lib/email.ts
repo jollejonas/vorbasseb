@@ -108,3 +108,24 @@ export async function sendPaymentFailed({ to }: { to: string }) {
     `,
   });
 }
+
+export async function sendLowStockAlert(
+  productName: string,
+  size: string,
+  stock: number,
+) {
+  const adminTo =
+    process.env.ADMIN_EMAIL ?? process.env.RESEND_FROM_EMAIL ?? FROM;
+  await resend.emails.send({
+    from: FROM,
+    to: adminTo,
+    subject: `Lav lagerstatus: ${productName} (${size})`,
+    html: `
+      <h2>Lav lagerstatus</h2>
+      <p>Produktet <strong>${productName}</strong>, størrelse <strong>${size}</strong>, har kun <strong>${stock}</strong> ${stock === 1 ? "enhed" : "enheder"} tilbage på lageret.</p>
+      <p>Genopfyld venligst lageret snarest.</p>
+      <hr />
+      <p>VBK Shoppen – automatisk besked</p>
+    `,
+  });
+}

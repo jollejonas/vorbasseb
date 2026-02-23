@@ -1,23 +1,55 @@
 import { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { ProductGrid } from "@/components/shop/ProductGrid";
+import { FilterContent } from "@/components/shop/FilterContent";
+import { MobileFilterDrawer } from "@/components/shop/MobileFilterDrawer";
 import type { Prisma } from "@prisma/client";
+import { X } from "lucide-react";
 
 export const metadata: Metadata = { title: "Butik" };
 
 type Props = {
-  searchParams: Promise<{ kategori?: string; q?: string; sort?: string; tilgaengelig?: string }>;
+  searchParams: Promise<{
+    kategori?: string;
+    q?: string;
+    sort?: string;
+    tilgaengelig?: string;
+    size?: string;
+  }>;
 };
 
 export default async function ButikPage({ searchParams }: Props) {
-  const { kategori, q, sort, tilgaengelig } = await searchParams;
+  const { kategori, q, sort, tilgaengelig, size } = await searchParams;
 
-  const categories = await prisma.category.findMany({ orderBy: { position: "asc" } });
+  const filterParams = { kategori, q, sort, tilgaengelig, size };
+
+  const categories = await prisma.category.findMany({
+    orderBy: { position: "asc" },
+  });
+
+  // Fetch distinct in-stock sizes (scoped to current category if set)
+  const sizeWhere: Prisma.SKUWhereInput = {
+    stock: { gt: 0 },
+    product: {
+      published: true,
+      ...(kategori ? { category: { slug: kategori } } : {}),
+    },
+  };
+  const rawSizes = await prisma.sKU.findMany({
+    where: sizeWhere,
+    select: { size: true },
+    distinct: ["size"],
+    orderBy: { size: "asc" },
+  });
+  const sizeOptions = rawSizes.map((s) => s.size);
 
   const where: Prisma.ProductWhereInput = {
     published: true,
     ...(kategori ? { category: { slug: kategori } } : {}),
-    ...(tilgaengelig === "1" ? { skus: { some: { stock: { gt: 0 } } } } : {}),
+    ...(size ? { skus: { some: { size, stock: { gt: 0 } } } } : {}),
+    ...(tilgaengelig === "1" && !size
+      ? { skus: { some: { stock: { gt: 0 } } } }
+      : {}),
     ...(q
       ? {
           OR: [
@@ -41,124 +73,124 @@ export default async function ButikPage({ searchParams }: Props) {
     orderBy,
   });
 
-  const buildHref = (overrides: Record<string, string | undefined>) => {
+  // Active filter pills
+  const activeFilters: { label: string; removeKey: string }[] = [];
+  if (kategori) {
+    const cat = categories.find((c) => c.slug === kategori);
+    activeFilters.push({ label: cat?.name ?? kategori, removeKey: "kategori" });
+  }
+  if (size) activeFilters.push({ label: `Størrelse: ${size}`, removeKey: "size" });
+  if (tilgaengelig === "1")
+    activeFilters.push({ label: "Kun tilgængelige", removeKey: "tilgaengelig" });
+  if (sort)
+    activeFilters.push({
+      label: sort === "price_asc" ? "Pris: lav → høj" : "Pris: høj → lav",
+      removeKey: "sort",
+    });
+
+  function buildHref(overrides: Record<string, string | undefined>): string {
     const params = new URLSearchParams();
-    const merged = { kategori, q, sort, tilgaengelig, ...overrides };
+    const merged = { ...filterParams, ...overrides };
     for (const [k, v] of Object.entries(merged)) {
       if (v) params.set(k, v);
     }
     const str = params.toString();
     return `/butik${str ? `?${str}` : ""}`;
-  };
+  }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-10">
-      <h1 className="text-3xl font-bold mb-2">Butik</h1>
-      <p className="text-gray-500 mb-8">Officielt Vorbasse Boldklub merchandise</p>
+    <div className="max-w-7xl mx-auto px-4 py-10">
+      <h1 className="text-3xl font-bold mb-1">Butik</h1>
+      <p className="text-gray-500 mb-6">
+        Officielt Vorbasse Boldklub merchandise
+      </p>
 
-      {/* Search + Sort */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        <form method="GET" className="flex gap-2 flex-1">
-          <input
-            name="q"
-            defaultValue={q}
-            placeholder="Søg produkter..."
-            className="border rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-secondary"
-          />
-          {kategori && <input type="hidden" name="kategori" value={kategori} />}
-          {tilgaengelig && <input type="hidden" name="tilgaengelig" value={tilgaengelig} />}
-          {sort && <input type="hidden" name="sort" value={sort} />}
-          <button
-            type="submit"
-            className="bg-secondary text-white px-4 py-2 rounded-lg text-sm hover:bg-secondary-dark transition"
-          >
-            Søg
-          </button>
-        </form>
-
-        {/* Sort */}
-        <div className="flex gap-2 items-center">
-          <span className="text-sm text-gray-500 whitespace-nowrap">Sortér:</span>
-          <div className="flex gap-1">
-            {[
-              { label: "Nyeste", value: "" },
-              { label: "Pris ↑", value: "price_asc" },
-              { label: "Pris ↓", value: "price_desc" },
-            ].map((s) => (
-              <a
-                key={s.value}
-                href={buildHref({ sort: s.value || undefined })}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
-                  (sort ?? "") === s.value
-                    ? "bg-secondary text-white border-secondary"
-                    : "bg-white text-gray-700 border-gray-200 hover:border-secondary"
-                }`}
-              >
-                {s.label}
-              </a>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Category filter pills */}
-      <div className="flex gap-2 flex-wrap mb-4">
-        <a
-          href={buildHref({ kategori: undefined })}
-          className={`px-4 py-2 rounded-lg text-sm font-medium border transition ${
-            !kategori
-              ? "bg-secondary text-white border-secondary"
-              : "bg-white text-gray-700 border-gray-200 hover:border-secondary"
-          }`}
+      {/* Search bar */}
+      <form method="GET" className="flex gap-2 mb-6 max-w-xl">
+        <input
+          name="q"
+          defaultValue={q}
+          placeholder="Søg produkter..."
+          className="border rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-secondary"
+        />
+        {kategori && <input type="hidden" name="kategori" value={kategori} />}
+        {tilgaengelig && (
+          <input type="hidden" name="tilgaengelig" value={tilgaengelig} />
+        )}
+        {sort && <input type="hidden" name="sort" value={sort} />}
+        {size && <input type="hidden" name="size" value={size} />}
+        <button
+          type="submit"
+          className="bg-secondary text-white px-4 py-2 rounded-lg text-sm hover:bg-secondary-dark transition"
         >
-          Alle
-        </a>
-        {categories.map((c) => (
-          <a
-            key={c.id}
-            href={buildHref({ kategori: c.slug })}
-            className={`px-4 py-2 rounded-lg text-sm font-medium border transition ${
-              kategori === c.slug
-                ? "bg-secondary text-white border-secondary"
-                : "bg-white text-gray-700 border-gray-200 hover:border-secondary"
-            }`}
-          >
-            {c.name}
-          </a>
-        ))}
+          Søg
+        </button>
+      </form>
+
+      {/* Mobile filter drawer trigger */}
+      <div className="mb-4">
+        <MobileFilterDrawer
+          categories={categories}
+          sizeOptions={sizeOptions}
+          searchParams={filterParams}
+        />
       </div>
 
-      {/* Availability toggle */}
-      <div className="mb-8">
-        <a
-          href={buildHref({ tilgaengelig: tilgaengelig === "1" ? undefined : "1" })}
-          className={`inline-flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg border transition ${
-            tilgaengelig === "1"
-              ? "bg-secondary text-white border-secondary"
-              : "bg-white text-gray-600 border-gray-200 hover:border-secondary"
-          }`}
-        >
-          <span
-            className={`w-4 h-4 rounded border flex items-center justify-center text-xs ${
-              tilgaengelig === "1" ? "bg-white border-white text-secondary font-bold" : "border-gray-400"
-            }`}
-          >
-            {tilgaengelig === "1" && "✓"}
-          </span>
-          Kun tilgængelige
-        </a>
-      </div>
-
-      {products.length === 0 ? (
-        <div className="text-center py-20">
-          <p className="text-gray-400 text-lg mb-2">Ingen produkter fundet</p>
-          <a href="/butik" className="text-secondary underline text-sm">
-            Vis alle produkter
-          </a>
+      {/* Active filter pills */}
+      {activeFilters.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-5">
+          {activeFilters.map((f) => (
+            <a
+              key={f.removeKey}
+              href={buildHref({ [f.removeKey]: undefined })}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary/10 text-secondary text-xs font-medium border border-secondary/30 hover:bg-secondary/20 transition"
+            >
+              {f.label}
+              <X size={12} strokeWidth={2.5} />
+            </a>
+          ))}
+          {activeFilters.length > 1 && (
+            <a
+              href="/butik"
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100 text-gray-600 text-xs font-medium hover:bg-gray-200 transition"
+            >
+              Ryd alle filtre
+            </a>
+          )}
         </div>
-      ) : (
-        <ProductGrid products={products} />
       )}
+
+      {/* Main layout: sidebar + grid */}
+      <div className="flex gap-8 items-start">
+        {/* Desktop sidebar */}
+        <aside className="hidden md:block w-52 shrink-0 sticky top-20">
+          <FilterContent
+            categories={categories}
+            sizeOptions={sizeOptions}
+            searchParams={filterParams}
+          />
+        </aside>
+
+        {/* Product grid */}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm text-gray-500 mb-4">
+            {products.length}{" "}
+            {products.length === 1 ? "produkt" : "produkter"}
+          </p>
+          {products.length === 0 ? (
+            <div className="text-center py-20">
+              <p className="text-gray-400 text-lg mb-2">
+                Ingen produkter fundet
+              </p>
+              <a href="/butik" className="text-secondary underline text-sm">
+                Vis alle produkter
+              </a>
+            </div>
+          ) : (
+            <ProductGrid products={products} />
+          )}
+        </div>
+      </div>
     </div>
   );
 }

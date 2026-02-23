@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
-import { sendOrderConfirmation, sendShippingNotification } from "@/lib/email";
+import { sendOrderConfirmation, sendShippingNotification, sendLowStockAlert } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -97,6 +97,19 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       }
     },
   );
+
+  // Send low-stock alerts outside the transaction (external service)
+  for (const item of items) {
+    const sku = await prisma.sKU.findUnique({
+      where: { id: item.skuId },
+      include: { product: { select: { name: true } } },
+    });
+    if (sku && sku.stock <= 2) {
+      await sendLowStockAlert(sku.product.name, sku.size, sku.stock).catch(
+        () => {},
+      );
+    }
+  }
 
   const email = session.customer_details?.email;
   if (email) {

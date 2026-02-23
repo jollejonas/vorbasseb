@@ -17,7 +17,7 @@ const navLinks = [
 
 export function Header() {
   const { totalItems } = useCart();
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
   // @ts-expect-error custom field
   const isAdmin = session?.user?.role === "ADMIN";
@@ -64,7 +64,9 @@ export function Header() {
             </span>
           )}
 
-          {session ? (
+          {status === "loading" ? (
+            <div className="hidden md:block w-20 h-5" />
+          ) : session ? (
             <div className="hidden md:flex items-center gap-3 text-xs">
               <Link href="/mine-ordrer" className="hover:text-primary">
                 Mine ordrer
@@ -145,7 +147,7 @@ export function Header() {
             </Link>
           )}
           <hr className="border-white/20" />
-          {session ? (
+          {status !== "loading" && (session ? (
             <>
               <Link
                 href="/mine-ordrer"
@@ -185,7 +187,7 @@ export function Header() {
                 Opret konto
               </Link>
             </>
-          )}
+          ))}
         </div>
       )}
     </header>

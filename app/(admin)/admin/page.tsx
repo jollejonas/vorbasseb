@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/utils";
 import Link from "next/link";
-import { Package, ShoppingBag, Users, Newspaper, Settings, Mail } from "lucide-react";
+import { Package, ShoppingBag, Users, Newspaper, Settings, Mail, Tag } from "lucide-react";
 
 export const metadata: Metadata = { title: "Admin" };
 
@@ -13,15 +13,19 @@ export default async function AdminPage() {
   // @ts-expect-error custom field
   if (session?.user?.role !== "ADMIN") redirect("/");
 
-  const [orderCount, activeMembers, revenue, productCount] = await Promise.all([
-    prisma.order.count({ where: { status: { in: ["PAID", "SHIPPED"] } } }),
-    prisma.subscription.count({ where: { status: "ACTIVE" } }),
-    prisma.order.aggregate({
-      where: { status: { in: ["PAID", "SHIPPED", "DELIVERED"] } },
-      _sum: { total: true },
-    }),
-    prisma.product.count({ where: { published: true } }),
-  ]);
+  const [orderCount, activeMembers, revenue, productCount, lowStockCount] =
+    await Promise.all([
+      prisma.order.count({ where: { status: { in: ["PAID", "SHIPPED"] } } }),
+      prisma.subscription.count({ where: { status: "ACTIVE" } }),
+      prisma.order.aggregate({
+        where: { status: { in: ["PAID", "SHIPPED", "DELIVERED"] } },
+        _sum: { total: true },
+      }),
+      prisma.product.count({ where: { published: true } }),
+      prisma.sKU.count({
+        where: { stock: { lte: 2 }, product: { published: true } },
+      }),
+    ]);
 
   const stats = [
     {
@@ -69,12 +73,25 @@ export default async function AdminPage() {
       </div>
 
       {/* Quick links */}
-      <div className="grid md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Link
+          href="/admin/produkter"
+          className="relative flex items-center gap-3 bg-secondary text-white rounded-xl p-5 hover:bg-secondary-dark transition"
+        >
+          <Package size={24} className="text-primary" />
+          <span className="font-semibold">Produkter</span>
+          {lowStockCount > 0 && (
+            <span className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+              {lowStockCount > 9 ? "9+" : lowStockCount}
+            </span>
+          )}
+        </Link>
         {[
-          { href: "/admin/produkter", label: "Produkter", icon: Package },
           { href: "/admin/ordrer", label: "Ordrer", icon: ShoppingBag },
           { href: "/admin/nyheder", label: "Nyheder", icon: Newspaper },
           { href: "/admin/nyhedsbrev", label: "Nyhedsbrev", icon: Mail },
+          { href: "/admin/brugere", label: "Brugere", icon: Users },
+          { href: "/admin/rabatkoder", label: "Rabatkoder", icon: Tag },
           { href: "/admin/indstillinger", label: "Indstillinger", icon: Settings },
         ].map((l) => (
           <Link
