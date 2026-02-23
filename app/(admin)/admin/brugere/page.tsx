@@ -82,6 +82,7 @@ export default async function AdminBrugerePage({ searchParams }: Props) {
               <th className="pb-3 pr-4 font-medium">Navn</th>
               <th className="pb-3 pr-4 font-medium">E-mail</th>
               <th className="pb-3 pr-4 font-medium">Rolle</th>
+              <th className="pb-3 pr-4 font-medium">Klubrolle</th>
               <th className="pb-3 pr-4 font-medium">Fanklub</th>
               <th className="pb-3 pr-4 font-medium">Ordrer</th>
               <th className="pb-3 pr-4 font-medium">Oprettet</th>
@@ -91,6 +92,7 @@ export default async function AdminBrugerePage({ searchParams }: Props) {
           <tbody className="divide-y divide-gray-100">
             {users.map((user) => {
               const subStatus = user.subscription?.status;
+              const isFreeGrant = user.subscription?.stripeSubscriptionId.startsWith("manual_");
               return (
                 <tr key={user.id}>
                   <td className="py-3 pr-4 font-medium">
@@ -109,23 +111,45 @@ export default async function AdminBrugerePage({ searchParams }: Props) {
                     </span>
                   </td>
                   <td className="py-3 pr-4">
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        subStatus === "ACTIVE"
-                          ? "bg-green-100 text-green-700"
-                          : subStatus
-                            ? "bg-gray-100 text-gray-500"
-                            : "text-gray-400"
-                      }`}
-                    >
-                      {subStatus === "ACTIVE"
-                        ? "Aktiv"
-                        : subStatus === "CANCELED"
-                          ? "Opsagt"
-                          : subStatus === "PAST_DUE"
-                            ? "Forfalden"
-                            : "–"}
-                    </span>
+                    {user.clubRole !== "NONE" ? (
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        user.clubRole === "TRAINER"
+                          ? "bg-purple-100 text-purple-700"
+                          : "bg-blue-100 text-blue-700"
+                      }`}>
+                        {user.clubRole === "TRAINER" ? "Træner" : "Spiller"}
+                      </span>
+                    ) : (
+                      <span className="text-gray-300 text-xs">–</span>
+                    )}
+                  </td>
+                  <td className="py-3 pr-4">
+                    <div className="flex flex-col gap-0.5">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-medium w-fit ${
+                          subStatus === "ACTIVE"
+                            ? "bg-green-100 text-green-700"
+                            : subStatus
+                              ? "bg-gray-100 text-gray-500"
+                              : "text-gray-400"
+                        }`}
+                      >
+                        {subStatus === "ACTIVE"
+                          ? "Aktiv"
+                          : subStatus === "CANCELED"
+                            ? "Opsagt"
+                            : subStatus === "PAST_DUE"
+                              ? "Forfalden"
+                              : "–"}
+                      </span>
+                      {subStatus === "ACTIVE" && (
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium w-fit ${
+                          isFreeGrant ? "bg-blue-50 text-blue-600" : "bg-yellow-50 text-yellow-700"
+                        }`}>
+                          {isFreeGrant ? "Gratis" : "Betalt"}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="py-3 pr-4 text-gray-600">
                     {user._count.orders}

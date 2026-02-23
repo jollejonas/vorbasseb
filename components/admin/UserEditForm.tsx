@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 type Role = "CUSTOMER" | "ADMIN";
+type ClubRole = "NONE" | "PLAYER" | "TRAINER";
 
 export function UserProfileForm({
   userId,
@@ -61,7 +62,7 @@ export function UserProfileForm({
         />
       </div>
       <div>
-        <label className="block text-xs text-gray-500 mb-1">Rolle</label>
+        <label className="block text-xs text-gray-500 mb-1">Systemrolle</label>
         <select
           value={role}
           onChange={(e) => setRole(e.target.value as Role)}
@@ -79,6 +80,56 @@ export function UserProfileForm({
         {saving ? "Gemmer…" : "Gem ændringer"}
       </button>
     </form>
+  );
+}
+
+export function ClubRoleSelector({
+  userId,
+  initialClubRole,
+}: {
+  userId: string;
+  initialClubRole: ClubRole;
+}) {
+  const [clubRole, setClubRole] = useState<ClubRole>(initialClubRole);
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clubRole }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success("Klubrolle opdateret");
+      window.location.reload();
+    } catch {
+      toast.error("Noget gik galt");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <select
+        value={clubRole}
+        onChange={(e) => setClubRole(e.target.value as ClubRole)}
+        className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary flex-1"
+      >
+        <option value="NONE">Ingen</option>
+        <option value="PLAYER">Spiller</option>
+        <option value="TRAINER">Træner</option>
+      </select>
+      <button
+        onClick={handleSave}
+        disabled={saving || clubRole === initialClubRole}
+        className="bg-secondary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-secondary-dark transition disabled:opacity-50"
+      >
+        {saving ? "Gemmer…" : "Gem"}
+      </button>
+    </div>
   );
 }
 

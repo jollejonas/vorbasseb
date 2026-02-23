@@ -16,6 +16,7 @@ model User {
   image                 String?
   passwordHash          String?
   role                  Role      @default(CUSTOMER)
+  clubRole              ClubRole  @default(NONE)
   newsletterConsent     Boolean   @default(false)
   newsletterConsentAt   DateTime?
   createdAt             DateTime  @default(now())
@@ -71,6 +72,12 @@ model VerificationToken {
 enum Role {
   CUSTOMER
   ADMIN
+}
+
+enum ClubRole {
+  NONE
+  PLAYER
+  TRAINER
 }
 
 model Subscription {
