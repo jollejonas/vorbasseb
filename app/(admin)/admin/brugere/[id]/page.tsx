@@ -5,6 +5,17 @@ import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/utils";
 import { UserProfileForm, MembershipButton } from "@/components/admin/UserEditForm";
 
+const ORDER_STATUS_DA: Record<string, string> = {
+  PENDING: "Afventer",
+  PAID: "Betalt",
+  SHIPPED: "Afsendt",
+  AWAITING_PICKUP: "Klar til afhentning",
+  PICKUP_READY: "Klar til afhentning",
+  DELIVERED: "Leveret",
+  CANCELLED: "Annulleret",
+  REFUNDED: "Refunderet",
+};
+
 export const metadata: Metadata = { title: "Bruger – Admin" };
 
 type Props = { params: Promise<{ id: string }> };
@@ -136,7 +147,9 @@ export default async function AdminBrugerDetailPage({ params }: Props) {
                     {formatPrice(order.total)}
                   </td>
                   <td className="py-2">
-                    <span className="text-xs text-gray-600">{order.status}</span>
+                    <span className="text-xs text-gray-600">
+                      {ORDER_STATUS_DA[order.status] ?? order.status}
+                    </span>
                   </td>
                 </tr>
               ))}

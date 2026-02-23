@@ -1,9 +1,11 @@
 import { CheckCircle } from "lucide-react";
 import Link from "next/link";
+import { CartClearer } from "@/components/shop/CartClearer";
 
 export default function OrdrebekraefdelsePage() {
   return (
     <div className="min-h-[70vh] flex items-center justify-center px-4">
+      <CartClearer />
       <div className="text-center max-w-md">
         <CheckCircle size={64} className="text-green-500 mx-auto mb-6" />
         <h1 className="text-3xl font-bold mb-3">Tak for din ordre!</h1>

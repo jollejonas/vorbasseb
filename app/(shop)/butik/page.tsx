@@ -1,4 +1,5 @@
 import { Metadata } from "next";
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { ProductGrid } from "@/components/shop/ProductGrid";
 import { FilterContent } from "@/components/shop/FilterContent";
@@ -7,6 +8,23 @@ import type { Prisma } from "@prisma/client";
 import { X } from "lucide-react";
 
 export const metadata: Metadata = { title: "Butik" };
+
+// Canonical clothing size order (smallest → largest, then children by age)
+const SIZE_ORDER = [
+  "XXS", "XS", "S", "M", "L", "XL", "XXL", "2XL", "3XL",
+  "116", "128", "140", "152", "164", "176",
+];
+
+function sortSizes(sizes: string[]): string[] {
+  return [...sizes].sort((a, b) => {
+    const ai = SIZE_ORDER.indexOf(a.toUpperCase());
+    const bi = SIZE_ORDER.indexOf(b.toUpperCase());
+    if (ai === -1 && bi === -1) return a.localeCompare(b);
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
+}
 
 type Props = {
   searchParams: Promise<{
@@ -39,9 +57,8 @@ export default async function ButikPage({ searchParams }: Props) {
     where: sizeWhere,
     select: { size: true },
     distinct: ["size"],
-    orderBy: { size: "asc" },
   });
-  const sizeOptions = rawSizes.map((s) => s.size);
+  const sizeOptions = sortSizes(rawSizes.map((s) => s.size));
 
   const where: Prisma.ProductWhereInput = {
     published: true,
@@ -140,22 +157,22 @@ export default async function ButikPage({ searchParams }: Props) {
       {activeFilters.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-5">
           {activeFilters.map((f) => (
-            <a
+            <Link
               key={f.removeKey}
               href={buildHref({ [f.removeKey]: undefined })}
               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary/10 text-secondary text-xs font-medium border border-secondary/30 hover:bg-secondary/20 transition"
             >
               {f.label}
               <X size={12} strokeWidth={2.5} />
-            </a>
+            </Link>
           ))}
           {activeFilters.length > 1 && (
-            <a
+            <Link
               href="/butik"
               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100 text-gray-600 text-xs font-medium hover:bg-gray-200 transition"
             >
               Ryd alle filtre
-            </a>
+            </Link>
           )}
         </div>
       )}
@@ -182,9 +199,9 @@ export default async function ButikPage({ searchParams }: Props) {
               <p className="text-gray-400 text-lg mb-2">
                 Ingen produkter fundet
               </p>
-              <a href="/butik" className="text-secondary underline text-sm">
+              <Link href="/butik" className="text-secondary underline text-sm">
                 Vis alle produkter
-              </a>
+              </Link>
             </div>
           ) : (
             <ProductGrid products={products} />

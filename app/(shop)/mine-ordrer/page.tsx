@@ -10,7 +10,10 @@ const STATUS_LABELS: Record<string, string> = {
   PENDING: "Afventer",
   PAID: "Betalt",
   SHIPPED: "Afsendt",
+  AWAITING_PICKUP: "Klar til afhentning",
+  PICKUP_READY: "Klar til afhentning",
   DELIVERED: "Leveret",
+  CANCELLED: "Annulleret",
   REFUNDED: "Refunderet",
 };
 
@@ -18,7 +21,10 @@ const STATUS_COLORS: Record<string, string> = {
   PENDING: "bg-yellow-100 text-yellow-800",
   PAID: "bg-blue-100 text-blue-800",
   SHIPPED: "bg-purple-100 text-purple-800",
+  AWAITING_PICKUP: "bg-orange-100 text-orange-800",
+  PICKUP_READY: "bg-green-100 text-green-700",
   DELIVERED: "bg-green-100 text-green-800",
+  CANCELLED: "bg-red-100 text-red-700",
   REFUNDED: "bg-gray-100 text-gray-600",
 };
 

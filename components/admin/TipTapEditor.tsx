@@ -27,6 +27,7 @@ type Props = {
 
 export function TipTapEditor({ content, onChange, placeholder = "Skriv indhold her..." }: Props) {
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [
       StarterKit,
       Link.configure({ openOnClick: false, HTMLAttributes: { class: "text-secondary underline" } }),

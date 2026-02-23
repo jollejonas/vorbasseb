@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { X } from "lucide-react";
 
 type Category = { name: string; slug: string };
@@ -50,20 +51,20 @@ export function FilterContent({
           Kategori
         </p>
         <div className="space-y-1">
-          <a
+          <Link
             href={buildHref(searchParams, { kategori: undefined })}
             className={`${pillBase} ${!kategori ? pillActive : pillInactive}`}
           >
             Alle produkter
-          </a>
+          </Link>
           {categories.map((c) => (
-            <a
+            <Link
               key={c.slug}
               href={buildHref(searchParams, { kategori: c.slug })}
               className={`${pillBase} ${kategori === c.slug ? pillActive : pillInactive}`}
             >
               {c.name}
-            </a>
+            </Link>
           ))}
         </div>
       </div>
@@ -76,7 +77,7 @@ export function FilterContent({
           </p>
           <div className="flex flex-wrap gap-1.5">
             {sizeOptions.map((s) => (
-              <a
+              <Link
                 key={s}
                 href={buildHref(searchParams, {
                   size: size === s ? undefined : s,
@@ -86,7 +87,7 @@ export function FilterContent({
                 }`}
               >
                 {s}
-              </a>
+              </Link>
             ))}
           </div>
         </div>
@@ -97,7 +98,7 @@ export function FilterContent({
         <p className="font-semibold text-gray-800 mb-2 uppercase tracking-wider text-xs">
           Tilgængelighed
         </p>
-        <a
+        <Link
           href={buildHref(searchParams, {
             tilgaengelig: tilgaengelig === "1" ? undefined : "1",
           })}
@@ -115,7 +116,7 @@ export function FilterContent({
             {tilgaengelig === "1" && <X size={10} strokeWidth={3} />}
           </span>
           Kun tilgængelige
-        </a>
+        </Link>
       </div>
 
       {/* Sortering */}
@@ -129,7 +130,7 @@ export function FilterContent({
             { label: "Pris: lav → høj", value: "price_asc" },
             { label: "Pris: høj → lav", value: "price_desc" },
           ].map((s) => (
-            <a
+            <Link
               key={s.value}
               href={buildHref(searchParams, { sort: s.value || undefined })}
               className={`${pillBase} ${
@@ -137,7 +138,7 @@ export function FilterContent({
               }`}
             >
               {s.label}
-            </a>
+            </Link>
           ))}
         </div>
       </div>
