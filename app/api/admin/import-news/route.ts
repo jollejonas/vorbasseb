@@ -114,6 +114,18 @@ export async function POST(req: NextRequest) {
 
   const $ = cheerio.load(html);
 
+  // Extract cover image before removing chrome — images use data-src (lazy-load)
+  const coverImageRaw =
+    $(".theme_newsItem_imageWrap img[data-src]").first().attr("data-src") ??
+    $(".theme_newsItem_imageHolder img[data-src]").first().attr("data-src") ??
+    null;
+  // Make URL absolute and strip cache-busting rnd param
+  const coverImage = coverImageRaw
+    ? (coverImageRaw.startsWith("http") ? coverImageRaw : BASE_URL + coverImageRaw)
+        .replace(/[?&]rnd=[^&]*/g, "")
+        .replace(/\?$/, "")
+    : null;
+
   // Remove navigation, header, footer, scripts, styles
   $("nav, header, footer, script, style, noscript, [class*='nav'], [class*='menu'], [class*='footer'], [class*='header'], [class*='breadcrumb'], [class*='social'], [class*='share']").remove();
 
@@ -169,6 +181,7 @@ export async function POST(req: NextRequest) {
       title,
       slug,
       content,
+      coverImage,
       publishedAt: publishedAt ?? new Date(),
       membersOnly: false,
     },
