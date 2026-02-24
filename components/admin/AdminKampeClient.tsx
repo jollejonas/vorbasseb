@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { DbuTeamConfig, DbuMatch, DbuStanding, FootballTeam } from "@prisma/client";
@@ -78,6 +78,10 @@ export function AdminKampeClient({ configs: initialConfigs, teams: initialTeams 
   const router = useRouter();
   const [configs, setConfigs] = useState(initialConfigs);
   const [teams, setTeams] = useState(initialTeams);
+
+  // Sync state when server re-renders with fresh data (after router.refresh())
+  useEffect(() => { setConfigs(initialConfigs); }, [initialConfigs]);
+  useEffect(() => { setTeams(initialTeams); }, [initialTeams]);
   const [discovering, setDiscovering] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
