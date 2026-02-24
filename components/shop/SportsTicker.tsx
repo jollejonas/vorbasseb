@@ -70,13 +70,23 @@ export async function SportsTicker() {
               new Date(a.matchDateTime).getTime() - new Date(b.matchDateTime).getTime()
           )[0] ?? null;
 
-      // Standings snippet: club row ± 1
-      const clubRow = config.standings.find((s) => s.isClubTeam);
-      const standingsSnippet: TickerStandingRow[] = clubRow
-        ? config.standings.filter(
-            (s) => s.sort >= clubRow.sort - 1 && s.sort <= clubRow.sort + 1
-          )
-        : [];
+      // Standings snippet: always exactly 3 rows centred on club team.
+      // If club is first, show positions 1–3. If last, show the bottom 3.
+      const standings = config.standings; // already sorted by sort asc
+      const clubIdx = standings.findIndex((s) => s.isClubTeam);
+      const standingsSnippet: TickerStandingRow[] = (() => {
+        if (clubIdx === -1 || standings.length === 0) return [];
+        const total = standings.length;
+        let start: number;
+        if (clubIdx === 0) {
+          start = 0; // first place → show 1st, 2nd, 3rd
+        } else if (clubIdx === total - 1) {
+          start = Math.max(0, total - 3); // last place → show 3rd-to-last … last
+        } else {
+          start = clubIdx - 1; // normal → 1 above, club, 1 below
+        }
+        return standings.slice(start, start + 3);
+      })();
 
       return {
         label: config.label,

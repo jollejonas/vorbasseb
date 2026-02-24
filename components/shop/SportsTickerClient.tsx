@@ -15,11 +15,16 @@ function shortName(name: string): string {
   return name.replace(/\s*\([^)]*\)\s*$/, "").trim();
 }
 
-function formatDate(dt: Date | string): string {
+function formatDay(dt: Date | string): string {
   return new Intl.DateTimeFormat("da-DK", {
     weekday: "short",
     day: "numeric",
     month: "numeric",
+  }).format(new Date(dt));
+}
+
+function formatTime(dt: Date | string): string {
+  return new Intl.DateTimeFormat("da-DK", {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(dt));
@@ -94,21 +99,28 @@ export function SportsTickerClient({ teams }: { teams: TickerTeam[] }) {
           </>
         )}
 
-        {/* Next match: date + teams on first line, venue below */}
+        {/* Next match: date column left, teams + venue column right */}
         {hasUpcoming && (
           <>
-            <span className="flex flex-col items-center gap-0.5">
-              <span className="flex items-center gap-1.5">
-                <span className="text-white/65">{formatDate(t.upcoming!.matchDateTime)}</span>
-                <Logo src={t.upcomingHomeLogo} name={t.upcoming!.homeTeamName} />
-                <span className="text-white/85">{shortName(t.upcoming!.homeTeamName)}</span>
-                <span className="text-white/40 text-[10px]">vs</span>
-                <Logo src={t.upcomingAwayLogo} name={t.upcoming!.awayTeamName} />
-                <span className="text-white/85">{shortName(t.upcoming!.awayTeamName)}</span>
+            <span className="flex items-start gap-2.5">
+              {/* Date — two lines */}
+              <span className="flex flex-col items-end text-white/65 shrink-0 leading-tight">
+                <span>{formatDay(t.upcoming!.matchDateTime)}</span>
+                <span>{formatTime(t.upcoming!.matchDateTime)}</span>
               </span>
-              {t.upcoming!.stadiumName && (
-                <span className="text-white/50">{t.upcoming!.stadiumName}</span>
-              )}
+              {/* Teams + venue */}
+              <span className="flex flex-col gap-0.5 leading-tight">
+                <span className="flex items-center gap-1.5">
+                  <Logo src={t.upcomingHomeLogo} name={t.upcoming!.homeTeamName} />
+                  <span className="text-white/85">{shortName(t.upcoming!.homeTeamName)}</span>
+                  <span className="text-white/40 text-[10px]">vs</span>
+                  <Logo src={t.upcomingAwayLogo} name={t.upcoming!.awayTeamName} />
+                  <span className="text-white/85">{shortName(t.upcoming!.awayTeamName)}</span>
+                </span>
+                {t.upcoming!.stadiumName && (
+                  <span className="text-white/50">{t.upcoming!.stadiumName}</span>
+                )}
+              </span>
             </span>
             {hasStandings && <Sep />}
           </>
