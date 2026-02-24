@@ -297,3 +297,55 @@ model ClubMatch {
 
   @@unique([clubTeam, isUpcoming])
 }
+
+// ─── DBU API cache ──────────────────────────────────────────────────────────
+
+model DbuTeamConfig {
+  id         String        @id @default(cuid())
+  label      String        // Admin-editable display name, e.g. "Herrer"
+  teamId     Int           // DBU TeamId
+  poolId     Int           // DBU PoolId
+  rowName    String        // e.g. "Herrer Serie 4 - Forår 2026" (from API)
+  enabled    Boolean       @default(true)
+  lastSyncAt DateTime?
+  matches    DbuMatch[]
+  standings  DbuStanding[]
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@unique([teamId, poolId])
+}
+
+model DbuMatch {
+  id            String        @id @default(cuid())
+  dbuId         Int           @unique // DBU Match.Id
+  configId      String
+  config        DbuTeamConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  matchDateTime DateTime
+  roundNo       Int
+  homeTeamName  String
+  homeScore     Int?          // null = not played yet
+  awayTeamName  String
+  awayScore     Int?
+  stadiumName   String
+  updatedAt     DateTime      @updatedAt
+}
+
+model DbuStanding {
+  id           String        @id @default(cuid())
+  configId     String
+  config       DbuTeamConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  sort         Int
+  teamName     String
+  isClubTeam   Boolean
+  noOfMatch    Int
+  matchWon     Int
+  matchDrawn   Int
+  matchLost    Int
+  score        Int
+  scoreAgainst Int
+  point        Int
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([configId, sort])
+}

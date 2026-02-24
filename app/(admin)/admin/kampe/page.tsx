@@ -12,9 +12,12 @@ export default async function AdminKampePage() {
   // @ts-expect-error custom field
   if (session?.user?.role !== "ADMIN") redirect("/");
 
-  const [matches, teams] = await Promise.all([
-    prisma.clubMatch.findMany({
-      include: { homeTeam: true, awayTeam: true },
+  const [configs, teams] = await Promise.all([
+    prisma.dbuTeamConfig.findMany({
+      include: {
+        matches: { orderBy: { matchDateTime: "asc" } },
+        standings: { orderBy: { sort: "asc" } },
+      },
       orderBy: { createdAt: "asc" },
     }),
     prisma.footballTeam.findMany({ orderBy: { name: "asc" } }),
@@ -31,7 +34,7 @@ export default async function AdminKampePage() {
           Kampe
         </h1>
       </div>
-      <AdminKampeClient matches={matches} teams={teams} />
+      <AdminKampeClient configs={configs} teams={teams} />
     </div>
   );
 }

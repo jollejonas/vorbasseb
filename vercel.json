@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/dbu-sync",
+      "schedule": "0 */6 * * *"
+    }
+  ]
+}
