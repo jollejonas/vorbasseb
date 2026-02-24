@@ -9,6 +9,9 @@
   --color-background: #ffffff;
   --color-foreground: #111111;
   --font-sans: "Share", system-ui, sans-serif;
+  /* Share renders slightly smaller than Inter — bump xs/sm by ~2px */
+  --font-size-xs: 0.875rem;   /* 14px  (was 12px) */
+  --font-size-sm: 0.9375rem;  /* 15px  (was 14px) */
 }
 
 body {

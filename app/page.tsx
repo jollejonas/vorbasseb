@@ -112,9 +112,9 @@ export default async function HomePage() {
       <section className="max-w-6xl mx-auto px-4 py-16">
         <div className="bg-secondary rounded-2xl p-10 text-white text-center">
           <Image src="/logo.png" alt="Vorbasse Boldklub" width={72} height={72} className="mx-auto mb-4" />
-          <h2 className="text-3xl font-bold mb-3">Bliv fanklubsmedlem</h2>
+          <h2 className="text-3xl font-bold mb-3">Bliv en del af ForzaHestene</h2>
           <p className="text-white/70 max-w-lg mx-auto mb-6">
-            Faa 10% rabat paa alle koeb, adgang til eksklusivt merchandise og stoet
+            Få 10% rabat på alle køb, adgang til eksklusivt merchandise og støt
             Vorbasse Boldklub direkte med dit abonnement.
           </p>
           <Link
