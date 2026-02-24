@@ -31,17 +31,18 @@ function Sep() {
 
 function StandingRows({ rows }: { rows: TickerStandingRow[] }) {
   return (
-    <span className="flex items-center gap-1.5">
-      <span className="text-white/35 text-[10px]">📊</span>
-      {rows.map((r, i) => (
-        <span key={r.sort} className="flex items-center gap-1">
-          {i > 0 && <span className="text-white/20">·</span>}
-          <span className={r.isClubTeam ? "text-primary font-bold" : "text-white/55"}>
-            {r.sort}. {shortName(r.teamName)}
+    <span className="flex items-start gap-1.5">
+      <span className="text-white/35 text-[10px] mt-0.5">📊</span>
+      <span className="flex flex-col gap-0.5">
+        {rows.map((r) => (
+          <span key={r.sort} className="flex items-center gap-1">
+            <span className={r.isClubTeam ? "text-primary font-bold" : "text-white/55"}>
+              {r.sort}. {shortName(r.teamName)}
+            </span>
+            <span className="text-white/25">({r.point}p)</span>
           </span>
-          <span className="text-white/25">({r.point}p)</span>
-        </span>
-      ))}
+        ))}
+      </span>
     </span>
   );
 }
@@ -103,6 +104,12 @@ export function SportsTickerClient({ teams }: { teams: TickerTeam[] }) {
               <span className="text-white/30 text-[10px]">vs</span>
               <Logo src={t.upcomingAwayLogo} name={t.upcoming!.awayTeamName} />
               <span className="text-white/75">{shortName(t.upcoming!.awayTeamName)}</span>
+              {t.upcoming!.stadiumName && (
+                <>
+                  <span className="text-white/20">·</span>
+                  <span className="text-white/45">{t.upcoming!.stadiumName}</span>
+                </>
+              )}
             </span>
             {hasStandings && <Sep />}
           </>
