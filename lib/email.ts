@@ -1,6 +1,15 @@
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
 // RESEND_FROM_EMAIL must be set to an address on a Resend-verified domain.
 // Without a verified domain, all sends will fail silently.
 const FROM = process.env.RESEND_FROM_EMAIL ?? "";
@@ -43,8 +52,8 @@ export async function sendOrderConfirmation({
           .map(
             (i) =>
               `<li>${i.quantity}x (${formatDKK(i.price + i.customizationFee)})
-                ${i.customName ? ` – Tryk: ${i.customName}` : ""}
-                ${i.customNumber ? ` #${i.customNumber}` : ""}
+                ${i.customName ? ` – Tryk: ${escapeHtml(i.customName)}` : ""}
+                ${i.customNumber ? ` #${escapeHtml(i.customNumber)}` : ""}
               </li>`,
           )
           .join("")}
@@ -124,7 +133,7 @@ export async function sendLowStockAlert(
     subject: `Lav lagerstatus: ${productName} (${size})`,
     html: `
       <h2>Lav lagerstatus</h2>
-      <p>Produktet <strong>${productName}</strong>, størrelse <strong>${size}</strong>, har kun <strong>${stock}</strong> ${stock === 1 ? "enhed" : "enheder"} tilbage på lageret.</p>
+      <p>Produktet <strong>${escapeHtml(productName)}</strong>, størrelse <strong>${escapeHtml(size)}</strong>, har kun <strong>${stock}</strong> ${stock === 1 ? "enhed" : "enheder"} tilbage på lageret.</p>
       <p>Genopfyld venligst lageret snarest.</p>
       <hr />
       <p>VBK Shoppen – automatisk besked</p>

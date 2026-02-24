@@ -37,6 +37,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Manglende felter" }, { status: 400 });
   }
 
+  const numAmount = Number(amount);
+  if (type === "percent" && (numAmount <= 0 || numAmount > 100)) {
+    return NextResponse.json({ error: "Procent skal være 1–100" }, { status: 400 });
+  }
+  if (type === "fixed" && numAmount <= 0) {
+    return NextResponse.json({ error: "Beløb skal være positivt" }, { status: 400 });
+  }
+
   const stripe = getStripe();
 
   const coupon = await stripe.coupons.create({

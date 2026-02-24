@@ -80,6 +80,11 @@ export async function PATCH(
   }
 
   // ── Profile update ────────────────────────────────────────────────────────
+  const VALID_ROLES = ["ADMIN", "USER"];
+  if (role !== undefined && !VALID_ROLES.includes(role)) {
+    return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+  }
+
   const updated = await prisma.user.update({
     where: { id },
     data: {

@@ -7,6 +7,8 @@ import { MobileFilterDrawer } from "@/components/shop/MobileFilterDrawer";
 import type { Prisma } from "@prisma/client";
 import { X } from "lucide-react";
 
+export const revalidate = 300; // 5-minute ISR cache per unique URL
+
 export const metadata: Metadata = { title: "Butik" };
 
 // Canonical clothing size order (smallest → largest, then children by age)
@@ -86,7 +88,7 @@ export default async function ButikPage({ searchParams }: Props) {
 
   const products = await prisma.product.findMany({
     where,
-    include: { skus: true, category: true },
+    include: { skus: { select: { stock: true } } },
     orderBy,
   });
 
