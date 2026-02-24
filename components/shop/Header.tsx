@@ -13,6 +13,7 @@ const navLinks = [
   { href: "/butik?kategori=traeningtoj", label: "TRÆNINGSTØJ" },
   { href: "/butik?kategori=fritidstoj", label: "FRITIDSTØJ" },
   { href: "/butik?kategori=tilbehor", label: "TILBEHØR" },
+  { href: "/fanklub", label: "FANKLUB" },
 ];
 
 export function Header() {
