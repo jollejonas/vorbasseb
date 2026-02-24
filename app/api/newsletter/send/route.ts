@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM = process.env.RESEND_FROM_EMAIL ?? "noreply@vorbassebk.dk";
+const FROM = process.env.RESEND_FROM_EMAIL;
 const BATCH_SIZE = 50;
 
 export async function POST(req: NextRequest) {
@@ -12,6 +12,13 @@ export async function POST(req: NextRequest) {
   // @ts-expect-error custom field
   if (session?.user?.role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  if (!FROM) {
+    return NextResponse.json(
+      { error: "RESEND_FROM_EMAIL er ikke konfigureret. Tilføj en verificeret afsender-e-mail i Vercel miljøvariable." },
+      { status: 503 }
+    );
   }
 
   const { subject, html } = await req.json();

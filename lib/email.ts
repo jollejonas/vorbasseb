@@ -1,7 +1,9 @@
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM = process.env.RESEND_FROM_EMAIL ?? "noreply@vorbassebk.dk";
+// RESEND_FROM_EMAIL must be set to an address on a Resend-verified domain.
+// Without a verified domain, all sends will fail silently.
+const FROM = process.env.RESEND_FROM_EMAIL ?? "";
 
 function formatDKK(ore: number) {
   return new Intl.NumberFormat("da-DK", {
