@@ -1,5 +1,5 @@
 ﻿import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Share } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { Header } from "@/components/shop/Header";
@@ -8,7 +8,7 @@ import { SportsTicker } from "@/components/shop/SportsTicker";
 import { CookieBanner } from "@/components/shop/CookieBanner";
 import { Toaster } from "sonner";
 
-const inter = Inter({ subsets: ["latin"] });
+const share = Share({ subsets: ["latin"], weight: ["400", "700"] });
 
 export const metadata: Metadata = {
   title: {
@@ -25,7 +25,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="da" className={inter.className}>
+    <html lang="da" className={share.className}>
       <body>
         <Providers>
           <Header />
