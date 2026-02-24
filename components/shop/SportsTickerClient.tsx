@@ -99,17 +99,16 @@ export function SportsTickerClient({ teams }: { teams: TickerTeam[] }) {
           </>
         )}
 
-        {/* Next match: date column left, teams + venue column right */}
+        {/* Next match: date on one line left, teams + venue centered on right */}
         {hasUpcoming && (
           <>
-            <span className="flex items-start gap-2.5">
-              {/* Date — two lines */}
-              <span className="flex flex-col items-end text-white/65 shrink-0 leading-tight">
-                <span>{formatDay(t.upcoming!.matchDateTime)}</span>
-                <span>{formatTime(t.upcoming!.matchDateTime)}</span>
+            <span className="flex items-center gap-2.5">
+              {/* Date — single line, vertically centred */}
+              <span className="text-white/65 shrink-0 whitespace-nowrap">
+                {formatDay(t.upcoming!.matchDateTime)} {formatTime(t.upcoming!.matchDateTime)}
               </span>
-              {/* Teams + venue */}
-              <span className="flex flex-col gap-0.5 leading-tight">
+              {/* Teams + venue — centred horizontally */}
+              <span className="flex flex-col items-center gap-0.5 leading-tight">
                 <span className="flex items-center gap-1.5">
                   <Logo src={t.upcomingHomeLogo} name={t.upcoming!.homeTeamName} />
                   <span className="text-white/85">{shortName(t.upcoming!.homeTeamName)}</span>
