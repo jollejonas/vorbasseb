@@ -1,20 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import type { TickerTeam, TickerMatch, TickerStandingRow } from "./SportsTicker";
+import { useState, useEffect } from "react";
+import type { TickerTeam, TickerStandingRow } from "./SportsTicker";
 
 function Logo({ src, name }: { src: string | null; name: string }) {
-  if (src) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={src} alt={name} className="w-4 h-4 rounded-full object-cover shrink-0 inline-block" />
-    );
-  }
-  return null;
+  if (!src) return null;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={src} alt={name} className="w-4 h-4 rounded-full object-cover shrink-0 inline-block" />
+  );
 }
 
 function shortName(name: string): string {
-  // Strip parenthetical suffix e.g. "Vorbasse B (S4 p. 91)" → "Vorbasse B"
   return name.replace(/\s*\([^)]*\)\s*$/, "").trim();
 }
 
@@ -28,69 +25,21 @@ function formatDate(dt: Date | string): string {
   }).format(new Date(dt));
 }
 
-function ResultPanel({
-  match,
-  homeLogo,
-  awayLogo,
-}: {
-  match: TickerMatch;
-  homeLogo: string | null;
-  awayLogo: string | null;
-}) {
-  return (
-    <span className="flex items-center gap-1.5">
-      <span className="text-white/40 text-[10px]">⚽</span>
-      <Logo src={homeLogo} name={match.homeTeamName} />
-      <span className="text-white/80">{shortName(match.homeTeamName)}</span>
-      <span className="font-bold text-white tabular-nums px-0.5">
-        {match.homeScore}–{match.awayScore}
-      </span>
-      <Logo src={awayLogo} name={match.awayTeamName} />
-      <span className="text-white/80">{shortName(match.awayTeamName)}</span>
-    </span>
-  );
+function Sep() {
+  return <span className="text-white/15 mx-0.5">|</span>;
 }
 
-function UpcomingPanel({
-  match,
-  homeLogo,
-  awayLogo,
-}: {
-  match: TickerMatch;
-  homeLogo: string | null;
-  awayLogo: string | null;
-}) {
+function StandingRows({ rows }: { rows: TickerStandingRow[] }) {
   return (
     <span className="flex items-center gap-1.5">
-      <span className="text-white/40 text-[10px]">📅</span>
-      <span className="text-white/60">{formatDate(match.matchDateTime)}</span>
-      <span className="text-white/20">·</span>
-      <Logo src={homeLogo} name={match.homeTeamName} />
-      <span className="text-white/75">{shortName(match.homeTeamName)}</span>
-      <span className="text-white/40 text-[10px]">vs</span>
-      <Logo src={awayLogo} name={match.awayTeamName} />
-      <span className="text-white/75">{shortName(match.awayTeamName)}</span>
-      {match.stadiumName && (
-        <>
-          <span className="text-white/20">·</span>
-          <span className="text-white/50">{match.stadiumName}</span>
-        </>
-      )}
-    </span>
-  );
-}
-
-function StandingsPanel({ rows }: { rows: TickerStandingRow[] }) {
-  return (
-    <span className="flex items-center gap-2">
-      <span className="text-white/40 text-[10px]">📊</span>
-      {rows.map((r) => (
-        <span
-          key={r.sort}
-          className={r.isClubTeam ? "text-primary font-bold" : "text-white/60"}
-        >
-          {r.sort}. {shortName(r.teamName)}
-          <span className="text-white/30 ml-1">({r.point}p)</span>
+      <span className="text-white/35 text-[10px]">📊</span>
+      {rows.map((r, i) => (
+        <span key={r.sort} className="flex items-center gap-1">
+          {i > 0 && <span className="text-white/20">·</span>}
+          <span className={r.isClubTeam ? "text-primary font-bold" : "text-white/55"}>
+            {r.sort}. {shortName(r.teamName)}
+          </span>
+          <span className="text-white/25">({r.point}p)</span>
         </span>
       ))}
     </span>
@@ -98,81 +47,78 @@ function StandingsPanel({ rows }: { rows: TickerStandingRow[] }) {
 }
 
 export function SportsTickerClient({ teams }: { teams: TickerTeam[] }) {
-  // teamIdx = which team; panelIdx = which panel within that team (result/upcoming/standings)
   const [teamIdx, setTeamIdx] = useState(0);
-  const [panelIdx, setPanelIdx] = useState(0);
-
-  // Build panels for a team
-  const getPanels = useCallback(
-    (t: TickerTeam) => {
-      const panels: React.ReactNode[] = [];
-      if (t.result)
-        panels.push(
-          <ResultPanel match={t.result} homeLogo={t.homeLogo} awayLogo={t.awayLogo} />
-        );
-      if (t.upcoming)
-        panels.push(
-          <UpcomingPanel
-            match={t.upcoming}
-            homeLogo={t.upcomingHomeLogo}
-            awayLogo={t.upcomingAwayLogo}
-          />
-        );
-      if (t.standingsSnippet.length > 0)
-        panels.push(<StandingsPanel rows={t.standingsSnippet} />);
-      return panels;
-    },
-    []
-  );
 
   useEffect(() => {
-    const currentTeam = teams[teamIdx];
-    if (!currentTeam) return;
-    const panels = getPanels(currentTeam);
-
+    if (teams.length <= 1) return;
     const id = setInterval(() => {
-      setPanelIdx((p) => {
-        const next = p + 1;
-        if (next >= panels.length) {
-          // Move to next team, reset panel
-          setTeamIdx((t) => (t + 1) % teams.length);
-          return 0;
-        }
-        return next;
-      });
-    }, 4000);
-
+      setTeamIdx((i) => (i + 1) % teams.length);
+    }, 8000);
     return () => clearInterval(id);
-  }, [teamIdx, teams, getPanels]);
+  }, [teams.length]);
 
-  const currentTeam = teams[teamIdx];
-  if (!currentTeam) return null;
-  const panels = getPanels(currentTeam);
-  const currentPanel = panels[panelIdx] ?? panels[0];
+  const t = teams[teamIdx];
+  if (!t) return null;
+
+  const hasResult = !!t.result;
+  const hasUpcoming = !!t.upcoming;
+  const hasStandings = t.standingsSnippet.length > 0;
 
   return (
     <div className="sticky top-16 z-40 bg-[#0a0f1e] border-b border-white/10 text-xs text-white py-2 px-4">
-      <div className="max-w-6xl mx-auto flex items-center justify-center gap-3">
+      <div className="max-w-6xl mx-auto flex items-center justify-center gap-2 flex-wrap">
+
         {/* Team label */}
         <span className="font-black text-primary uppercase tracking-widest shrink-0 text-[11px]">
-          {currentTeam.label}
+          {t.label}
         </span>
 
-        <span className="text-white/20">|</span>
+        <Sep />
 
-        {/* Current panel content */}
-        <span className="flex items-center gap-1.5 flex-wrap justify-center">
-          {currentPanel}
-        </span>
+        {/* Latest result — no venue */}
+        {hasResult && (
+          <>
+            <span className="flex items-center gap-1.5">
+              <span className="text-white/35 text-[10px]">⚽</span>
+              <Logo src={t.homeLogo} name={t.result!.homeTeamName} />
+              <span className="text-white/75">{shortName(t.result!.homeTeamName)}</span>
+              <span className="font-bold text-white tabular-nums">
+                {t.result!.homeScore}–{t.result!.awayScore}
+              </span>
+              <Logo src={t.awayLogo} name={t.result!.awayTeamName} />
+              <span className="text-white/75">{shortName(t.result!.awayTeamName)}</span>
+            </span>
+            {(hasUpcoming || hasStandings) && <Sep />}
+          </>
+        )}
 
-        {/* Navigation dots — teams */}
+        {/* Next match */}
+        {hasUpcoming && (
+          <>
+            <span className="flex items-center gap-1.5">
+              <span className="text-white/35 text-[10px]">📅</span>
+              <span className="text-white/55">{formatDate(t.upcoming!.matchDateTime)}</span>
+              <Logo src={t.upcomingHomeLogo} name={t.upcoming!.homeTeamName} />
+              <span className="text-white/75">{shortName(t.upcoming!.homeTeamName)}</span>
+              <span className="text-white/30 text-[10px]">vs</span>
+              <Logo src={t.upcomingAwayLogo} name={t.upcoming!.awayTeamName} />
+              <span className="text-white/75">{shortName(t.upcoming!.awayTeamName)}</span>
+            </span>
+            {hasStandings && <Sep />}
+          </>
+        )}
+
+        {/* Standings: 1 above · club · 1 below */}
+        {hasStandings && <StandingRows rows={t.standingsSnippet} />}
+
+        {/* Team dots (only if multiple teams) */}
         {teams.length > 1 && (
           <div className="flex gap-1 ml-2 shrink-0">
-            {teams.map((t, i) => (
+            {teams.map((team, i) => (
               <button
                 key={i}
-                onClick={() => { setTeamIdx(i); setPanelIdx(0); }}
-                aria-label={`Vis ${t.label}`}
+                onClick={() => setTeamIdx(i)}
+                aria-label={`Vis ${team.label}`}
                 className={`w-1.5 h-1.5 rounded-full transition-colors ${
                   i === teamIdx ? "bg-primary" : "bg-white/20 hover:bg-white/40"
                 }`}
@@ -181,20 +127,6 @@ export function SportsTickerClient({ teams }: { teams: TickerTeam[] }) {
           </div>
         )}
 
-        {/* Panel dots — sub-pages within a team */}
-        {panels.length > 1 && (
-          <div className="flex gap-0.5 shrink-0">
-            {panels.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setPanelIdx(i)}
-                className={`w-1 h-1 rounded-full transition-colors ${
-                  i === panelIdx ? "bg-white/70" : "bg-white/15"
-                }`}
-              />
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
