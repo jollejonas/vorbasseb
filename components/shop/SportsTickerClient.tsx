@@ -26,23 +26,20 @@ function formatDate(dt: Date | string): string {
 }
 
 function Sep() {
-  return <span className="text-white/15 mx-0.5">|</span>;
+  return <span className="text-white/40 mx-1 self-stretch flex items-center">|</span>;
 }
 
 function StandingRows({ rows }: { rows: TickerStandingRow[] }) {
   return (
-    <span className="flex items-start gap-1.5">
-      <span className="text-white/35 text-[10px] mt-0.5">📊</span>
-      <span className="flex flex-col gap-0.5">
-        {rows.map((r) => (
-          <span key={r.sort} className="flex items-center gap-1">
-            <span className={r.isClubTeam ? "text-primary font-bold" : "text-white/55"}>
-              {r.sort}. {shortName(r.teamName)}
-            </span>
-            <span className="text-white/25">({r.point}p)</span>
+    <span className="flex flex-col gap-0.5">
+      {rows.map((r) => (
+        <span key={r.sort} className="flex items-center gap-1">
+          <span className={r.isClubTeam ? "text-primary font-bold" : "text-white/65"}>
+            {r.sort}. {shortName(r.teamName)}
           </span>
-        ))}
-      </span>
+          <span className="text-white/40">({r.point}p)</span>
+        </span>
+      ))}
     </span>
   );
 }
@@ -76,39 +73,41 @@ export function SportsTickerClient({ teams }: { teams: TickerTeam[] }) {
 
         <Sep />
 
-        {/* Latest result — no venue */}
+        {/* Latest result: teams on first line, venue below */}
         {hasResult && (
           <>
-            <span className="flex items-center gap-1.5">
-              <span className="text-white/35 text-[10px]">⚽</span>
-              <Logo src={t.homeLogo} name={t.result!.homeTeamName} />
-              <span className="text-white/75">{shortName(t.result!.homeTeamName)}</span>
-              <span className="font-bold text-white tabular-nums">
-                {t.result!.homeScore}–{t.result!.awayScore}
+            <span className="flex flex-col items-center gap-0.5">
+              <span className="flex items-center gap-1.5">
+                <Logo src={t.homeLogo} name={t.result!.homeTeamName} />
+                <span className="text-white/85">{shortName(t.result!.homeTeamName)}</span>
+                <span className="font-bold text-white tabular-nums">
+                  {t.result!.homeScore}–{t.result!.awayScore}
+                </span>
+                <Logo src={t.awayLogo} name={t.result!.awayTeamName} />
+                <span className="text-white/85">{shortName(t.result!.awayTeamName)}</span>
               </span>
-              <Logo src={t.awayLogo} name={t.result!.awayTeamName} />
-              <span className="text-white/75">{shortName(t.result!.awayTeamName)}</span>
+              {t.result!.stadiumName && (
+                <span className="text-white/50">{t.result!.stadiumName}</span>
+              )}
             </span>
             {(hasUpcoming || hasStandings) && <Sep />}
           </>
         )}
 
-        {/* Next match */}
+        {/* Next match: date + teams on first line, venue below */}
         {hasUpcoming && (
           <>
-            <span className="flex items-center gap-1.5">
-              <span className="text-white/35 text-[10px]">📅</span>
-              <span className="text-white/55">{formatDate(t.upcoming!.matchDateTime)}</span>
-              <Logo src={t.upcomingHomeLogo} name={t.upcoming!.homeTeamName} />
-              <span className="text-white/75">{shortName(t.upcoming!.homeTeamName)}</span>
-              <span className="text-white/30 text-[10px]">vs</span>
-              <Logo src={t.upcomingAwayLogo} name={t.upcoming!.awayTeamName} />
-              <span className="text-white/75">{shortName(t.upcoming!.awayTeamName)}</span>
+            <span className="flex flex-col items-center gap-0.5">
+              <span className="flex items-center gap-1.5">
+                <span className="text-white/65">{formatDate(t.upcoming!.matchDateTime)}</span>
+                <Logo src={t.upcomingHomeLogo} name={t.upcoming!.homeTeamName} />
+                <span className="text-white/85">{shortName(t.upcoming!.homeTeamName)}</span>
+                <span className="text-white/40 text-[10px]">vs</span>
+                <Logo src={t.upcomingAwayLogo} name={t.upcoming!.awayTeamName} />
+                <span className="text-white/85">{shortName(t.upcoming!.awayTeamName)}</span>
+              </span>
               {t.upcoming!.stadiumName && (
-                <>
-                  <span className="text-white/20">·</span>
-                  <span className="text-white/45">{t.upcoming!.stadiumName}</span>
-                </>
+                <span className="text-white/50">{t.upcoming!.stadiumName}</span>
               )}
             </span>
             {hasStandings && <Sep />}
