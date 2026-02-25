@@ -169,6 +169,12 @@ export function CartView() {
           <span>Subtotal</span>
           <span>{formatPrice(subtotal)}</span>
         </div>
+        {membership?.isMember && (
+          <div className="flex justify-between text-sm text-green-600 font-medium">
+            <span>Fanklubsrabat ({membership.discountPct}%)</span>
+            <span>−{formatPrice(Math.round(subtotal * membership.discountPct / 100))}</span>
+          </div>
+        )}
         <div className="flex justify-between text-sm">
           <span>Fragt</span>
           <span className={shipping === 0 ? "text-green-600 font-medium" : ""}>
@@ -177,17 +183,40 @@ export function CartView() {
         </div>
         <div className="flex justify-between font-bold text-lg border-t pt-3">
           <span>Total</span>
-          <span>{formatPrice(total)}</span>
+          <span>
+            {membership?.isMember
+              ? formatPrice(total - Math.round(subtotal * membership.discountPct / 100))
+              : formatPrice(total)}
+          </span>
         </div>
+        {membership?.isMember && (
+          <p className="text-xs text-gray-400">* Den endelige rabat beregnes af Stripe ved betaling</p>
+        )}
       </div>
 
-      {/* Member discount notice */}
-      {membership?.isMember && (
-        <div className="flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-xl px-4 py-3 text-sm text-primary font-medium">
-          <Star size={16} className="shrink-0" />
-          Du sparer {membership.discountPct}% som fanklubsmedlem — rabatten trækkes automatisk i kassen
+      {/* Member discount notice / CTA */}
+      {membership?.isMember ? (
+        <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-700 font-medium">
+          <Star size={16} className="shrink-0 text-green-500" />
+          Du er fanklubsmedlem — {membership.discountPct}% rabat er inkluderet i totalen ovenfor
         </div>
-      )}
+      ) : membership !== null ? (
+        <div className="bg-[#0a0f1e] rounded-xl px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <div className="flex-1">
+            <p className="text-white text-sm font-semibold flex items-center gap-1.5">
+              <Star size={14} className="text-primary shrink-0" />
+              Bliv fanklubsmedlem og spar {membership?.discountPct ?? 10}% på alle køb
+            </p>
+            <p className="text-white/60 text-xs mt-0.5">Fra kun 49 kr/md — støt klubben og få rabat i butikken</p>
+          </div>
+          <a
+            href="/fanklub"
+            className="shrink-0 bg-primary text-secondary text-xs font-bold px-4 py-2 rounded-lg hover:bg-primary-dark transition whitespace-nowrap"
+          >
+            Bliv medlem →
+          </a>
+        </div>
+      ) : null}
 
       {/* Actions */}
       <div className="flex flex-col sm:flex-row gap-3">

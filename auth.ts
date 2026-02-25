@@ -37,11 +37,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    jwt({ token, user }) {
+    async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
         // @ts-expect-error custom field
         token.role = user.role;
+      }
+      // Always refresh clubRole and subscriptionStatus so changes take effect without re-login
+      if (token.id) {
+        const [dbUser, subscription] = await Promise.all([
+          prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: { clubRole: true },
+          }),
+          prisma.subscription.findUnique({
+            where: { userId: token.id as string },
+            select: { status: true },
+          }),
+        ]);
+        token.clubRole = dbUser?.clubRole ?? "NONE";
+        token.subscriptionStatus = subscription?.status ?? null;
       }
       return token;
     },
@@ -50,6 +65,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.id = token.id as string;
         // @ts-expect-error custom field
         session.user.role = token.role;
+        // @ts-expect-error custom field
+        session.user.clubRole = token.clubRole;
+        // @ts-expect-error custom field
+        session.user.subscriptionStatus = token.subscriptionStatus;
       }
       return session;
     },
