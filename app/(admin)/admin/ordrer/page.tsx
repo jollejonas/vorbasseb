@@ -51,6 +51,7 @@ export default async function AdminOrdrerPage({ searchParams }: Props) {
         include: { sku: { include: { product: true } } },
       },
       shippingAddress: true,
+      user: { select: { name: true, customerNumber: true } },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -74,6 +75,7 @@ export default async function AdminOrdrerPage({ searchParams }: Props) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-left text-gray-500">
+              <th className="pb-3 pr-4 font-medium">Ordrenr.</th>
               <th className="pb-3 pr-4 font-medium">Dato</th>
               <th className="pb-3 pr-4 font-medium">Kunde</th>
               <th className="pb-3 pr-4 font-medium">Produkter</th>
@@ -92,12 +94,15 @@ export default async function AdminOrdrerPage({ searchParams }: Props) {
             ) : (
               orders.map((order: OrderWithItems) => (
                 <tr key={order.id}>
+                  <td className="py-4 pr-4 font-mono text-sm text-gray-500 whitespace-nowrap">
+                    #{order.orderNumber}
+                  </td>
                   <td className="py-4 pr-4 text-gray-500 whitespace-nowrap">
                     {new Intl.DateTimeFormat("da-DK").format(new Date(order.createdAt))}
                   </td>
                   <td className="py-4 pr-4">
-                    <p className="font-medium">{order.customerName ?? "–"}</p>
-                    <p className="text-xs text-gray-400">{order.guestEmail ?? order.userId ?? ""}</p>
+                    <p className="font-medium">{order.customerName ?? order.user?.name ?? "–"}</p>
+                    <p className="text-xs text-gray-400">{order.guestEmail ?? ""}</p>
                   </td>
                   <td className="py-4 pr-4">
                     <ul className="space-y-0.5">

@@ -24,7 +24,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const { id } = await params;
   const body = await req.json();
 
-  type SkuInput = { id?: string; size: string; stock: number };
+  type SkuInput = { id?: string; size: string; stock: number; itemNumber?: string | null };
 
   const [product] = await prisma.$transaction(async (tx) => {
     const updated = await tx.product.update({
@@ -55,10 +55,10 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
       await Promise.all([
         ...existing.map((s) =>
-          tx.sKU.update({ where: { id: s.id! }, data: { stock: s.stock } })
+          tx.sKU.update({ where: { id: s.id! }, data: { stock: s.stock, itemNumber: s.itemNumber ?? null } })
         ),
         ...fresh.map((s) =>
-          tx.sKU.create({ data: { productId: id, size: s.size, stock: s.stock } })
+          tx.sKU.create({ data: { productId: id, size: s.size, stock: s.stock, itemNumber: s.itemNumber ?? null } })
         ),
       ]);
     }

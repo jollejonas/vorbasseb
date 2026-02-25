@@ -15,6 +15,7 @@ model User {
   emailVerified         DateTime?
   image                 String?
   passwordHash          String?
+  customerNumber        Int       @default(autoincrement())
   role                  Role      @default(CUSTOMER)
   clubRole              ClubRole  @default(NONE)
   newsletterConsent     Boolean   @default(false)
@@ -142,11 +143,13 @@ model SKU {
   product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
   size       String // "XS","S","M","L","XL","XXL","116","128","140","152","164"
   stock      Int         @default(0)
+  itemNumber String? // varenummer (manual)
   orderItems OrderItem[]
 }
 
 model Order {
   id              String         @id @default(cuid())
+  orderNumber     Int            @default(autoincrement())
   userId          String?
   user            User?          @relation(fields: [userId], references: [id])
   guestEmail      String?

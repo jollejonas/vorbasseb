@@ -7,11 +7,11 @@ import { slugify } from "@/lib/utils";
 import type { Product, SKU, Category, ClubRole } from "@prisma/client";
 
 type ProductWithSkus = Product & { skus: SKU[]; category: Category | null };
-type SkuRow = { id?: string; size: string; stock: number };
+type SkuRow = { id?: string; size: string; stock: number; itemNumber?: string };
 
 const ADULT_SIZES = ["XS", "S", "M", "L", "XL", "XXL"];
 const KIDS_SIZES = ["116", "128", "140", "152", "164"];
-const ALL_SIZES = [...ADULT_SIZES, ...KIDS_SIZES];
+const ALL_SIZES = [...ADULT_SIZES, ...KIDS_SIZES, "One Size"];
 
 export function ProductForm({ product }: { product?: ProductWithSkus }) {
   const router = useRouter();
@@ -38,7 +38,7 @@ export function ProductForm({ product }: { product?: ProductWithSkus }) {
   const [description, setDescription] = useState(product?.description ?? "");
   const [images, setImages] = useState<string[]>(product?.images ?? []);
   const [skus, setSkus] = useState<SkuRow[]>(
-    product?.skus.map((s) => ({ id: s.id, size: s.size, stock: s.stock })) ?? []
+    product?.skus.map((s) => ({ id: s.id, size: s.size, stock: s.stock, itemNumber: s.itemNumber ?? "" })) ?? []
   );
   const [saving, setSaving] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -107,7 +107,11 @@ export function ProductForm({ product }: { product?: ProductWithSkus }) {
 
   function addSize(size: string) {
     if (skus.find((s) => s.size === size)) return;
-    setSkus((prev) => [...prev, { size, stock: 0 }]);
+    setSkus((prev) => [...prev, { size, stock: 0, itemNumber: "" }]);
+  }
+
+  function updateItemNumber(size: string, itemNumber: string) {
+    setSkus((prev) => prev.map((s) => (s.size === size ? { ...s, itemNumber } : s)));
   }
 
   function removeSize(size: string) {
@@ -144,7 +148,7 @@ export function ProductForm({ product }: { product?: ProductWithSkus }) {
         featured,
         description,
         images,
-        skus: skus.map(({ id, size, stock }) => ({ id, size, stock })),
+        skus: skus.map(({ id, size, stock, itemNumber }) => ({ id, size, stock, itemNumber: itemNumber || null })),
       };
 
       const url = isEdit ? `/api/products/${product.id}` : "/api/products";
@@ -415,6 +419,9 @@ export function ProductForm({ product }: { product?: ProductWithSkus }) {
                     Størrelse
                   </th>
                   <th className="text-left px-4 py-2 font-medium text-gray-600 text-xs">
+                    Varenummer
+                  </th>
+                  <th className="text-left px-4 py-2 font-medium text-gray-600 text-xs">
                     Lager (stk)
                   </th>
                   <th className="px-4 py-2" />
@@ -423,8 +430,17 @@ export function ProductForm({ product }: { product?: ProductWithSkus }) {
               <tbody className="divide-y divide-gray-100">
                 {skus.map((sku) => (
                   <tr key={sku.size}>
-                    <td className="px-4 py-2 font-mono font-semibold text-sm">
+                    <td className="px-4 py-2 font-mono font-semibold text-sm w-20">
                       {sku.size}
+                    </td>
+                    <td className="px-4 py-2">
+                      <input
+                        type="text"
+                        value={sku.itemNumber ?? ""}
+                        onChange={(e) => updateItemNumber(sku.size, e.target.value)}
+                        placeholder="f.eks. VBK-001-M"
+                        className="w-36 border rounded px-2 py-1 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-secondary"
+                      />
                     </td>
                     <td className="px-4 py-2">
                       <input

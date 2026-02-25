@@ -79,6 +79,7 @@ export default async function AdminBrugerePage({ searchParams }: Props) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-left text-gray-500">
+              <th className="pb-3 pr-4 font-medium">Kundenr.</th>
               <th className="pb-3 pr-4 font-medium">Navn</th>
               <th className="pb-3 pr-4 font-medium">E-mail</th>
               <th className="pb-3 pr-4 font-medium">Rolle</th>
@@ -95,6 +96,9 @@ export default async function AdminBrugerePage({ searchParams }: Props) {
               const isFreeGrant = user.subscription?.stripeSubscriptionId.startsWith("manual_");
               return (
                 <tr key={user.id}>
+                  <td className="py-3 pr-4 font-mono text-sm text-gray-500">
+                    #{user.customerNumber}
+                  </td>
                   <td className="py-3 pr-4 font-medium">
                     {user.name ?? "–"}
                   </td>

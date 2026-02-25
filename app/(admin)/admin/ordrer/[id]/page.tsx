@@ -35,7 +35,7 @@ export default async function AdminOrderDetailPage({ params }: Params) {
         include: { sku: { include: { product: true } } },
       },
       shippingAddress: true,
-      user: { select: { name: true, email: true } },
+      user: { select: { name: true, email: true, customerNumber: true } },
     },
   });
 
@@ -47,7 +47,7 @@ export default async function AdminOrderDetailPage({ params }: Params) {
         <Link href="/admin/ordrer" className="text-sm text-gray-500 hover:text-secondary">
           ← Ordrer
         </Link>
-        <h1 className="text-2xl font-bold">Ordre #{id.slice(-8).toUpperCase()}</h1>
+        <h1 className="text-2xl font-bold">Ordre #{order.orderNumber}</h1>
         <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
           {STATUS_LABELS[order.status] ?? order.status}
         </span>
@@ -69,6 +69,12 @@ export default async function AdminOrderDetailPage({ params }: Params) {
             <span className="text-gray-500">Telefon: </span>
             {order.phone ?? "–"}
           </p>
+          {order.user?.customerNumber && (
+            <p className="text-sm">
+              <span className="text-gray-500">Kundenr.: </span>
+              <span className="font-mono">#{order.user.customerNumber}</span>
+            </p>
+          )}
           <p className="text-sm">
             <span className="text-gray-500">Levering: </span>
             {order.deliveryMethod === "PICKUP" ? "Afhentning ved klubben" : "Forsendelse"}
@@ -105,6 +111,7 @@ export default async function AdminOrderDetailPage({ params }: Params) {
           <thead>
             <tr className="border-b text-left text-gray-500">
               <th className="px-5 py-2 font-medium">Produkt</th>
+              <th className="px-5 py-2 font-medium">Varenr.</th>
               <th className="px-5 py-2 font-medium">Størrelse</th>
               <th className="px-5 py-2 font-medium">Tryk</th>
               <th className="px-5 py-2 font-medium text-right">Antal</th>
@@ -115,6 +122,9 @@ export default async function AdminOrderDetailPage({ params }: Params) {
             {order.items.map((item) => (
               <tr key={item.id}>
                 <td className="px-5 py-3">{item.sku.product.name}</td>
+                <td className="px-5 py-3 font-mono text-xs text-gray-500">
+                  {item.sku.itemNumber ?? "–"}
+                </td>
                 <td className="px-5 py-3">{item.sku.size}</td>
                 <td className="px-5 py-3 text-gray-500">
                   {item.customName || item.customNumber
