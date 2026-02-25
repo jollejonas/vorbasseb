@@ -52,6 +52,7 @@ export function AddToCartSection({
       customizationFee: withCustomization && product.customizationFee != null
         ? product.customizationFee
         : undefined,
+      clubRoleRequired: product.clubRoleRequired ?? null,
     });
 
     toast.success(`${product.name} (${selectedSku.size}) lagt i kurven`);

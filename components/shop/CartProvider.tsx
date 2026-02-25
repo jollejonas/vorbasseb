@@ -19,6 +19,7 @@ export type CartItem = {
   customName?: string;
   customNumber?: string;
   customizationFee?: number; // øre
+  clubRoleRequired?: string | null; // null/undefined = public product; "TRAINER" = trainer-only
 };
 
 type CartState = { items: CartItem[] };
