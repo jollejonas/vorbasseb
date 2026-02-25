@@ -52,6 +52,7 @@ export default async function ButikPage({ searchParams }: Props) {
     stock: { gt: 0 },
     product: {
       published: true,
+      clubRoleRequired: null,
       ...(kategori ? { category: { slug: kategori } } : {}),
     },
   };
@@ -64,6 +65,7 @@ export default async function ButikPage({ searchParams }: Props) {
 
   const where: Prisma.ProductWhereInput = {
     published: true,
+    clubRoleRequired: null, // role-restricted products only appear on their dedicated page
     ...(kategori ? { category: { slug: kategori } } : {}),
     ...(size ? { skus: { some: { size, stock: { gt: 0 } } } } : {}),
     ...(tilgaengelig === "1" && !size

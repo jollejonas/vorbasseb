@@ -48,8 +48,8 @@ export function AddToCartSection({
       quantity: 1,
       image: product.images[0],
       customName: withCustomization ? customName || undefined : undefined,
-      customNumber: withCustomization ? customNumber || undefined : undefined,
-      customizationFee: withCustomization && product.customizationFee
+      customNumber: withCustomization && product.customizationShowNumber ? customNumber || undefined : undefined,
+      customizationFee: withCustomization && product.customizationFee != null
         ? product.customizationFee
         : undefined,
     });
@@ -99,7 +99,7 @@ export function AddToCartSection({
       </div>
 
       {/* Optional jersey customization */}
-      {product.customizationFee && (
+      {product.customizationFee != null && (
         <div className="border rounded-xl p-4 bg-surface">
           <label className="flex items-center gap-3 cursor-pointer">
             <input
@@ -109,15 +109,17 @@ export function AddToCartSection({
               className="w-4 h-4 accent-secondary"
             />
             <span className="text-sm font-medium">
-              Tilføj trøjetryk{" "}
-              <span className="text-gray-500 font-normal">
-                (+{formatPrice(product.customizationFee)})
-              </span>
+              {product.customizationLabel ?? "Tilføj trøjetryk"}{" "}
+              {product.customizationFee > 0 && (
+                <span className="text-gray-500 font-normal">
+                  (+{formatPrice(product.customizationFee)})
+                </span>
+              )}
             </span>
           </label>
 
           {withCustomization && (
-            <div className="mt-3 grid grid-cols-2 gap-3">
+            <div className={`mt-3 grid gap-3 ${product.customizationShowNumber ? "grid-cols-2" : "grid-cols-1"}`}>
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">
                   Navn (valgfrit)
@@ -131,19 +133,21 @@ export function AddToCartSection({
                   className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
                 />
               </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">
-                  Nummer (valgfrit)
-                </label>
-                <input
-                  value={customNumber}
-                  onChange={(e) =>
-                    setCustomNumber(e.target.value.replace(/\D/g, "").slice(0, 2))
-                  }
-                  placeholder="10"
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
-                />
-              </div>
+              {product.customizationShowNumber && (
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">
+                    Nummer (valgfrit)
+                  </label>
+                  <input
+                    value={customNumber}
+                    onChange={(e) =>
+                      setCustomNumber(e.target.value.replace(/\D/g, "").slice(0, 2))
+                    }
+                    placeholder="10"
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>

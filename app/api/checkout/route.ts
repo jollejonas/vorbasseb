@@ -15,6 +15,22 @@ export async function POST(req: NextRequest) {
 
   const isPickup = deliveryMethod === "PICKUP";
 
+  // Enforce clubRoleRequired: look up products for each cart item
+  const skuIds = items.map((i) => i.skuId);
+  const skusWithProducts = await prisma.sKU.findMany({
+    where: { id: { in: skuIds } },
+    select: { id: true, product: { select: { clubRoleRequired: true } } },
+  });
+  for (const sku of skusWithProducts) {
+    if (sku.product.clubRoleRequired) {
+      // @ts-expect-error custom field
+      const userClubRole = session?.user?.clubRole ?? "NONE";
+      if (userClubRole !== sku.product.clubRoleRequired) {
+        return NextResponse.json({ error: "Ikke autoriseret til dette produkt" }, { status: 403 });
+      }
+    }
+  }
+
   // Read shipping rules and member discount from DB (fall back to defaults)
   const cfg = await prisma.siteSetting
     .findMany({ where: { key: { in: ["shipping_flat_ore", "shipping_free_ore", "member_discount_pct"] } } })
@@ -106,6 +122,7 @@ export async function POST(req: NextRequest) {
     },
     success_url: `${baseUrl}/ordre-bekraeftelse?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${baseUrl}/kurv`,
+    phone_number_collection: { enabled: true },
     billing_address_collection: "required",
     ...(isPickup ? {} : { shipping_address_collection: { allowed_countries: ["DK"] } }),
     locale: "da",

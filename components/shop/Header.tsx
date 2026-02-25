@@ -24,6 +24,8 @@ export function Header() {
   const isAdmin = session?.user?.role === "ADMIN";
   // @ts-expect-error custom field
   const isMember = session?.user?.subscriptionStatus === "ACTIVE";
+  // @ts-expect-error custom field
+  const isTrainer = session?.user?.clubRole === "TRAINER";
 
   return (
     <header className="sticky top-0 z-50 bg-[#0a0f1e] text-white shadow-md">
@@ -47,6 +49,14 @@ export function Header() {
               {l.label}
             </Link>
           ))}
+          {isTrainer && (
+            <Link
+              href="/traener"
+              className="text-primary hover:text-primary-dark transition-colors"
+            >
+              TRÆNERE
+            </Link>
+          )}
           {isAdmin && (
             <Link
               href="/admin"
@@ -138,6 +148,15 @@ export function Header() {
               {l.label}
             </Link>
           ))}
+          {isTrainer && (
+            <Link
+              href="/traener"
+              onClick={() => setMenuOpen(false)}
+              className="text-primary"
+            >
+              TRÆNERE
+            </Link>
+          )}
           {isAdmin && (
             <Link
               href="/admin"

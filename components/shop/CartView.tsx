@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Trash2, Package, Truck } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Trash2, Package, Truck, Star } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useCart } from "./CartProvider";
@@ -12,6 +12,14 @@ type DeliveryMethod = "SHIPPING" | "PICKUP";
 export function CartView() {
   const { items, removeItem, updateQty, subtotal, clearCart } = useCart();
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>("SHIPPING");
+  const [membership, setMembership] = useState<{ isMember: boolean; discountPct: number } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/membership")
+      .then((r) => r.json())
+      .then(setMembership)
+      .catch(() => {});
+  }, []);
 
   if (items.length === 0) {
     return (
@@ -172,6 +180,14 @@ export function CartView() {
           <span>{formatPrice(total)}</span>
         </div>
       </div>
+
+      {/* Member discount notice */}
+      {membership?.isMember && (
+        <div className="flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-xl px-4 py-3 text-sm text-primary font-medium">
+          <Star size={16} className="shrink-0" />
+          Du sparer {membership.discountPct}% som fanklubsmedlem — rabatten trækkes automatisk i kassen
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex flex-col sm:flex-row gap-3">

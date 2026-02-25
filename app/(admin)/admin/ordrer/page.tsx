@@ -1,4 +1,5 @@
 import { Metadata } from "next";
+import Link from "next/link";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -17,6 +18,7 @@ export default async function AdminOrdrerPage() {
       items: {
         include: { sku: { include: { product: true } } },
       },
+      shippingAddress: true,
     },
     orderBy: { createdAt: "desc" },
   });
@@ -40,7 +42,8 @@ export default async function AdminOrdrerPage() {
               <th className="pb-3 pr-4 font-medium">Kunde</th>
               <th className="pb-3 pr-4 font-medium">Produkter</th>
               <th className="pb-3 pr-4 font-medium">Total</th>
-              <th className="pb-3 font-medium">Status / Handling</th>
+              <th className="pb-3 pr-4 font-medium">Status / Handling</th>
+              <th className="pb-3 font-medium" />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -52,7 +55,8 @@ export default async function AdminOrdrerPage() {
                   )}
                 </td>
                 <td className="py-4 pr-4">
-                  {order.guestEmail ?? order.userId ?? "–"}
+                  <p className="font-medium">{order.customerName ?? "–"}</p>
+                  <p className="text-xs text-gray-400">{order.guestEmail ?? order.userId ?? ""}</p>
                 </td>
                 <td className="py-4 pr-4">
                   <ul className="space-y-0.5">
@@ -66,7 +70,7 @@ export default async function AdminOrdrerPage() {
                 <td className="py-4 pr-4 font-medium">
                   {formatPrice(order.total)}
                 </td>
-                <td className="py-4">
+                <td className="py-4 pr-4">
                   <AdminOrderActions
                     orderId={order.id}
                     initialStatus={order.status}
@@ -74,6 +78,14 @@ export default async function AdminOrdrerPage() {
                     initialRefunded={order.refunded}
                     deliveryMethod={order.deliveryMethod}
                   />
+                </td>
+                <td className="py-4 text-right whitespace-nowrap">
+                  <Link
+                    href={`/admin/ordrer/${order.id}`}
+                    className="text-secondary text-xs hover:underline"
+                  >
+                    Se detaljer →
+                  </Link>
                 </td>
               </tr>
             ))}

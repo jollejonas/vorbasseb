@@ -74,12 +74,35 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
   const discountApplied =
     isMember === "true" ? Math.round(subtotal * 0.1) : 0;
 
+  const customerName = session.customer_details?.name ?? null;
+  const phone = session.customer_details?.phone ?? null;
+  const shippingInfo = session.collected_information?.shipping_details;
+
   await prisma.$transaction(
     async (tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) => {
+      // Create address record from shipping details (if available)
+      let addressId: string | null = null;
+      if (shippingInfo?.address && shippingInfo.name) {
+        const address = await tx.address.create({
+          data: {
+            userId: userId || null,
+            name: shippingInfo.name,
+            line1: shippingInfo.address.line1 ?? "",
+            line2: shippingInfo.address.line2 ?? null,
+            city: shippingInfo.address.city ?? "",
+            postcode: shippingInfo.address.postal_code ?? "",
+            country: shippingInfo.address.country ?? "DK",
+          },
+        });
+        addressId = address.id;
+      }
+
       await tx.order.create({
         data: {
           userId: userId || null,
           guestEmail: session.customer_details?.email ?? null,
+          customerName,
+          phone,
           status: "PAID",
           stripeSessionId: session.id,
           stripePaymentId: session.payment_intent as string,
@@ -89,6 +112,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
           discountApplied,
           shippingFee: Number(shippingFee ?? 0),
           deliveryMethod: deliveryMethod === "PICKUP" ? "PICKUP" : "SHIPPING",
+          addressId,
           items: {
             create: items.map((i) => ({
               skuId: i.skuId,

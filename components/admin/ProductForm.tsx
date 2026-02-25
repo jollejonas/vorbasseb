@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { slugify } from "@/lib/utils";
-import type { Product, SKU, Category } from "@prisma/client";
+import type { Product, SKU, Category, ClubRole } from "@prisma/client";
 
 type ProductWithSkus = Product & { skus: SKU[]; category: Category | null };
 type SkuRow = { id?: string; size: string; stock: number };
@@ -30,6 +30,9 @@ export function ProductForm({ product }: { product?: ProductWithSkus }) {
   );
   const [membersOnly, setMembersOnly] = useState(product?.membersOnly ?? false);
   const [membersEarlyAccess, setMembersEarlyAccess] = useState(product?.membersEarlyAccess ?? false);
+  const [clubRoleRequired, setClubRoleRequired] = useState<ClubRole | "">(product?.clubRoleRequired ?? "");
+  const [customizationLabel, setCustomizationLabel] = useState(product?.customizationLabel ?? "");
+  const [customizationShowNumber, setCustomizationShowNumber] = useState(product?.customizationShowNumber ?? true);
   const [published, setPublished] = useState(product?.published ?? true);
   const [featured, setFeatured] = useState(product?.featured ?? false);
   const [description, setDescription] = useState(product?.description ?? "");
@@ -134,6 +137,9 @@ export function ProductForm({ product }: { product?: ProductWithSkus }) {
           : null,
         membersOnly,
         membersEarlyAccess,
+        clubRoleRequired: clubRoleRequired || null,
+        customizationLabel: customizationLabel || null,
+        customizationShowNumber,
         published,
         featured,
         description,
@@ -251,6 +257,53 @@ export function ProductForm({ product }: { product?: ProductWithSkus }) {
               placeholder="75.00"
             />
             <p className="text-xs text-gray-400 mt-1">Lad stå tomt hvis ikke relevant</p>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Kræver klubrolle
+          </label>
+          <select
+            value={clubRoleRequired}
+            onChange={(e) => setClubRoleRequired(e.target.value as ClubRole | "")}
+            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
+          >
+            <option value="">Ingen begrænsning (synlig for alle)</option>
+            <option value="PLAYER">Kun spillere (PLAYER)</option>
+            <option value="TRAINER">Kun trænere (TRAINER)</option>
+          </select>
+          <p className="text-xs text-gray-400 mt-1">
+            Produkter med rollebegrænsning vises ikke i den almindelige butik
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              PersonaliseringsLabel
+            </label>
+            <input
+              type="text"
+              value={customizationLabel}
+              onChange={(e) => setCustomizationLabel(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
+              placeholder="f.eks. Initialer eller Trøjenavn"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Overskrift på personaliseringsfeltet (bruges kun hvis gebyr er sat)
+            </p>
+          </div>
+          <div className="flex items-start pt-6">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={customizationShowNumber}
+                onChange={(e) => setCustomizationShowNumber(e.target.checked)}
+                className="w-4 h-4 accent-secondary"
+              />
+              <span className="text-sm">Vis nummerfelt</span>
+            </label>
           </div>
         </div>
 

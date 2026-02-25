@@ -122,8 +122,11 @@ model Product {
   category         Category?   @relation(fields: [categoryId], references: [id])
   price            Int // øre (DKK × 100)
   customizationFee Int? // øre, kun for trøjer med tryk
-  membersOnly          Boolean     @default(false)
-  membersEarlyAccess   Boolean     @default(false)
+  membersOnly             Boolean     @default(false)
+  membersEarlyAccess      Boolean     @default(false)
+  clubRoleRequired        ClubRole?
+  customizationLabel      String?
+  customizationShowNumber Boolean     @default(true)
   published            Boolean     @default(true)
   featured             Boolean     @default(false)
   images           String[] // Cloudinary URLs
@@ -155,6 +158,8 @@ model Order {
   discountApplied Int            @default(0) // øre
   shippingFee     Int // øre
   trackingNumber  String?
+  customerName    String?
+  phone           String?
   refunded        Boolean        @default(false)
   cancelledAt     DateTime?
   items           OrderItem[]
