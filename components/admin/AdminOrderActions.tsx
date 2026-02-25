@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Package, Truck } from "lucide-react";
 
+// Non-terminal statuses only — CANCELLED and REFUNDED are reached via dedicated buttons
 const STATUS_OPTIONS: Record<string, { label: string; color: string }> = {
   PENDING: { label: "Afventer", color: "bg-yellow-100 text-yellow-700" },
   PAID: { label: "Betalt", color: "bg-blue-100 text-blue-700" },
@@ -11,6 +12,9 @@ const STATUS_OPTIONS: Record<string, { label: string; color: string }> = {
   AWAITING_PICKUP: { label: "Afventer afhentning", color: "bg-orange-100 text-orange-700" },
   PICKUP_READY: { label: "Klar til afhentning", color: "bg-teal-100 text-teal-700" },
   DELIVERED: { label: "Leveret", color: "bg-green-100 text-green-700" },
+};
+
+const TERMINAL_LABELS: Record<string, { label: string; color: string }> = {
   CANCELLED: { label: "Annulleret", color: "bg-red-100 text-red-700" },
   REFUNDED: { label: "Refunderet", color: "bg-gray-100 text-gray-600" },
 };
@@ -30,11 +34,12 @@ export function AdminOrderActions({
 }) {
   const [status, setStatus] = useState(initialStatus);
   const [trackingNumber, setTrackingNumber] = useState(initialTrackingNumber ?? "");
-  const [refunded, setRefunded] = useState(initialRefunded);
   const [saving, setSaving] = useState(false);
 
-  const isCancelled = status === "CANCELLED";
   const isShipped = status === "SHIPPED";
+  const isCancelled = status === "CANCELLED";
+  const isRefunded = status === "REFUNDED";
+  const isTerminal = isCancelled || isRefunded;
 
   async function patch(data: Record<string, unknown>) {
     setSaving(true);
@@ -67,11 +72,12 @@ export function AdminOrderActions({
     }
   }
 
-  async function handleRefundToggle() {
-    const newVal = !refunded;
-    if (await patch({ refunded: newVal })) {
-      setRefunded(newVal);
-      toast.success(newVal ? "Markeret som refunderet" : "Refundering fjernet");
+  async function handleRefund() {
+    if (!confirm("Markér ordren som refunderet?")) return;
+    // Set both status and refunded flag atomically
+    if (await patch({ status: "REFUNDED", refunded: true })) {
+      setStatus("REFUNDED");
+      toast.success("Ordre refunderet");
     }
   }
 
@@ -81,7 +87,7 @@ export function AdminOrderActions({
     }
   }
 
-  const badge = STATUS_OPTIONS[status];
+  const activeBadge = STATUS_OPTIONS[status] ?? TERMINAL_LABELS[status];
 
   return (
     <div className="space-y-2 min-w-[200px]">
@@ -94,12 +100,14 @@ export function AdminOrderActions({
         )}
       </div>
 
-      {/* Status badge + dropdown */}
+      {/* Status badge */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge?.color ?? "bg-gray-100 text-gray-600"}`}>
-          {badge?.label ?? status}
+        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${activeBadge?.color ?? "bg-gray-100 text-gray-600"}`}>
+          {activeBadge?.label ?? status}
         </span>
-        {!isCancelled && (
+
+        {/* Dropdown only for non-terminal statuses */}
+        {!isTerminal && (
           <select
             value={status}
             onChange={handleStatusChange}
@@ -133,8 +141,8 @@ export function AdminOrderActions({
         </div>
       )}
 
-      {/* Cancel + refund */}
-      {!isCancelled && (
+      {/* Cancel button — only for active orders */}
+      {!isTerminal && (
         <button
           onClick={handleCancel}
           disabled={saving}
@@ -143,19 +151,16 @@ export function AdminOrderActions({
           Annullér ordre
         </button>
       )}
+
+      {/* Refund button — only after cancellation */}
       {isCancelled && (
-        <label className="flex items-center gap-1.5 text-xs cursor-pointer">
-          <input
-            type="checkbox"
-            checked={refunded}
-            onChange={handleRefundToggle}
-            disabled={saving}
-            className="accent-secondary"
-          />
-          <span className={refunded ? "text-green-600 font-medium" : "text-gray-600"}>
-            {refunded ? "Refunderet" : "Markér som refunderet"}
-          </span>
-        </label>
+        <button
+          onClick={handleRefund}
+          disabled={saving}
+          className="block text-xs text-orange-600 underline hover:text-orange-800 disabled:opacity-60 transition"
+        >
+          Markér som refunderet
+        </button>
       )}
     </div>
   );
