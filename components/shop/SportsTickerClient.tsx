@@ -20,6 +20,7 @@ function formatDay(dt: Date | string): string {
     weekday: "short",
     day: "numeric",
     month: "numeric",
+    timeZone: "Europe/Copenhagen",
   }).format(new Date(dt));
 }
 
@@ -27,6 +28,7 @@ function formatTime(dt: Date | string): string {
   return new Intl.DateTimeFormat("da-DK", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Europe/Copenhagen",
   }).format(new Date(dt));
 }
 

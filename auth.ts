@@ -45,18 +45,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       // Always refresh clubRole and subscriptionStatus so changes take effect without re-login
       if (token.id) {
-        const [dbUser, subscription] = await Promise.all([
-          prisma.user.findUnique({
-            where: { id: token.id as string },
-            select: { clubRole: true },
-          }),
-          prisma.subscription.findUnique({
-            where: { userId: token.id as string },
-            select: { status: true },
-          }),
-        ]);
-        token.clubRole = dbUser?.clubRole ?? "NONE";
-        token.subscriptionStatus = subscription?.status ?? null;
+        try {
+          const [dbUser, subscription] = await Promise.all([
+            prisma.user.findUnique({
+              where: { id: token.id as string },
+              select: { clubRole: true },
+            }),
+            prisma.subscription.findUnique({
+              where: { userId: token.id as string },
+              select: { status: true },
+            }),
+          ]);
+          token.clubRole = dbUser?.clubRole ?? "NONE";
+          token.subscriptionStatus = subscription?.status ?? null;
+        } catch {
+          // DB temporarily unavailable — keep existing token values
+        }
       }
       return token;
     },
