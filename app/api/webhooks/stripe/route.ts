@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
 async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
   if (session.mode !== "payment") return;
 
-  const { userId, cartJson, shippingFee, isMember, deliveryMethod } = session.metadata ?? {};
+  const { userId, cartJson, shippingFee, isMember, deliveryMethod, grantIds, totalDiscountApplied } = session.metadata ?? {};
   if (!cartJson) return;
 
   // Idempotency: skip if order already exists for this session
@@ -67,12 +67,8 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
   };
   const items: CartMeta[] = JSON.parse(cartJson);
 
-  const subtotal = items.reduce(
-    (s, i) => s + (i.price + i.customizationFee) * i.quantity,
-    0,
-  );
-  const discountApplied =
-    isMember === "true" ? Math.round(subtotal * 0.1) : 0;
+  // Use the combined discount value stored in metadata (grants + member discount)
+  const discountApplied = Number(totalDiscountApplied ?? 0);
 
   const customerName = session.customer_details?.name ?? null;
   const phone = session.customer_details?.phone ?? null;
@@ -97,7 +93,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
         addressId = address.id;
       }
 
-      await tx.order.create({
+      const createdOrder = await tx.order.create({
         data: {
           userId: userId || null,
           guestEmail: session.customer_details?.email ?? null,
@@ -106,9 +102,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
           status: "PAID",
           stripeSessionId: session.id,
           stripePaymentId: session.payment_intent as string,
-          total:
-            session.amount_total ??
-            subtotal - discountApplied + Number(shippingFee ?? 0),
+          total: session.amount_total ?? 0,
           discountApplied,
           shippingFee: Number(shippingFee ?? 0),
           deliveryMethod: deliveryMethod === "PICKUP" ? "PICKUP" : "SHIPPING",
@@ -123,7 +117,17 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
             })),
           },
         },
+        select: { id: true },
       });
+
+      // Mark any applied grants as USED
+      const parsedGrantIds: string[] = grantIds ? JSON.parse(grantIds) : [];
+      if (parsedGrantIds.length > 0) {
+        await tx.trainerGrant.updateMany({
+          where: { id: { in: parsedGrantIds }, status: "PENDING" },
+          data: { status: "USED", orderId: createdOrder.id },
+        });
+      }
 
       // Decrement stock for each item
       for (const item of items) {

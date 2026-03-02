@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { GrantManager } from "@/components/admin/GrantManager";
 
 export const metadata: Metadata = { title: "Træneroversigt – Admin" };
 
@@ -16,6 +17,16 @@ export default async function AdminTraenerPage() {
     where: { published: true, clubRoleRequired: "TRAINER" },
     include: {
       skus: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  // All pending grants
+  const pendingGrants = await prisma.trainerGrant.findMany({
+    where: { status: "PENDING" },
+    include: {
+      user: { select: { id: true, name: true, email: true } },
+      product: { select: { id: true, name: true } },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -151,6 +162,19 @@ export default async function AdminTraenerPage() {
           Ingen brugere har trænertilladelse endnu. Sæt en brugers klubrolle til TRAINER under brugerstyring.
         </p>
       )}
+
+      <GrantManager
+        trainers={trainers.map((t) => ({ id: t.id, name: t.name, email: t.email }))}
+        products={trainerProducts.map((p) => ({ id: p.id, name: p.name }))}
+        initialGrants={pendingGrants.map((g) => ({
+          id: g.id,
+          userId: g.userId,
+          productId: g.productId,
+          user: { name: g.user.name, email: g.user.email },
+          product: { name: g.product.name },
+          createdAt: g.createdAt.toISOString(),
+        }))}
+      />
     </div>
   );
 }

@@ -13,13 +13,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Tom kurv" }, { status: 400 });
   }
 
-  const isPickup = deliveryMethod === "PICKUP";
-
   // Enforce clubRoleRequired: look up products for each cart item
   const skuIds = items.map((i) => i.skuId);
   const skusWithProducts = await prisma.sKU.findMany({
     where: { id: { in: skuIds } },
-    select: { id: true, product: { select: { clubRoleRequired: true } } },
+    select: { id: true, productId: true, product: { select: { clubRoleRequired: true } } },
   });
   for (const sku of skusWithProducts) {
     if (sku.product.clubRoleRequired) {
@@ -31,7 +29,15 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Read shipping rules and member discount from DB (fall back to defaults)
+  // Force PICKUP if any item requires a club role (all restricted items are pickup-only)
+  const hasTrainerItem = skusWithProducts.some((s) => s.product.clubRoleRequired === "TRAINER");
+  const effectiveDelivery: "SHIPPING" | "PICKUP" = hasTrainerItem ? "PICKUP" : deliveryMethod;
+  const isPickup = effectiveDelivery === "PICKUP";
+
+  // Build skuId → productId map for grant matching
+  const skuProductMap = new Map(skusWithProducts.map((s) => [s.id, s.productId]));
+
+  // Read shipping rules and member discount from DB
   const cfg = await prisma.siteSetting
     .findMany({ where: { key: { in: ["shipping_flat_ore", "shipping_free_ore", "member_discount_pct"] } } })
     .catch(() => []);
@@ -42,39 +48,132 @@ export async function POST(req: NextRequest) {
   // Check if user is an active member (for discount)
   let isMember = false;
   if (session?.user?.id) {
-    const sub = await prisma.subscription.findUnique({
-      where: { userId: session.user.id },
-    });
+    const sub = await prisma.subscription.findUnique({ where: { userId: session.user.id } });
     isMember = sub?.status === "ACTIVE";
   }
 
-  const subtotal = items.reduce(
+  // Resolve pending grants for this user
+  const pendingGrants = session?.user?.id
+    ? await prisma.trainerGrant.findMany({
+        where: { userId: session.user.id, status: "PENDING" },
+        select: { id: true, productId: true },
+      })
+    : [];
+
+  // Build grant pool: productId → queue of grantIds (one consumed per unit)
+  const grantPool = new Map<string, string[]>();
+  for (const g of pendingGrants) {
+    if (!grantPool.has(g.productId)) grantPool.set(g.productId, []);
+    grantPool.get(g.productId)!.push(g.id);
+  }
+
+  // Determine which item units are covered by grants
+  // appliedGrantIds = grants we'll consume; grantDiscountTotal = value in øre
+  const appliedGrantIds: string[] = [];
+  let grantDiscountTotal = 0;
+
+  // Per-item: how many units are granted
+  const grantedQtyMap = new Map<string, number>(); // skuId → granted quantity
+
+  for (const item of items) {
+    const productId = skuProductMap.get(item.skuId);
+    if (!productId) continue;
+    const pool = grantPool.get(productId);
+    if (!pool || pool.length === 0) continue;
+
+    const unitPrice = item.price + (item.customizationFee ?? 0);
+    let grantedUnits = 0;
+    for (let u = 0; u < item.quantity && pool.length > 0; u++) {
+      const grantId = pool.shift()!;
+      appliedGrantIds.push(grantId);
+      grantedUnits++;
+      grantDiscountTotal += unitPrice;
+    }
+    if (grantedUnits > 0) grantedQtyMap.set(item.skuId, grantedUnits);
+  }
+
+  // Compute totals
+  const originalSubtotal = items.reduce(
     (s, i) => s + (i.price + (i.customizationFee ?? 0)) * i.quantity,
     0,
   );
-  // Pickup = always free; shipping = free above threshold
-  const shipping = isPickup ? 0 : subtotal >= freeOre ? 0 : flatOre;
+  const effectiveSubtotal = originalSubtotal - grantDiscountTotal;
+  const shipping = isPickup ? 0 : effectiveSubtotal >= freeOre ? 0 : flatOre;
+  const memberDiscount = isMember ? Math.round(effectiveSubtotal * discountPct / 100) : 0;
+  const totalDiscountOre = grantDiscountTotal + memberDiscount;
+  const finalTotal = effectiveSubtotal + shipping - memberDiscount;
 
-  // Build Stripe line items
-  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = items.map(
-    (item) => ({
+  // ── Zero-total path: skip Stripe, create order directly ──────────────────
+  if (finalTotal <= 0 && appliedGrantIds.length > 0) {
+    const order = await prisma.$transaction(async (tx) => {
+      // Decrement stock
+      for (const item of items) {
+        await tx.sKU.update({
+          where: { id: item.skuId },
+          data: { stock: { decrement: item.quantity } },
+        });
+      }
+
+      // Create order
+      const created = await tx.order.create({
+        data: {
+          userId: session?.user?.id ?? null,
+          customerName: session?.user?.name ?? null,
+          status: "PAID",
+          deliveryMethod: "PICKUP",
+          total: 0,
+          shippingFee: 0,
+          discountApplied: grantDiscountTotal,
+          items: {
+            create: items.map((item) => ({
+              skuId: item.skuId,
+              quantity: item.quantity,
+              priceAtPurchase: 0,
+              customName: item.customName ?? null,
+              customNumber: item.customNumber ?? null,
+            })),
+          },
+        },
+        select: { id: true, orderNumber: true },
+      });
+
+      // Mark grants as used — with race condition guard
+      const result = await tx.trainerGrant.updateMany({
+        where: { id: { in: appliedGrantIds }, status: "PENDING" },
+        data: { status: "USED", orderId: created.id },
+      });
+      if (result.count !== appliedGrantIds.length) {
+        throw new Error("En eller flere tildelinger er allerede brugt — prøv igen.");
+      }
+
+      return created;
+    });
+
+    return NextResponse.json({ redirect: "/ordre-bekraeftelse" });
+  }
+
+  // ── Stripe path ───────────────────────────────────────────────────────────
+
+  // Build line items at original prices — grants applied via coupon (Stripe rejects unit_amount: 0)
+  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
+
+  for (const item of items) {
+    const unitPrice = item.price + (item.customizationFee ?? 0);
+    const name = `${item.productName} (${item.size})${
+      item.customName || item.customNumber
+        ? ` · Tryk: ${item.customName ?? ""} ${item.customNumber ?? ""}`.trim()
+        : ""
+    }`;
+    lineItems.push({
       price_data: {
         currency: "dkk",
-        product_data: {
-          name: `${item.productName} (${item.size})${
-            item.customName || item.customNumber
-              ? ` · Tryk: ${item.customName ?? ""} ${item.customNumber ?? ""}`.trim()
-              : ""
-          }`,
-          images: item.image ? [item.image] : [],
-        },
-        unit_amount: item.price + (item.customizationFee ?? 0),
+        product_data: { name, images: item.image ? [item.image] : [] },
+        unit_amount: unitPrice,
       },
       quantity: item.quantity,
-    }),
-  );
+    });
+  }
 
-  // Shipping line item
   if (shipping > 0) {
     lineItems.push({
       price_data: {
@@ -86,13 +185,21 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Apply member discount via Stripe coupon (percentage read from DB)
+  // Combined coupon for grants + member discount
   let discounts: Stripe.Checkout.SessionCreateParams["discounts"] = undefined;
-  if (isMember) {
+  if (totalDiscountOre > 0) {
+    const couponName =
+      grantDiscountTotal > 0 && memberDiscount > 0
+        ? `Tildeling + Fanklubsrabat ${discountPct}%`
+        : grantDiscountTotal > 0
+          ? "Tildelt produkt"
+          : `Fanklubsrabat ${discountPct}%`;
+
     const coupon = await stripe.coupons.create({
-      percent_off: discountPct,
+      amount_off: totalDiscountOre,
+      currency: "dkk",
       duration: "once",
-      name: `Fanklubsrabat ${discountPct}%`,
+      name: couponName,
     });
     discounts = [{ coupon: coupon.id }];
   }
@@ -118,7 +225,9 @@ export async function POST(req: NextRequest) {
       ),
       shippingFee: String(shipping),
       isMember: String(isMember),
-      deliveryMethod,
+      deliveryMethod: effectiveDelivery,
+      grantIds: JSON.stringify(appliedGrantIds),
+      totalDiscountApplied: String(totalDiscountOre),
     },
     success_url: `${baseUrl}/ordre-bekraeftelse?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${baseUrl}/kurv`,
