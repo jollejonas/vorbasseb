@@ -144,12 +144,13 @@ model Product {
 }
 
 model GlobalColor {
-  id           String               @id @default(cuid())
-  name         String               // "Rød"
-  hex          String               // "#CC0000"
-  code         String               @unique // "03" — used in varenummer
-  position     Int                  @default(0)
-  optionValues ProductOptionValue[]
+  id                   String                    @id @default(cuid())
+  name                 String                    // "Rød"
+  hex                  String                    // "#CC0000"
+  code                 String                    @unique // "03" — used in varenummer
+  position             Int                       @default(0)
+  optionValues         ProductOptionValue[]
+  optionTemplateValues OptionGroupTemplateValue[]
 
   @@index([position])
 }
@@ -199,6 +200,36 @@ model SKUOptionValue {
 
   @@id([skuId, optionValueId])
   @@index([optionValueId])
+}
+
+// ─── Global option group template library ─────────────────────────────────
+
+model OptionGroupTemplate {
+  id        String                     @id @default(cuid())
+  name      String                     // "Voksen tøjstørrelser", "Sko EU størrelser"
+  type      ProductOptionType
+  tags      String[]                   // ["Tøj", "Sport"] — free-form, multiple
+  required  Boolean                    @default(false)
+  fee       Int?                       // øre — TEXT/CUSTOM only
+  inputType String?                    // "text"|"number"|"checkbox"|"dropdown" — CUSTOM only
+  position  Int                        @default(0)
+  values    OptionGroupTemplateValue[]
+  createdAt DateTime                   @default(now())
+
+  @@index([type])
+}
+
+model OptionGroupTemplateValue {
+  id            String              @id @default(cuid())
+  templateId    String
+  template      OptionGroupTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  label         String
+  position      Int                 @default(0)
+  globalColorId String?
+  globalColor   GlobalColor?        @relation(fields: [globalColorId], references: [id], onDelete: SetNull)
+  images        String[]
+
+  @@index([templateId, position])
 }
 
 model ColorVariant {

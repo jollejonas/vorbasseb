@@ -4,7 +4,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { slugify } from "@/lib/utils";
-import type { Product, SKU, Category, ClubRole, ColorVariant, ProductOptionGroup, ProductOptionValue, GlobalColor } from "@prisma/client";
+import type { Product, SKU, Category, ClubRole, ColorVariant, ProductOptionGroup, ProductOptionValue, GlobalColor, OptionGroupTemplate, OptionGroupTemplateValue } from "@prisma/client";
+import { BookOpen, X } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -52,6 +53,9 @@ type SkuMatrixCell = {
 };
 
 type LegacySkuRow = { id?: string; size: string; stock: number; itemNumber?: string };
+
+type TemplateValueFull = OptionGroupTemplateValue & { globalColor: GlobalColor | null };
+type TemplateFull = OptionGroupTemplate & { values: TemplateValueFull[] };
 type LegacyColorVariantRow = {
   id?: string; name: string; hex: string; images: string[]; skus: LegacySkuRow[];
 };
@@ -102,6 +106,13 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
   // ── New option groups system ────────────────────────────────────────────────
   const [useOptionGroups, setUseOptionGroups] = useState(hasOptionGroups);
   const [globalColors, setGlobalColors] = useState<GlobalColor[]>([]);
+
+  // ── Template library panel ──────────────────────────────────────────────────
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryTemplates, setLibraryTemplates] = useState<TemplateFull[]>([]);
+  const [libraryLoading, setLibraryLoading] = useState(false);
+  const [libraryFilterType, setLibraryFilterType] = useState<OptionType | "ALL">("ALL");
+  const [libraryFilterTag, setLibraryFilterTag] = useState<string | null>(null);
 
   const [optionGroups, setOptionGroups] = useState<OptionGroupRow[]>(() => {
     if (!product?.optionGroups.length) return [];
@@ -347,6 +358,79 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
     setSkuMatrix((prev) =>
       prev.map((c) => c.colorValueKey !== colorKey || c.sizeValueKey !== sizeKey ? c : { ...c, ...patch })
     );
+  }
+
+  // ── Template library helpers ─────────────────────────────────────────────────
+
+  function openLibrary() {
+    setLibraryOpen(true);
+    if (libraryTemplates.length === 0) {
+      setLibraryLoading(true);
+      fetch("/api/admin/option-templates")
+        .then((r) => r.json())
+        .then((data: TemplateFull[]) => setLibraryTemplates(data))
+        .catch(() => {})
+        .finally(() => setLibraryLoading(false));
+    }
+  }
+
+  function applyTemplate(tpl: TemplateFull) {
+    const groupKey = nextKey();
+    const values: OptionValueRow[] = tpl.values.map((v) => ({
+      _key: nextKey(),
+      label: v.label,
+      position: v.position,
+      globalColorId: v.globalColorId ?? null,
+      globalColorHex: v.globalColor?.hex,
+      images: v.images,
+    }));
+    const newGroup: OptionGroupRow = {
+      _key: groupKey,
+      type: tpl.type as OptionType,
+      label: tpl.name,
+      position: optionGroups.length,
+      required: tpl.required,
+      feeKr: tpl.fee ? String(Math.round(tpl.fee / 100)) : "",
+      inputType: tpl.inputType ?? "text",
+      values,
+    };
+
+    setOptionGroups((prev) => [...prev, newGroup]);
+
+    // Expand SKU matrix if COLOR or SIZE
+    if (tpl.type === "COLOR") {
+      const sizeGrp = optionGroups.find((g) => g.type === "SIZE");
+      if (sizeGrp) {
+        setSkuMatrix((prev) => {
+          const next = [...prev];
+          for (const cv of values) {
+            for (const sv of sizeGrp.values) {
+              if (!next.find((c) => c.colorValueKey === cv._key && c.sizeValueKey === sv._key)) {
+                next.push({ colorValueKey: cv._key, sizeValueKey: sv._key, stock: 0, itemNumber: "", itemNumberOverride: false });
+              }
+            }
+          }
+          return next;
+        });
+      }
+    } else if (tpl.type === "SIZE") {
+      const colorGrp = optionGroups.find((g) => g.type === "COLOR");
+      if (colorGrp) {
+        setSkuMatrix((prev) => {
+          const next = [...prev];
+          for (const sv of values) {
+            for (const cv of colorGrp.values) {
+              if (!next.find((c) => c.colorValueKey === cv._key && c.sizeValueKey === sv._key)) {
+                next.push({ colorValueKey: cv._key, sizeValueKey: sv._key, stock: 0, itemNumber: "", itemNumberOverride: false });
+              }
+            }
+          }
+          return next;
+        });
+      }
+    }
+
+    setLibraryOpen(false);
   }
 
   // ── Legacy helpers ────────────────────────────────────────────────────────────
@@ -669,7 +753,101 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
                   </button>
                 );
               })}
+              <button
+                type="button"
+                onClick={() => libraryOpen ? setLibraryOpen(false) : openLibrary()}
+                className={`flex items-center gap-1 px-3 py-1.5 text-xs border rounded-lg transition ${
+                  libraryOpen ? "bg-secondary text-white border-secondary" : "hover:border-secondary hover:text-secondary"
+                }`}
+              >
+                <BookOpen size={12} />
+                Fra bibliotek
+              </button>
             </div>
+
+            {/* Template library panel */}
+            {libraryOpen && (
+              <div className="border rounded-xl p-4 bg-gray-50 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">Vælg skabelon</p>
+                  <button type="button" onClick={() => setLibraryOpen(false)} className="text-gray-400 hover:text-gray-600">
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {/* Filters */}
+                <div className="flex flex-wrap gap-2">
+                  <div className="flex gap-1 border rounded-lg p-0.5 bg-white text-xs">
+                    {(["ALL", "COLOR", "SIZE", "TEXT", "SELECT", "CUSTOM"] as const).map((t) => {
+                      const lbl: Record<string, string> = { ALL: "Alle", COLOR: "Farve", SIZE: "Str.", TEXT: "Tekst", SELECT: "Valg", CUSTOM: "Custom" };
+                      return (
+                        <button key={t} type="button" onClick={() => setLibraryFilterType(t)}
+                          className={`px-2 py-1 rounded-md transition ${libraryFilterType === t ? "bg-secondary text-white" : "hover:bg-gray-100"}`}>
+                          {lbl[t]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {Array.from(new Set(libraryTemplates.flatMap((t) => t.tags))).sort().map((tag) => (
+                    <button key={tag} type="button" onClick={() => setLibraryFilterTag(libraryFilterTag === tag ? null : tag)}
+                      className={`px-2 py-1 text-xs border rounded-full transition ${
+                        libraryFilterTag === tag ? "bg-secondary text-white border-secondary" : "border-gray-300 hover:border-secondary"
+                      }`}>
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Template list */}
+                {libraryLoading && <p className="text-xs text-gray-400">Henter skabeloner…</p>}
+                {!libraryLoading && libraryTemplates.length === 0 && (
+                  <p className="text-xs text-gray-400">Ingen skabeloner oprettet endnu.</p>
+                )}
+                <div className="space-y-2">
+                  {libraryTemplates
+                    .filter((t) => {
+                      if (libraryFilterType !== "ALL" && t.type !== libraryFilterType) return false;
+                      if (libraryFilterTag && !t.tags.includes(libraryFilterTag)) return false;
+                      // Disable if COLOR or SIZE already present
+                      const alreadyHas = (t.type === "COLOR" || t.type === "SIZE") && optionGroups.some((g) => g.type === t.type);
+                      return !alreadyHas;
+                    })
+                    .map((t) => {
+                      const typeBadge: Record<string, string> = {
+                        COLOR: "bg-pink-100 text-pink-700", SIZE: "bg-blue-100 text-blue-700",
+                        TEXT: "bg-yellow-100 text-yellow-700", SELECT: "bg-purple-100 text-purple-700", CUSTOM: "bg-gray-100 text-gray-700",
+                      };
+                      const typeLabel: Record<string, string> = {
+                        COLOR: "Farve", SIZE: "Størrelse", TEXT: "Tekst", SELECT: "Vælg", CUSTOM: "Custom",
+                      };
+                      return (
+                        <div key={t.id} className="flex items-center gap-3 bg-white border rounded-lg px-3 py-2">
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${typeBadge[t.type]}`}>
+                            {typeLabel[t.type]}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{t.name}</p>
+                            {t.values.length > 0 && (
+                              <p className="text-xs text-gray-400 truncate">{t.values.map((v) => v.label).join(" · ")}</p>
+                            )}
+                            {t.tags.length > 0 && (
+                              <div className="flex gap-1 mt-0.5 flex-wrap">
+                                {t.tags.map((tag) => (
+                                  <span key={tag} className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">{tag}</span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <button type="button" onClick={() => applyTemplate(t)}
+                            className="text-xs font-medium text-secondary hover:underline shrink-0">
+                            Brug
+                          </button>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
 
             {/* SKU matrix (shown when both COLOR and SIZE groups with values exist) */}
             {hasMatrix && colorGroup && sizeGroup && (
