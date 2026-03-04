@@ -17,7 +17,6 @@ export async function GET(req: NextRequest) {
       published: true,
       ...(category ? { category: { slug: category } } : {}),
       ...(featured === "true" ? { featured: true } : {}),
-      // Non-members can still see member products (just can't buy them)
       ...(q
         ? {
             OR: [
@@ -28,9 +27,18 @@ export async function GET(req: NextRequest) {
         : {}),
     },
     include: {
-      skus: true,
+      skus: { include: { optionValues: { include: { optionValue: true } } } },
       category: true,
       colorVariants: { include: { skus: true }, orderBy: { position: "asc" } },
+      optionGroups: {
+        include: {
+          values: {
+            include: { globalColor: true },
+            orderBy: { position: "asc" },
+          },
+        },
+        orderBy: { position: "asc" },
+      },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -51,6 +59,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
+
   type ColorVariantInput = {
     name: string; hex: string; images: string[]; position?: number;
     skus: { size: string; stock: number; itemNumber?: string | null }[];
@@ -59,7 +68,7 @@ export async function POST(req: NextRequest) {
   const cvInputs: ColorVariantInput[] = body.colorVariants ?? [];
   const hasColorVariants = cvInputs.length > 0;
 
-  // Create product (+ global skus if no color variants)
+  // Create product (+ global skus if no color variants and no option groups)
   const product = await prisma.product.create({
     data: {
       name: body.name,
@@ -67,6 +76,7 @@ export async function POST(req: NextRequest) {
       description: body.description,
       categoryId: body.categoryId ?? null,
       price: body.price,
+      modelNumber: body.modelNumber ?? null,
       customizationFee: body.customizationFee ?? null,
       membersOnly: body.membersOnly ?? false,
       membersEarlyAccess: body.membersEarlyAccess ?? false,
@@ -76,12 +86,12 @@ export async function POST(req: NextRequest) {
       published: body.published ?? true,
       featured: body.featured ?? false,
       images: body.images ?? [],
-      skus: hasColorVariants ? undefined : { create: body.skus ?? [] },
+      skus: (!hasColorVariants && !body.optionGroups?.length) ? { create: body.skus ?? [] } : undefined,
     },
     include: { skus: true, category: true },
   });
 
-  // Create color variants + their skus separately (avoids deeply-nested type issues)
+  // Legacy color variants path
   if (hasColorVariants) {
     for (let i = 0; i < cvInputs.length; i++) {
       const cv = cvInputs[i];
@@ -105,9 +115,13 @@ export async function POST(req: NextRequest) {
   const result = await prisma.product.findUnique({
     where: { id: product.id },
     include: {
-      skus: true,
+      skus: { include: { optionValues: { include: { optionValue: true } } } },
       category: true,
       colorVariants: { include: { skus: true }, orderBy: { position: "asc" } },
+      optionGroups: {
+        include: { values: { include: { globalColor: true }, orderBy: { position: "asc" } } },
+        orderBy: { position: "asc" },
+      },
     },
   });
   return NextResponse.json(result, { status: 201 });

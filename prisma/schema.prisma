@@ -124,6 +124,7 @@ model Product {
   categoryId       String?
   category         Category?   @relation(fields: [categoryId], references: [id])
   price            Int // øre (DKK × 100)
+  modelNumber      String?     // e.g. "2001" — used in varenummer auto-generation
   customizationFee Int? // øre, kun for trøjer med tryk
   membersOnly             Boolean     @default(false)
   membersEarlyAccess      Boolean     @default(false)
@@ -135,10 +136,69 @@ model Product {
   images           String[] // Cloudinary URLs (used when no color variants)
   skus             SKU[]
   colorVariants    ColorVariant[]
+  optionGroups     ProductOptionGroup[]
   heroSlides       HeroSlide[]
   trainerGrants    TrainerGrant[]
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
+}
+
+model GlobalColor {
+  id           String               @id @default(cuid())
+  name         String               // "Rød"
+  hex          String               // "#CC0000"
+  code         String               @unique // "03" — used in varenummer
+  position     Int                  @default(0)
+  optionValues ProductOptionValue[]
+
+  @@index([position])
+}
+
+enum ProductOptionType {
+  COLOR
+  SIZE
+  TEXT
+  SELECT
+  CUSTOM
+}
+
+model ProductOptionGroup {
+  id        String              @id @default(cuid())
+  productId String
+  product   Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  type      ProductOptionType
+  label     String
+  position  Int                 @default(0)
+  required  Boolean             @default(false)
+  fee       Int?                // øre — TEXT/CUSTOM only
+  inputType String?             // "text"|"number"|"checkbox"|"dropdown" — CUSTOM only
+  values    ProductOptionValue[]
+
+  @@index([productId, position])
+}
+
+model ProductOptionValue {
+  id            String              @id @default(cuid())
+  groupId       String
+  group         ProductOptionGroup  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  label         String
+  position      Int                 @default(0)
+  globalColorId String?
+  globalColor   GlobalColor?        @relation(fields: [globalColorId], references: [id], onDelete: SetNull)
+  images        String[]            // Cloudinary URLs — COLOR type only
+  skuValues     SKUOptionValue[]
+
+  @@index([groupId, position])
+}
+
+model SKUOptionValue {
+  skuId         String
+  sku           SKU                @relation(fields: [skuId], references: [id], onDelete: Cascade)
+  optionValueId String
+  optionValue   ProductOptionValue @relation(fields: [optionValueId], references: [id], onDelete: Cascade)
+
+  @@id([skuId, optionValueId])
+  @@index([optionValueId])
 }
 
 model ColorVariant {
@@ -163,7 +223,9 @@ model SKU {
   colorVariant   ColorVariant? @relation(fields: [colorVariantId], references: [id], onDelete: Cascade)
   size           String // "XS","S","M","L","XL","XXL","116","128","140","152","164"
   stock          Int           @default(0)
-  itemNumber     String? // varenummer (manual)
+  itemNumber     String?       // varenummer
+  itemNumberOverride Boolean   @default(false) // true = never auto-overwrite
+  optionValues   SKUOptionValue[]
   orderItems     OrderItem[]
 }
 
@@ -234,16 +296,17 @@ enum DeliveryMethod {
 }
 
 model OrderItem {
-  id              String  @id @default(cuid())
-  orderId         String
-  order           Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  skuId           String
-  sku             SKU     @relation(fields: [skuId], references: [id])
-  quantity        Int
-  priceAtPurchase Int // øre
-  customName      String?
-  customNumber    String?
-  colorName       String? // stored at purchase for historical accuracy
+  id               String  @id @default(cuid())
+  orderId          String
+  order            Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  skuId            String
+  sku              SKU     @relation(fields: [skuId], references: [id])
+  quantity         Int
+  priceAtPurchase  Int // øre
+  customName       String?
+  customNumber     String?
+  colorName        String? // stored at purchase for historical accuracy
+  optionSelections Json    @default("[]") // snapshot of TEXT/SELECT/CUSTOM selections
 }
 
 model Address {

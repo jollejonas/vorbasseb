@@ -2,6 +2,7 @@ import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ProductColorSection } from "@/components/shop/ProductColorSection";
+import { ProductOptionsSection } from "@/components/shop/ProductOptionsSection";
 import { formatPrice } from "@/lib/utils";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -17,10 +18,23 @@ export default async function ProductPage({ params }: Props) {
   const product = await prisma.product.findUnique({
     where: { slug, published: true },
     include: {
-      skus: { where: { colorVariantId: null }, orderBy: { size: "asc" } },
+      skus: {
+        where: { colorVariantId: null },
+        orderBy: { size: "asc" },
+        include: { optionValues: { select: { optionValueId: true } } },
+      },
       category: true,
       colorVariants: {
         include: { skus: { orderBy: { size: "asc" } } },
+        orderBy: { position: "asc" },
+      },
+      optionGroups: {
+        include: {
+          values: {
+            include: { globalColor: true, skuValues: true },
+            orderBy: { position: "asc" },
+          },
+        },
         orderBy: { position: "asc" },
       },
     },
@@ -68,11 +82,19 @@ export default async function ProductPage({ params }: Props) {
         <p className="text-gray-600 leading-relaxed">{product.description}</p>
       </div>
 
-      <ProductColorSection
-        product={product}
-        skus={product.skus}
-        colorVariants={product.colorVariants}
-      />
+      {product.optionGroups.length > 0 ? (
+        <ProductOptionsSection
+          product={product}
+          skus={product.skus}
+          optionGroups={product.optionGroups}
+        />
+      ) : (
+        <ProductColorSection
+          product={product}
+          skus={product.skus}
+          colorVariants={product.colorVariants}
+        />
+      )}
     </div>
   );
 }

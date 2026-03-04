@@ -20,6 +20,12 @@ export default async function RedigerProduktPage({ params }: Props) {
       skus: { orderBy: { size: "asc" } },
       category: true,
       colorVariants: { include: { skus: { orderBy: { size: "asc" } } }, orderBy: { position: "asc" } },
+      optionGroups: {
+        include: {
+          values: { include: { globalColor: true }, orderBy: { position: "asc" } },
+        },
+        orderBy: { position: "asc" },
+      },
     },
   });
 

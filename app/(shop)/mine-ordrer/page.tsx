@@ -92,6 +92,9 @@ export default async function MineOrdrerPage() {
                     {item.colorName && ` · ${item.colorName}`}
                     {item.customName && ` · ${item.customName}`}
                     {item.customNumber && ` #${item.customNumber}`}
+                    {(item.optionSelections as { groupLabel: string; value: string }[] | null)?.map(
+                      (s, i) => <span key={i}> · {s.value}</span>
+                    )}
                   </li>
                 ))}
               </ul>

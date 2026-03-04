@@ -8,6 +8,8 @@ import {
   type ReactNode,
 } from "react";
 
+export type OptionSelection = { groupLabel: string; value: string };
+
 export type CartItem = {
   skuId: string;
   productId: string;
@@ -21,6 +23,7 @@ export type CartItem = {
   customizationFee?: number; // øre
   clubRoleRequired?: string | null; // null/undefined = public product; "TRAINER" = trainer-only
   colorName?: string;
+  optionSelections?: OptionSelection[]; // snapshot of TEXT/SELECT/CUSTOM selections
 };
 
 type CartState = { items: CartItem[] };
@@ -66,7 +69,8 @@ function reducer(state: CartState, action: Action): CartState {
 }
 
 function itemKey(item: CartItem) {
-  return `${item.skuId}::${item.customName ?? ""}::${item.customNumber ?? ""}::${item.colorName ?? ""}`;
+  const selections = item.optionSelections?.map((s) => `${s.groupLabel}=${s.value}`).join(",") ?? "";
+  return `${item.skuId}::${item.customName ?? ""}::${item.customNumber ?? ""}::${item.colorName ?? ""}::${selections}`;
 }
 
 type CartContextValue = {

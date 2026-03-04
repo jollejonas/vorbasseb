@@ -129,11 +129,17 @@ export default async function AdminOrderDetailPage({ params }: Params) {
                 <td className="px-5 py-3">{item.sku.size}</td>
                 <td className="px-5 py-3 text-gray-500">{item.colorName ?? "–"}</td>
                 <td className="px-5 py-3 text-gray-500">
-                  {item.customName || item.customNumber
-                    ? [item.customName, item.customNumber ? `#${item.customNumber}` : null]
-                        .filter(Boolean)
-                        .join(" ")
-                    : "–"}
+                  {(() => {
+                    const parts: string[] = [];
+                    if (item.customName || item.customNumber) {
+                      parts.push([item.customName, item.customNumber ? `#${item.customNumber}` : null].filter(Boolean).join(" "));
+                    }
+                    const selections = item.optionSelections as { groupLabel: string; value: string }[] | null;
+                    if (selections?.length) {
+                      parts.push(...selections.map((s) => `${s.groupLabel}: ${s.value}`));
+                    }
+                    return parts.length > 0 ? parts.join(" · ") : "–";
+                  })()}
                 </td>
                 <td className="px-5 py-3 text-right">{item.quantity}</td>
                 <td className="px-5 py-3 text-right font-medium">
