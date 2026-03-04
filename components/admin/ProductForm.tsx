@@ -4,10 +4,18 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { slugify } from "@/lib/utils";
-import type { Product, SKU, Category, ClubRole } from "@prisma/client";
+import type { Product, SKU, Category, ClubRole, ColorVariant } from "@prisma/client";
 
-type ProductWithSkus = Product & { skus: SKU[]; category: Category | null };
+type ColorVariantWithSkus = ColorVariant & { skus: SKU[] };
+type ProductWithSkus = Product & { skus: SKU[]; category: Category | null; colorVariants: ColorVariantWithSkus[] };
 type SkuRow = { id?: string; size: string; stock: number; itemNumber?: string };
+type ColorVariantRow = {
+  id?: string;
+  name: string;
+  hex: string;
+  images: string[];
+  skus: SkuRow[];
+};
 
 const ADULT_SIZES = ["XS", "S", "M", "L", "XL", "XXL"];
 const KIDS_SIZES = ["116", "128", "140", "152", "164"];
@@ -38,11 +46,24 @@ export function ProductForm({ product }: { product?: ProductWithSkus }) {
   const [description, setDescription] = useState(product?.description ?? "");
   const [images, setImages] = useState<string[]>(product?.images ?? []);
   const [skus, setSkus] = useState<SkuRow[]>(
-    product?.skus.map((s) => ({ id: s.id, size: s.size, stock: s.stock, itemNumber: s.itemNumber ?? "" })) ?? []
+    product?.skus
+      .filter((s) => !s.colorVariantId)
+      .map((s) => ({ id: s.id, size: s.size, stock: s.stock, itemNumber: s.itemNumber ?? "" })) ?? []
+  );
+  const [colorVariants, setColorVariants] = useState<ColorVariantRow[]>(
+    product?.colorVariants.map((cv) => ({
+      id: cv.id,
+      name: cv.name,
+      hex: cv.hex,
+      images: cv.images,
+      skus: cv.skus.map((s) => ({ id: s.id, size: s.size, stock: s.stock, itemNumber: s.itemNumber ?? "" })),
+    })) ?? []
   );
   const [saving, setSaving] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const widgetRef = useRef<any>(null);
+  // Track which upload target is active: "main" | colorVariantIndex
+  const uploadTarget = useRef<"main" | number>("main");
 
   useEffect(() => {
     if (!slugManual) setSlug(slugify(name));
@@ -69,13 +90,14 @@ export function ProductForm({ product }: { product?: ProductWithSkus }) {
     };
   }, []);
 
-  function openCloudinaryWidget() {
+  function openCloudinaryWidget(target: "main" | number) {
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = process.env.NEXT_PUBLIC_UPLOAD_PRESET;
     if (!cloudName || !uploadPreset) {
       toast.error("Cloudinary er ikke konfigureret (mangler env-variabler)");
       return;
     }
+    uploadTarget.current = target;
     if (!widgetRef.current) {
       // @ts-expect-error cloudinary global from CDN
       widgetRef.current = window.cloudinary?.createUploadWidget(
@@ -97,7 +119,17 @@ export function ProductForm({ product }: { product?: ProductWithSkus }) {
             return;
           }
           if (result.event === "success") {
-            setImages((prev) => [...prev, result.info.secure_url]);
+            const url = result.info.secure_url;
+            if (uploadTarget.current === "main") {
+              setImages((prev) => [...prev, url]);
+            } else {
+              const idx = uploadTarget.current as number;
+              setColorVariants((prev) =>
+                prev.map((cv, i) =>
+                  i === idx ? { ...cv, images: [...cv.images, url] } : cv
+                )
+              );
+            }
           }
         }
       );
@@ -105,21 +137,54 @@ export function ProductForm({ product }: { product?: ProductWithSkus }) {
     widgetRef.current?.open();
   }
 
+  // Global SKU helpers (no color variants)
   function addSize(size: string) {
     if (skus.find((s) => s.size === size)) return;
     setSkus((prev) => [...prev, { size, stock: 0, itemNumber: "" }]);
   }
-
   function updateItemNumber(size: string, itemNumber: string) {
     setSkus((prev) => prev.map((s) => (s.size === size ? { ...s, itemNumber } : s)));
   }
-
   function removeSize(size: string) {
     setSkus((prev) => prev.filter((s) => s.size !== size));
   }
-
   function updateStock(size: string, stock: number) {
     setSkus((prev) => prev.map((s) => (s.size === size ? { ...s, stock } : s)));
+  }
+
+  // Color variant helpers
+  function addColorVariant() {
+    setColorVariants((prev) => [...prev, { name: "", hex: "#000000", images: [], skus: [] }]);
+  }
+  function removeColorVariant(idx: number) {
+    setColorVariants((prev) => prev.filter((_, i) => i !== idx));
+  }
+  function updateColorVariant(idx: number, patch: Partial<ColorVariantRow>) {
+    setColorVariants((prev) => prev.map((cv, i) => (i === idx ? { ...cv, ...patch } : cv)));
+  }
+  function addColorSize(cvIdx: number, size: string) {
+    setColorVariants((prev) =>
+      prev.map((cv, i) => {
+        if (i !== cvIdx || cv.skus.find((s) => s.size === size)) return cv;
+        return { ...cv, skus: [...cv.skus, { size, stock: 0, itemNumber: "" }] };
+      })
+    );
+  }
+  function updateColorSku(cvIdx: number, size: string, patch: Partial<SkuRow>) {
+    setColorVariants((prev) =>
+      prev.map((cv, i) =>
+        i !== cvIdx
+          ? cv
+          : { ...cv, skus: cv.skus.map((s) => (s.size === size ? { ...s, ...patch } : s)) }
+      )
+    );
+  }
+  function removeColorSize(cvIdx: number, size: string) {
+    setColorVariants((prev) =>
+      prev.map((cv, i) =>
+        i !== cvIdx ? cv : { ...cv, skus: cv.skus.filter((s) => s.size !== size) }
+      )
+    );
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -148,7 +213,22 @@ export function ProductForm({ product }: { product?: ProductWithSkus }) {
         featured,
         description,
         images,
-        skus: skus.map(({ id, size, stock, itemNumber }) => ({ id, size, stock, itemNumber: itemNumber || null })),
+        skus: colorVariants.length === 0
+          ? skus.map(({ id, size, stock, itemNumber }) => ({ id, size, stock, itemNumber: itemNumber || null }))
+          : [],
+        colorVariants: colorVariants.map(({ id, name: cvName, hex, images: cvImages, skus: cvSkus }, i) => ({
+          id,
+          name: cvName,
+          hex,
+          images: cvImages,
+          position: i,
+          skus: cvSkus.map(({ id: sid, size, stock, itemNumber }) => ({
+            id: sid,
+            size,
+            stock,
+            itemNumber: itemNumber || null,
+          })),
+        })),
       };
 
       const url = isEdit ? `/api/products/${product.id}` : "/api/products";
@@ -353,9 +433,11 @@ export function ProductForm({ product }: { product?: ProductWithSkus }) {
         </div>
       </section>
 
-      {/* Images */}
+      {/* Main images (used when no color variants, or as fallback) */}
       <section>
-        <p className="text-sm font-medium text-gray-700 mb-2">Billeder</p>
+        <p className="text-sm font-medium text-gray-700 mb-2">
+          Billeder{colorVariants.length > 0 ? " (fallback — bruges hvis en farve mangler billeder)" : ""}
+        </p>
         <div className="flex flex-wrap gap-3 mb-3">
           {images.map((url, i) => (
             <div
@@ -375,7 +457,7 @@ export function ProductForm({ product }: { product?: ProductWithSkus }) {
           ))}
           <button
             type="button"
-            onClick={openCloudinaryWidget}
+            onClick={() => openCloudinaryWidget("main")}
             className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:border-secondary hover:text-secondary transition gap-1"
           >
             <span className="text-2xl leading-none">+</span>
@@ -387,92 +469,248 @@ export function ProductForm({ product }: { product?: ProductWithSkus }) {
         </p>
       </section>
 
-      {/* SKUs */}
+      {/* Color Variants */}
       <section>
-        <p className="text-sm font-medium text-gray-700 mb-2">
-          Størrelser &amp; lager
-        </p>
-
-        <div className="flex flex-wrap gap-2 mb-3">
-          <span className="text-xs text-gray-500 self-center mr-1">Tilføj størrelse:</span>
-          {ALL_SIZES.filter((sz) => !unavailableSizes.includes(sz)).map((sz) => (
-            <button
-              key={sz}
-              type="button"
-              onClick={() => addSize(sz)}
-              className="px-2.5 py-1 text-xs border rounded-lg hover:border-secondary hover:text-secondary transition"
-            >
-              {sz}
-            </button>
-          ))}
-          {ALL_SIZES.every((sz) => unavailableSizes.includes(sz)) && (
-            <span className="text-xs text-gray-400 italic">Alle størrelser tilføjet</span>
-          )}
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-medium text-gray-700">Farver</p>
+          <button
+            type="button"
+            onClick={addColorVariant}
+            className="px-3 py-1.5 text-xs border rounded-lg hover:border-secondary hover:text-secondary transition"
+          >
+            + Tilføj farve
+          </button>
         </div>
 
-        {skus.length > 0 ? (
-          <div className="border rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 border-b">
-                  <th className="text-left px-4 py-2 font-medium text-gray-600 text-xs">
-                    Størrelse
-                  </th>
-                  <th className="text-left px-4 py-2 font-medium text-gray-600 text-xs">
-                    Varenummer
-                  </th>
-                  <th className="text-left px-4 py-2 font-medium text-gray-600 text-xs">
-                    Lager (stk)
-                  </th>
-                  <th className="px-4 py-2" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {skus.map((sku) => (
-                  <tr key={sku.size}>
-                    <td className="px-4 py-2 font-mono font-semibold text-sm w-20">
-                      {sku.size}
-                    </td>
-                    <td className="px-4 py-2">
-                      <input
-                        type="text"
-                        value={sku.itemNumber ?? ""}
-                        onChange={(e) => updateItemNumber(sku.size, e.target.value)}
-                        placeholder="f.eks. VBK-001-M"
-                        className="w-36 border rounded px-2 py-1 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-secondary"
-                      />
-                    </td>
-                    <td className="px-4 py-2">
-                      <input
-                        type="number"
-                        min="0"
-                        value={sku.stock}
-                        onChange={(e) =>
-                          updateStock(sku.size, parseInt(e.target.value) || 0)
-                        }
-                        className="w-24 border rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-secondary"
-                      />
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <button
-                        type="button"
-                        onClick={() => removeSize(sku.size)}
-                        className="text-xs text-red-400 hover:text-red-600 underline"
-                      >
-                        Fjern
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
+        {colorVariants.length === 0 && (
           <p className="text-sm text-gray-400 italic border rounded-lg px-4 py-3">
-            Ingen størrelser tilføjet endnu. Klik på en størrelse ovenfor for at tilføje.
+            Ingen farver tilføjet. Størrelser og lager håndteres nedenfor.
           </p>
         )}
+
+        {colorVariants.map((cv, cvIdx) => {
+          const usedSizes = cv.skus.map((s) => s.size);
+          return (
+            <div key={cvIdx} className="border rounded-xl p-4 mb-4 space-y-4">
+              {/* Color header */}
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-7 h-7 rounded-full border border-gray-300 flex-shrink-0"
+                  style={{ backgroundColor: cv.hex }}
+                />
+                <input
+                  type="text"
+                  value={cv.name}
+                  onChange={(e) => updateColorVariant(cvIdx, { name: e.target.value })}
+                  placeholder="Farvenavn (f.eks. Rød/Hvid)"
+                  className="flex-1 border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
+                />
+                <input
+                  type="color"
+                  value={cv.hex}
+                  onChange={(e) => updateColorVariant(cvIdx, { hex: e.target.value })}
+                  className="w-10 h-9 border rounded-lg cursor-pointer p-0.5"
+                  title="Vælg farve"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeColorVariant(cvIdx)}
+                  className="text-xs text-red-400 hover:text-red-600 underline flex-shrink-0"
+                >
+                  Fjern
+                </button>
+              </div>
+
+              {/* Color images */}
+              <div>
+                <p className="text-xs text-gray-500 mb-2">Billeder for denne farve</p>
+                <div className="flex flex-wrap gap-2">
+                  {cv.images.map((url, imgIdx) => (
+                    <div key={imgIdx} className="relative w-16 h-16 rounded-lg overflow-hidden border">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt="" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateColorVariant(cvIdx, {
+                            images: cv.images.filter((_, j) => j !== imgIdx),
+                          })
+                        }
+                        className="absolute top-0.5 right-0.5 bg-white/90 rounded-full w-4 h-4 text-xs text-red-600 hover:bg-white leading-none font-bold"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => openCloudinaryWidget(cvIdx)}
+                    className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:border-secondary hover:text-secondary transition gap-0.5"
+                  >
+                    <span className="text-xl leading-none">+</span>
+                    <span className="text-[10px]">Upload</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Color SKUs */}
+              <div>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  <span className="text-xs text-gray-500 self-center mr-1">Tilføj størrelse:</span>
+                  {ALL_SIZES.filter((sz) => !usedSizes.includes(sz)).map((sz) => (
+                    <button
+                      key={sz}
+                      type="button"
+                      onClick={() => addColorSize(cvIdx, sz)}
+                      className="px-2 py-0.5 text-xs border rounded-lg hover:border-secondary hover:text-secondary transition"
+                    >
+                      {sz}
+                    </button>
+                  ))}
+                </div>
+
+                {cv.skus.length > 0 && (
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 border-b">
+                          <th className="text-left px-3 py-2 font-medium text-gray-600 text-xs">Størrelse</th>
+                          <th className="text-left px-3 py-2 font-medium text-gray-600 text-xs">Varenummer</th>
+                          <th className="text-left px-3 py-2 font-medium text-gray-600 text-xs">Lager</th>
+                          <th className="px-3 py-2" />
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {cv.skus.map((sku) => (
+                          <tr key={sku.size}>
+                            <td className="px-3 py-2 font-mono font-semibold text-sm w-16">{sku.size}</td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="text"
+                                value={sku.itemNumber ?? ""}
+                                onChange={(e) => updateColorSku(cvIdx, sku.size, { itemNumber: e.target.value })}
+                                placeholder="VBK-001-M"
+                                className="w-32 border rounded px-2 py-1 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-secondary"
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="number"
+                                min="0"
+                                value={sku.stock}
+                                onChange={(e) => updateColorSku(cvIdx, sku.size, { stock: parseInt(e.target.value) || 0 })}
+                                className="w-20 border rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-secondary"
+                              />
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              <button
+                                type="button"
+                                onClick={() => removeColorSize(cvIdx, sku.size)}
+                                className="text-xs text-red-400 hover:text-red-600 underline"
+                              >
+                                Fjern
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </section>
+
+      {/* Global SKUs — only shown when no color variants */}
+      {colorVariants.length === 0 && (
+        <section>
+          <p className="text-sm font-medium text-gray-700 mb-2">
+            Størrelser &amp; lager
+          </p>
+
+          <div className="flex flex-wrap gap-2 mb-3">
+            <span className="text-xs text-gray-500 self-center mr-1">Tilføj størrelse:</span>
+            {ALL_SIZES.filter((sz) => !unavailableSizes.includes(sz)).map((sz) => (
+              <button
+                key={sz}
+                type="button"
+                onClick={() => addSize(sz)}
+                className="px-2.5 py-1 text-xs border rounded-lg hover:border-secondary hover:text-secondary transition"
+              >
+                {sz}
+              </button>
+            ))}
+            {ALL_SIZES.every((sz) => unavailableSizes.includes(sz)) && (
+              <span className="text-xs text-gray-400 italic">Alle størrelser tilføjet</span>
+            )}
+          </div>
+
+          {skus.length > 0 ? (
+            <div className="border rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b">
+                    <th className="text-left px-4 py-2 font-medium text-gray-600 text-xs">
+                      Størrelse
+                    </th>
+                    <th className="text-left px-4 py-2 font-medium text-gray-600 text-xs">
+                      Varenummer
+                    </th>
+                    <th className="text-left px-4 py-2 font-medium text-gray-600 text-xs">
+                      Lager (stk)
+                    </th>
+                    <th className="px-4 py-2" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {skus.map((sku) => (
+                    <tr key={sku.size}>
+                      <td className="px-4 py-2 font-mono font-semibold text-sm w-20">
+                        {sku.size}
+                      </td>
+                      <td className="px-4 py-2">
+                        <input
+                          type="text"
+                          value={sku.itemNumber ?? ""}
+                          onChange={(e) => updateItemNumber(sku.size, e.target.value)}
+                          placeholder="f.eks. VBK-001-M"
+                          className="w-36 border rounded px-2 py-1 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-secondary"
+                        />
+                      </td>
+                      <td className="px-4 py-2">
+                        <input
+                          type="number"
+                          min="0"
+                          value={sku.stock}
+                          onChange={(e) =>
+                            updateStock(sku.size, parseInt(e.target.value) || 0)
+                          }
+                          className="w-24 border rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-secondary"
+                        />
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        <button
+                          type="button"
+                          onClick={() => removeSize(sku.size)}
+                          className="text-xs text-red-400 hover:text-red-600 underline"
+                        >
+                          Fjern
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 italic border rounded-lg px-4 py-3">
+              Ingen størrelser tilføjet endnu. Klik på en størrelse ovenfor for at tilføje.
+            </p>
+          )}
+        </section>
+      )}
 
       {/* Actions */}
       <div className="flex gap-3 pt-2 border-t">

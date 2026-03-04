@@ -69,7 +69,7 @@ export function CartView() {
           const isGranted = grantedProductIds.has(item.productId);
           return (
             <li
-              key={`${item.skuId}::${item.customName}::${item.customNumber}`}
+              key={`${item.skuId}::${item.customName}::${item.customNumber}::${item.colorName}`}
               className="flex gap-4 py-4"
             >
               <div className="relative w-20 h-20 shrink-0 bg-surface rounded-lg overflow-hidden">
@@ -92,6 +92,7 @@ export function CartView() {
                 <p className="font-medium truncate">{item.productName}</p>
                 <p className="text-sm text-gray-500">
                   Størrelse: {item.size}
+                  {item.colorName && ` · ${item.colorName}`}
                   {item.customName && ` · Tryk: ${item.customName}`}
                   {item.customNumber && ` #${item.customNumber}`}
                 </p>
@@ -106,9 +107,7 @@ export function CartView() {
 
               <div className="flex flex-col items-end gap-2">
                 <button
-                  onClick={() =>
-                    removeItem(item.skuId, item.customName, item.customNumber)
-                  }
+                  onClick={() => removeItem(item)}
                   className="text-gray-400 hover:text-red-500 transition"
                   aria-label="Fjern"
                 >
@@ -118,8 +117,8 @@ export function CartView() {
                   <button
                     onClick={() =>
                       item.quantity > 1
-                        ? updateQty(item.skuId, item.quantity - 1)
-                        : removeItem(item.skuId, item.customName, item.customNumber)
+                        ? updateQty(item, item.quantity - 1)
+                        : removeItem(item)
                     }
                     className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 text-lg"
                   >
@@ -129,7 +128,7 @@ export function CartView() {
                     {item.quantity}
                   </span>
                   <button
-                    onClick={() => updateQty(item.skuId, item.quantity + 1)}
+                    onClick={() => updateQty(item, item.quantity + 1)}
                     className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 text-lg"
                   >
                     +

@@ -89,6 +89,7 @@ export default async function MineOrdrerPage() {
                 {order.items.map((item) => (
                   <li key={item.id}>
                     {item.quantity}× {item.sku.product.name} ({item.sku.size})
+                    {item.colorName && ` · ${item.colorName}`}
                     {item.customName && ` · ${item.customName}`}
                     {item.customNumber && ` #${item.customNumber}`}
                   </li>

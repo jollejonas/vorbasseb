@@ -64,6 +64,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
     customName: string;
     customNumber: string;
     customizationFee: number;
+    colorName: string;
   };
   const items: CartMeta[] = JSON.parse(cartJson);
 
@@ -114,6 +115,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
               priceAtPurchase: i.price + i.customizationFee,
               customName: i.customName || null,
               customNumber: i.customNumber || null,
+              colorName: i.colorName || null,
             })),
           },
         },

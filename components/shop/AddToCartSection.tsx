@@ -15,9 +15,11 @@ const SIZES_ORDER = [
 export function AddToCartSection({
   product,
   skus,
+  colorName,
 }: {
   product: Product;
   skus: SKU[];
+  colorName?: string;
 }) {
   const { addItem } = useCart();
   const [selectedSku, setSelectedSku] = useState<SKU | null>(null);
@@ -53,9 +55,11 @@ export function AddToCartSection({
         ? product.customizationFee
         : undefined,
       clubRoleRequired: product.clubRoleRequired ?? null,
+      colorName: colorName || undefined,
     });
 
-    toast.success(`${product.name} (${selectedSku.size}) lagt i kurven`);
+    const colorLabel = colorName ? ` · ${colorName}` : "";
+    toast.success(`${product.name} (${selectedSku.size}${colorLabel}) lagt i kurven`);
   }
 
   return (

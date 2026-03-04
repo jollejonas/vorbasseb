@@ -27,7 +27,11 @@ export async function GET(req: NextRequest) {
           }
         : {}),
     },
-    include: { skus: true, category: true },
+    include: {
+      skus: true,
+      category: true,
+      colorVariants: { include: { skus: true }, orderBy: { position: "asc" } },
+    },
     orderBy: { createdAt: "desc" },
   });
 
@@ -47,6 +51,15 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
+  type ColorVariantInput = {
+    name: string; hex: string; images: string[]; position?: number;
+    skus: { size: string; stock: number; itemNumber?: string | null }[];
+  };
+
+  const cvInputs: ColorVariantInput[] = body.colorVariants ?? [];
+  const hasColorVariants = cvInputs.length > 0;
+
+  // Create product (+ global skus if no color variants)
   const product = await prisma.product.create({
     data: {
       name: body.name,
@@ -63,12 +76,39 @@ export async function POST(req: NextRequest) {
       published: body.published ?? true,
       featured: body.featured ?? false,
       images: body.images ?? [],
-      skus: {
-        create: body.skus ?? [],
-      },
+      skus: hasColorVariants ? undefined : { create: body.skus ?? [] },
     },
     include: { skus: true, category: true },
   });
 
-  return NextResponse.json(product, { status: 201 });
+  // Create color variants + their skus separately (avoids deeply-nested type issues)
+  if (hasColorVariants) {
+    for (let i = 0; i < cvInputs.length; i++) {
+      const cv = cvInputs[i];
+      const created = await prisma.colorVariant.create({
+        data: { productId: product.id, name: cv.name, hex: cv.hex, images: cv.images ?? [], position: cv.position ?? i },
+      });
+      if (cv.skus?.length) {
+        await prisma.sKU.createMany({
+          data: cv.skus.map((s) => ({
+            productId: product.id,
+            colorVariantId: created.id,
+            size: s.size,
+            stock: s.stock,
+            itemNumber: s.itemNumber ?? null,
+          })),
+        });
+      }
+    }
+  }
+
+  const result = await prisma.product.findUnique({
+    where: { id: product.id },
+    include: {
+      skus: true,
+      category: true,
+      colorVariants: { include: { skus: true }, orderBy: { position: "asc" } },
+    },
+  });
+  return NextResponse.json(result, { status: 201 });
 }

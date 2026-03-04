@@ -20,14 +20,15 @@ export type CartItem = {
   customNumber?: string;
   customizationFee?: number; // øre
   clubRoleRequired?: string | null; // null/undefined = public product; "TRAINER" = trainer-only
+  colorName?: string;
 };
 
 type CartState = { items: CartItem[] };
 
 type Action =
   | { type: "ADD"; item: CartItem }
-  | { type: "REMOVE"; skuId: string; customName?: string; customNumber?: string }
-  | { type: "UPDATE_QTY"; skuId: string; quantity: number }
+  | { type: "REMOVE"; key: string }
+  | { type: "UPDATE_QTY"; key: string; quantity: number }
   | { type: "CLEAR" }
   | { type: "INIT"; items: CartItem[] };
 
@@ -50,20 +51,11 @@ function reducer(state: CartState, action: Action): CartState {
       return { items: [...state.items, action.item] };
     }
     case "REMOVE":
-      return {
-        items: state.items.filter(
-          (i) =>
-            !(
-              i.skuId === action.skuId &&
-              i.customName === action.customName &&
-              i.customNumber === action.customNumber
-            ),
-        ),
-      };
+      return { items: state.items.filter((i) => itemKey(i) !== action.key) };
     case "UPDATE_QTY":
       return {
         items: state.items.map((i) =>
-          i.skuId === action.skuId ? { ...i, quantity: action.quantity } : i,
+          itemKey(i) === action.key ? { ...i, quantity: action.quantity } : i,
         ),
       };
     case "CLEAR":
@@ -74,18 +66,14 @@ function reducer(state: CartState, action: Action): CartState {
 }
 
 function itemKey(item: CartItem) {
-  return `${item.skuId}::${item.customName ?? ""}::${item.customNumber ?? ""}`;
+  return `${item.skuId}::${item.customName ?? ""}::${item.customNumber ?? ""}::${item.colorName ?? ""}`;
 }
 
 type CartContextValue = {
   items: CartItem[];
   addItem: (item: CartItem) => void;
-  removeItem: (
-    skuId: string,
-    customName?: string,
-    customNumber?: string,
-  ) => void;
-  updateQty: (skuId: string, qty: number) => void;
+  removeItem: (item: CartItem) => void;
+  updateQty: (item: CartItem, qty: number) => void;
   clearCart: () => void;
   totalItems: number;
   subtotal: number; // øre
@@ -114,10 +102,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const value: CartContextValue = {
     items: state.items,
     addItem: (item) => dispatch({ type: "ADD", item }),
-    removeItem: (skuId, customName, customNumber) =>
-      dispatch({ type: "REMOVE", skuId, customName, customNumber }),
-    updateQty: (skuId, quantity) =>
-      dispatch({ type: "UPDATE_QTY", skuId, quantity }),
+    removeItem: (item) => dispatch({ type: "REMOVE", key: itemKey(item) }),
+    updateQty: (item, quantity) => dispatch({ type: "UPDATE_QTY", key: itemKey(item), quantity }),
     clearCart: () => dispatch({ type: "CLEAR" }),
     totalItems: state.items.reduce((s, i) => s + i.quantity, 0),
     subtotal: state.items.reduce(

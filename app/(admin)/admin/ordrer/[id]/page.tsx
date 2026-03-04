@@ -113,6 +113,7 @@ export default async function AdminOrderDetailPage({ params }: Params) {
               <th className="px-5 py-2 font-medium">Produkt</th>
               <th className="px-5 py-2 font-medium">Varenr.</th>
               <th className="px-5 py-2 font-medium">Størrelse</th>
+              <th className="px-5 py-2 font-medium">Farve</th>
               <th className="px-5 py-2 font-medium">Tryk</th>
               <th className="px-5 py-2 font-medium text-right">Antal</th>
               <th className="px-5 py-2 font-medium text-right">Pris</th>
@@ -126,6 +127,7 @@ export default async function AdminOrderDetailPage({ params }: Params) {
                   {item.sku.itemNumber ?? "–"}
                 </td>
                 <td className="px-5 py-3">{item.sku.size}</td>
+                <td className="px-5 py-3 text-gray-500">{item.colorName ?? "–"}</td>
                 <td className="px-5 py-3 text-gray-500">
                   {item.customName || item.customNumber
                     ? [item.customName, item.customNumber ? `#${item.customNumber}` : null]

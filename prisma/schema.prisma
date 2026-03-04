@@ -132,22 +132,39 @@ model Product {
   customizationShowNumber Boolean     @default(true)
   published            Boolean     @default(true)
   featured             Boolean     @default(false)
-  images           String[] // Cloudinary URLs
+  images           String[] // Cloudinary URLs (used when no color variants)
   skus             SKU[]
+  colorVariants    ColorVariant[]
   heroSlides       HeroSlide[]
   trainerGrants    TrainerGrant[]
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 }
 
+model ColorVariant {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name      String   // e.g. "Rød/Hvid"
+  hex       String   // e.g. "#CC0000" — swatch color
+  images    String[] // Cloudinary URLs for this color
+  position  Int      @default(0)
+  skus      SKU[]
+  createdAt DateTime @default(now())
+
+  @@index([productId, position])
+}
+
 model SKU {
-  id         String      @id @default(cuid())
-  productId  String
-  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  size       String // "XS","S","M","L","XL","XXL","116","128","140","152","164"
-  stock      Int         @default(0)
-  itemNumber String? // varenummer (manual)
-  orderItems OrderItem[]
+  id             String        @id @default(cuid())
+  productId      String
+  product        Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  colorVariantId String?
+  colorVariant   ColorVariant? @relation(fields: [colorVariantId], references: [id], onDelete: Cascade)
+  size           String // "XS","S","M","L","XL","XXL","116","128","140","152","164"
+  stock          Int           @default(0)
+  itemNumber     String? // varenummer (manual)
+  orderItems     OrderItem[]
 }
 
 model Order {
@@ -226,6 +243,7 @@ model OrderItem {
   priceAtPurchase Int // øre
   customName      String?
   customNumber    String?
+  colorName       String? // stored at purchase for historical accuracy
 }
 
 model Address {
