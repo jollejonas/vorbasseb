@@ -40,6 +40,8 @@ function buildGroups(attentionCount: number): NavGroup[] {
         { href: "/admin/produkter", label: "Produkter", icon: Package, badge: attentionCount || undefined },
         { href: "/admin/ordrer", label: "Ordrer", icon: ShoppingBag },
         { href: "/admin/rabatkoder", label: "Rabatkoder", icon: Tag },
+        { href: "/admin/farver", label: "Farvebibliotek", icon: Palette },
+        { href: "/admin/tilvalg", label: "Tilvalg", icon: ListPlus },
       ],
     },
     {
@@ -60,8 +62,6 @@ function buildGroups(attentionCount: number): NavGroup[] {
     {
       label: "Opsætning",
       items: [
-        { href: "/admin/farver", label: "Farvebibliotek", icon: Palette },
-        { href: "/admin/tilvalg", label: "Tilvalg", icon: ListPlus },
         { href: "/admin/indstillinger", label: "Indstillinger", icon: Settings },
       ],
     },
