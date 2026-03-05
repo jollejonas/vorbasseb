@@ -106,7 +106,10 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
   const [saving, setSaving] = useState(false);
 
   // ── New option groups system ────────────────────────────────────────────────
-  const [useOptionGroups, setUseOptionGroups] = useState(hasOptionGroups);
+  // New products always start in option groups mode; existing products follow their data
+  const [useOptionGroups, setUseOptionGroups] = useState(!product || hasOptionGroups);
+  // Tracks when admin has clicked "Konverter" on a legacy product
+  const [migratedToOptions, setMigratedToOptions] = useState(false);
   const [globalColors, setGlobalColors] = useState<GlobalColor[]>([]);
 
   // ── Template library panel ──────────────────────────────────────────────────
@@ -365,8 +368,12 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
 
   // ── Template library helpers ─────────────────────────────────────────────────
 
-  function openLibrary() {
+  function openLibrary(defaultType?: OptionType) {
     setLibraryOpen(true);
+    if (defaultType) {
+      setLibraryFilterType(defaultType);
+      setLibraryFilterTag(null);
+    }
     if (libraryTemplates.length === 0) {
       setLibraryLoading(true);
       fetch("/api/admin/option-templates")
@@ -524,6 +531,7 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
           published, featured,
           optionGroups: groupsPayload,
           skuMatrix: matrixPayload,
+          clearColorVariants: migratedToOptions,
         };
       } else {
         // Legacy path
@@ -693,26 +701,41 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
 
       {/* ── Tilvalg (Option groups) ─────────────────────────────────────────── */}
       <section>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="text-sm font-medium text-gray-700">Tilvalg &amp; lager</p>
-            {!hasLegacyColors && (
-              <p className="text-xs text-gray-400 mt-0.5">
-                Brug tilvalgsgrupper til farver, størrelser og tilpasningsmuligheder
-              </p>
-            )}
-          </div>
-          {!hasLegacyColors && (
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input type="checkbox" checked={useOptionGroups} onChange={(e) => setUseOptionGroups(e.target.checked)}
-                className="w-4 h-4 accent-secondary" />
-              <span className="text-sm text-gray-600">Brug tilvalgsgrupper</span>
-            </label>
-          )}
+        <div className="mb-4">
+          <p className="text-sm font-medium text-gray-700">Tilvalg &amp; lager</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Brug tilvalgsgrupper til farver, størrelser og tilpasningsmuligheder
+          </p>
         </div>
 
+        {/* Migration notice for legacy products */}
+        {hasLegacyColors && !migratedToOptions && (
+          <div className="mb-4 flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+            <span className="text-amber-500 text-base mt-0.5">⚠</span>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-amber-800">Dette produkt bruger det gamle farvesystem</p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                Konverter til tilvalgsgrupper for at bruge det nye system med farvekoder, varenumre og SKU-matrix.
+                Eksisterende farve- og størrelsesdata fjernes, og du bygger grupperne op fra bunden.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm("Konverter dette produkt til tilvalgsgrupper?\n\nEksisterende farve- og størrelsesdata vil blive fjernet, og du bygger tilvalgsgrupperne op fra bunden med skabelonbiblioteket.")) {
+                  setMigratedToOptions(true);
+                  setUseOptionGroups(true);
+                }
+              }}
+              className="px-3 py-1.5 text-xs bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition shrink-0 font-medium"
+            >
+              Konverter
+            </button>
+          </div>
+        )}
+
         {/* ── New option groups UI ─────────────────────────────────────────── */}
-        {useOptionGroups && !hasLegacyColors && (
+        {useOptionGroups && (!hasLegacyColors || migratedToOptions) && (
           <div className="space-y-4">
             {optionGroups.map((g, gi) => (
               <OptionGroupEditor
@@ -761,7 +784,14 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
               })}
               <button
                 type="button"
-                onClick={() => libraryOpen ? setLibraryOpen(false) : openLibrary()}
+                onClick={() => {
+                  if (libraryOpen) { setLibraryOpen(false); return; }
+                  // Smart default: pre-filter to a type the product is missing
+                  const missingType = !optionGroups.some((g) => g.type === "SIZE") ? "SIZE"
+                    : !optionGroups.some((g) => g.type === "COLOR") ? "COLOR"
+                    : undefined;
+                  openLibrary(missingType);
+                }}
                 className={`flex items-center gap-1 px-3 py-1.5 text-xs border rounded-lg transition ${
                   libraryOpen ? "bg-secondary text-white border-secondary" : "hover:border-secondary hover:text-secondary"
                 }`}
@@ -782,26 +812,42 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
                 </div>
 
                 {/* Filters */}
-                <div className="flex flex-wrap gap-2">
-                  <div className="flex gap-1 border rounded-lg p-0.5 bg-white text-xs">
+                <div className="space-y-2">
+                  {/* Type filter */}
+                  <div className="flex gap-1 border rounded-lg p-0.5 bg-white text-xs self-start">
                     {(["ALL", "COLOR", "SIZE", "TEXT", "SELECT", "CUSTOM"] as const).map((t) => {
                       const lbl: Record<string, string> = { ALL: "Alle", COLOR: "Farve", SIZE: "Str.", TEXT: "Tekst", SELECT: "Valg", CUSTOM: "Custom" };
                       return (
-                        <button key={t} type="button" onClick={() => setLibraryFilterType(t)}
+                        <button key={t} type="button" onClick={() => { setLibraryFilterType(t); setLibraryFilterTag(null); }}
                           className={`px-2 py-1 rounded-md transition ${libraryFilterType === t ? "bg-secondary text-white" : "hover:bg-gray-100"}`}>
                           {lbl[t]}
                         </button>
                       );
                     })}
                   </div>
-                  {Array.from(new Set(libraryTemplates.flatMap((t) => t.tags))).sort().map((tag) => (
-                    <button key={tag} type="button" onClick={() => setLibraryFilterTag(libraryFilterTag === tag ? null : tag)}
-                      className={`px-2 py-1 text-xs border rounded-full transition ${
-                        libraryFilterTag === tag ? "bg-secondary text-white border-secondary" : "border-gray-300 hover:border-secondary"
-                      }`}>
-                      {tag}
-                    </button>
-                  ))}
+                  {/* Tag filter — only tags from templates matching selected type */}
+                  {(() => {
+                    const relevantTags = Array.from(new Set(
+                      libraryTemplates
+                        .filter((t) => libraryFilterType === "ALL" || t.type === libraryFilterType)
+                        .flatMap((t) => t.tags)
+                    )).sort();
+                    if (relevantTags.length === 0) return null;
+                    return (
+                      <div className="flex flex-wrap gap-1.5">
+                        {relevantTags.map((tag) => (
+                          <button key={tag} type="button" onClick={() => setLibraryFilterTag(libraryFilterTag === tag ? null : tag)}
+                            className={`px-2.5 py-1 text-xs rounded-full font-medium transition ${
+                              libraryFilterTag === tag
+                                ? "bg-secondary text-white"
+                                : "bg-white border border-gray-300 text-gray-600 hover:border-secondary hover:text-secondary"
+                            }`}>
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Template list */}
@@ -834,7 +880,10 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{t.name}</p>
                             {t.values.length > 0 && (
-                              <p className="text-xs text-gray-400 truncate">{t.values.map((v) => v.label).join(" · ")}</p>
+                              <p className="text-xs text-gray-500 truncate">
+                                {t.values.slice(0, 6).map((v) => v.label).join(" · ")}
+                                {t.values.length > 6 && <span className="text-gray-400"> …+{t.values.length - 6}</span>}
+                              </p>
                             )}
                             {t.tags.length > 0 && (
                               <div className="flex gap-1 mt-0.5 flex-wrap">
@@ -914,7 +963,7 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
         )}
 
         {/* ── Legacy color variant UI ──────────────────────────────────────── */}
-        {(!useOptionGroups || hasLegacyColors) && (
+        {hasLegacyColors && !migratedToOptions && (
           <LegacyVariantSection
             legacySkus={legacySkus}
             legacyColorVariants={legacyColorVariants}

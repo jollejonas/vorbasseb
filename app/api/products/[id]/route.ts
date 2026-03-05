@@ -90,6 +90,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const hasColorVariants = !hasOptionGroups && Array.isArray(body.colorVariants) && body.colorVariants.length > 0;
 
   await prisma.$transaction(async (tx) => {
+    // If switching to option groups mode, clean up any legacy colorVariants (and their SKUs via cascade)
+    if (hasOptionGroups || body.clearColorVariants === true) {
+      await tx.colorVariant.deleteMany({ where: { productId: id } });
+    }
+
     // Update core product fields
     await tx.product.update({
       where: { id },

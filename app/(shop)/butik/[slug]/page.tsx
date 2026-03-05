@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getVatRate } from "@/lib/vat";
 import { ProductColorSection } from "@/components/shop/ProductColorSection";
 import { ProductOptionsSection } from "@/components/shop/ProductOptionsSection";
+import { SimpleAddToCart } from "@/components/shop/SimpleAddToCart";
 import { formatPrice, withVat } from "@/lib/utils";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -95,12 +96,14 @@ export default async function ProductPage({ params }: Props) {
           optionGroups={product.optionGroups}
           vatPct={vatPct}
         />
-      ) : (
+      ) : product.colorVariants.length > 0 ? (
         <ProductColorSection
           product={product}
           skus={product.skus}
           colorVariants={product.colorVariants}
         />
+      ) : (
+        <SimpleAddToCart product={product} skus={product.skus} />
       )}
     </div>
   );
