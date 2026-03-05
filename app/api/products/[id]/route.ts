@@ -53,6 +53,7 @@ type OptionGroupInput = {
   position: number;
   required: boolean;
   fee?: number | null;
+  costFee?: number | null;
   inputType?: string | null;
   values: OptionValueInput[];
 };
@@ -64,6 +65,7 @@ type SkuMatrixEntry = {
   stock: number;
   itemNumber?: string | null;
   itemNumberOverride: boolean;
+  costPrice?: number | null;
 };
 
 type SkuInput = { id?: string; size: string; stock: number; itemNumber?: string | null };
@@ -131,12 +133,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
         if (g.id) {
           await tx.productOptionGroup.update({
             where: { id: g.id },
-            data: { type: g.type, label: g.label, position: gi, required: g.required, fee: g.fee ?? null, inputType: g.inputType ?? null },
+            data: { type: g.type, label: g.label, position: gi, required: g.required, fee: g.fee ?? null, costFee: g.costFee ?? null, inputType: g.inputType ?? null },
           });
           groupId = g.id;
         } else {
           const created = await tx.productOptionGroup.create({
-            data: { productId: id, type: g.type, label: g.label, position: gi, required: g.required, fee: g.fee ?? null, inputType: g.inputType ?? null },
+            data: { productId: id, type: g.type, label: g.label, position: gi, required: g.required, fee: g.fee ?? null, costFee: g.costFee ?? null, inputType: g.inputType ?? null },
           });
           groupId = created.id;
         }
@@ -254,7 +256,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
           // Update existing SKU
           await tx.sKU.update({
             where: { id: entry.id },
-            data: { stock: entry.stock, itemNumber, itemNumberOverride: entry.itemNumberOverride, size: sizeLabel },
+            data: { stock: entry.stock, itemNumber, itemNumberOverride: entry.itemNumberOverride, size: sizeLabel, costPrice: entry.costPrice ?? null },
           });
         } else {
           // Create new SKU
@@ -265,6 +267,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
               stock: entry.stock,
               itemNumber,
               itemNumberOverride: entry.itemNumberOverride,
+              costPrice: entry.costPrice ?? null,
             },
           });
 

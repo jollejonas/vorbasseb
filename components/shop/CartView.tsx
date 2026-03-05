@@ -5,12 +5,12 @@ import { Trash2, Package, Truck, Star } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useCart } from "./CartProvider";
-import { formatPrice, calcShipping } from "@/lib/utils";
+import { formatPrice, calcShipping, withVat, vatAmount } from "@/lib/utils";
 
 type DeliveryMethod = "SHIPPING" | "PICKUP";
 
 export function CartView() {
-  const { items, removeItem, updateQty, subtotal, clearCart } = useCart();
+  const { items, removeItem, updateQty, subtotal, clearCart, vatPct } = useCart();
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>("SHIPPING");
   const [membership, setMembership] = useState<{ isMember: boolean; discountPct: number } | null>(null);
   const [grants, setGrants] = useState<{ id: string; productId: string }[]>([]);
@@ -100,7 +100,7 @@ export function CartView() {
                   <p className="text-sm font-bold text-green-600 mt-1">Gratis (tildelt af klub)</p>
                 ) : (
                   <p className="text-sm font-bold text-secondary mt-1">
-                    {formatPrice((item.price + (item.customizationFee ?? 0)) * item.quantity)}
+                    {formatPrice(withVat(item.price + (item.customizationFee ?? 0), vatPct) * item.quantity)}
                   </p>
                 )}
               </div>
@@ -200,8 +200,8 @@ export function CartView() {
       {/* Summary */}
       <div className="bg-surface rounded-xl p-5 space-y-3">
         <div className="flex justify-between text-sm">
-          <span>Subtotal</span>
-          <span>{formatPrice(subtotal)}</span>
+          <span>Subtotal (ekskl. moms)</span>
+          <span>{formatPrice(effectiveSubtotal)}</span>
         </div>
         {grantDiscountDisplay > 0 && (
           <div className="flex justify-between text-sm text-green-600 font-medium">
@@ -215,6 +215,10 @@ export function CartView() {
             <span>−{formatPrice(memberDiscount)}</span>
           </div>
         )}
+        <div className="flex justify-between text-sm text-gray-500">
+          <span>Heraf moms ({vatPct}%)</span>
+          <span>{formatPrice(vatAmount(effectiveSubtotal - memberDiscount, vatPct))}</span>
+        </div>
         <div className="flex justify-between text-sm">
           <span>Fragt</span>
           <span className={shipping === 0 ? "text-green-600 font-medium" : ""}>
@@ -222,8 +226,8 @@ export function CartView() {
           </span>
         </div>
         <div className="flex justify-between font-bold text-lg border-t pt-3">
-          <span>Total</span>
-          <span>{formatPrice(finalTotal)}</span>
+          <span>Total (inkl. moms)</span>
+          <span>{formatPrice(withVat(effectiveSubtotal - memberDiscount, vatPct) + shipping)}</span>
         </div>
         {membership?.isMember && memberDiscount > 0 && (
           <p className="text-xs text-gray-400">* Den endelige rabat beregnes af Stripe ved betaling</p>

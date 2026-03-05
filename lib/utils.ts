@@ -14,6 +14,16 @@ export function formatPrice(ore: number): string {
   }).format(ore / 100);
 }
 
+/** Apply VAT to an excl.-VAT øre amount: withVat(10000, 25) → 12500 */
+export function withVat(ore: number, vatPct: number): number {
+  return Math.round(ore * (1 + vatPct / 100));
+}
+
+/** Extract VAT amount from an excl.-VAT øre amount: vatAmount(10000, 25) → 2500 */
+export function vatAmount(ore: number, vatPct: number): number {
+  return Math.round(ore * (vatPct / 100));
+}
+
 /** Shipping logic: 49 kr flat, free ≥ 499 kr */
 export function calcShipping(subtotalOre: number): number {
   return subtotalOre >= 49900 ? 0 : 4900;

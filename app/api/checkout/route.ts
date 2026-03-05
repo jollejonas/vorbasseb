@@ -37,13 +37,14 @@ export async function POST(req: NextRequest) {
   // Build skuId → productId map for grant matching
   const skuProductMap = new Map(skusWithProducts.map((s) => [s.id, s.productId]));
 
-  // Read shipping rules and member discount from DB
+  // Read shipping rules, member discount, and VAT rate from DB
   const cfg = await prisma.siteSetting
-    .findMany({ where: { key: { in: ["shipping_flat_ore", "shipping_free_ore", "member_discount_pct"] } } })
+    .findMany({ where: { key: { in: ["shipping_flat_ore", "shipping_free_ore", "member_discount_pct", "vat_rate"] } } })
     .catch(() => []);
   const flatOre = parseInt(cfg.find((s) => s.key === "shipping_flat_ore")?.value ?? "4900");
   const freeOre = parseInt(cfg.find((s) => s.key === "shipping_free_ore")?.value ?? "49900");
   const discountPct = parseInt(cfg.find((s) => s.key === "member_discount_pct")?.value ?? "10");
+  const vatRate = parseInt(cfg.find((s) => s.key === "vat_rate")?.value ?? "25");
 
   // Check if user is an active member (for discount)
   let isMember = false;
@@ -81,7 +82,8 @@ export async function POST(req: NextRequest) {
     const pool = grantPool.get(productId);
     if (!pool || pool.length === 0) continue;
 
-    const unitPrice = item.price + (item.customizationFee ?? 0);
+    const unitPriceExcl = item.price + (item.customizationFee ?? 0);
+    const unitPrice = Math.round(unitPriceExcl * (1 + vatRate / 100));
     let grantedUnits = 0;
     for (let u = 0; u < item.quantity && pool.length > 0; u++) {
       const grantId = pool.shift()!;
@@ -92,9 +94,9 @@ export async function POST(req: NextRequest) {
     if (grantedUnits > 0) grantedQtyMap.set(item.skuId, grantedUnits);
   }
 
-  // Compute totals
+  // Compute totals (all incl. VAT)
   const originalSubtotal = items.reduce(
-    (s, i) => s + (i.price + (i.customizationFee ?? 0)) * i.quantity,
+    (s, i) => s + Math.round((i.price + (i.customizationFee ?? 0)) * (1 + vatRate / 100)) * i.quantity,
     0,
   );
   const effectiveSubtotal = originalSubtotal - grantDiscountTotal;
@@ -160,7 +162,8 @@ export async function POST(req: NextRequest) {
   const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
 
   for (const item of items) {
-    const unitPrice = item.price + (item.customizationFee ?? 0);
+    const unitPriceExclVat = item.price + (item.customizationFee ?? 0);
+    const unitPriceInclVat = Math.round(unitPriceExclVat * (1 + vatRate / 100));
     const name = `${item.productName} (${item.size})${
       item.customName || item.customNumber
         ? ` · Tryk: ${item.customName ?? ""} ${item.customNumber ?? ""}`.trim()
@@ -170,7 +173,7 @@ export async function POST(req: NextRequest) {
       price_data: {
         currency: "dkk",
         product_data: { name, images: item.image ? [item.image] : [] },
-        unit_amount: unitPrice,
+        unit_amount: unitPriceInclVat,
       },
       quantity: item.quantity,
     });

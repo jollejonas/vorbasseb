@@ -18,6 +18,7 @@ type Props = {
 };
 
 const SETTING_LABELS: Record<string, string> = {
+  vat_rate: "Momssats (%)",
   footer_phone: "Telefon (footer)",
   footer_email: "E-mail (footer)",
   shipping_flat_ore: "Fast fragtgebyr (øre)",

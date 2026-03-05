@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { prisma } from "@/lib/prisma";
+import { getVatRate } from "@/lib/vat";
 import { ProductCard } from "@/components/shop/ProductCard";
 import { NewsCard } from "@/components/shop/NewsCard";
 import { HeroCarousel } from "@/components/shop/HeroCarousel";
@@ -11,7 +12,7 @@ import { Star, ArrowRight } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const [heroSlides, latestNewsList, latestProduct, featuredProducts, newsSection] =
+  const [heroSlides, latestNewsList, latestProduct, featuredProducts, newsSection, vatPct] =
     await Promise.all([
       prisma.heroSlide
         .findMany({
@@ -52,6 +53,7 @@ export default async function HomePage() {
           orderBy: { publishedAt: "desc" },
         })
         .catch(() => []),
+      getVatRate(),
     ]);
 
   const resolvedSlides = resolveSlides(heroSlides, latestNewsList, latestProduct);
@@ -72,7 +74,7 @@ export default async function HomePage() {
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
               {featuredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
+                <ProductCard key={product.id} product={product} vatPct={vatPct} />
               ))}
             </div>
           </div>

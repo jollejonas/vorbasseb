@@ -63,6 +63,15 @@ export function AdminProductsClient({
   const totalStock = (p: ProductWithDetails) =>
     p.skus.reduce((s, sku) => s + sku.stock, 0);
 
+  function avanceDisplay(p: ProductWithDetails): string {
+    const withCost = p.skus.filter((s) => s.costPrice != null && s.costPrice > 0);
+    if (withCost.length === 0) return "—";
+    const avg = withCost.reduce((s, sku) => s + sku.costPrice!, 0) / withCost.length;
+    const margin = p.price - avg;
+    const pct = p.price > 0 ? Math.round((margin / p.price) * 100) : 0;
+    return `${formatPrice(Math.round(margin))} (${pct}%)`;
+  }
+
   const attentionCount = products.filter((p) => p.attentionReasons.length > 0).length;
 
   return (
@@ -104,7 +113,8 @@ export function AdminProductsClient({
             <tr className="border-b text-left text-gray-500">
               <th className="pb-3 pr-4 font-medium">Produkt</th>
               <th className="pb-3 pr-4 font-medium">Kategori</th>
-              <th className="pb-3 pr-4 font-medium">Pris</th>
+              <th className="pb-3 pr-4 font-medium">Pris (ekskl. moms)</th>
+              <th className="pb-3 pr-4 font-medium">Avance</th>
               <th className="pb-3 pr-4 font-medium">Lager</th>
               <th className="pb-3 pr-4 font-medium">Status</th>
               <th className="pb-3 pr-4 font-medium">Opmærksomhed</th>
@@ -136,6 +146,7 @@ export function AdminProductsClient({
                 </td>
                 <td className="py-4 pr-4 text-gray-600">{p.category?.name ?? "—"}</td>
                 <td className="py-4 pr-4 font-medium">{formatPrice(p.price)}</td>
+                <td className="py-4 pr-4 text-sm text-gray-600">{avanceDisplay(p)}</td>
                 <td className="py-4 pr-4">
                   <span className={
                     totalStock(p) === 0 && p.skus.length > 0

@@ -172,6 +172,7 @@ model ProductOptionGroup {
   position  Int                 @default(0)
   required  Boolean             @default(false)
   fee       Int?                // øre — TEXT/CUSTOM only
+  costFee   Int?                // øre, ekskl. moms — kostpris for TEXT/CUSTOM tilvalg
   inputType String?             // "text"|"number"|"checkbox"|"dropdown" — CUSTOM only
   values    ProductOptionValue[]
 
@@ -256,6 +257,7 @@ model SKU {
   stock          Int           @default(0)
   itemNumber     String?       // varenummer
   itemNumberOverride Boolean   @default(false) // true = never auto-overwrite
+  costPrice      Int?          // øre, ekskl. moms — kostpris pr. SKU
   optionValues   SKUOptionValue[]
   orderItems     OrderItem[]
 }

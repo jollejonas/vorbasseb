@@ -39,6 +39,7 @@ type OptionGroupRow = {
   position: number;
   required: boolean;
   feeKr: string;
+  costFeeKr: string;
   inputType: string;
   values: OptionValueRow[];
 };
@@ -50,6 +51,7 @@ type SkuMatrixCell = {
   stock: number;
   itemNumber: string;
   itemNumberOverride: boolean;
+  costPriceKr: string;
 };
 
 type LegacySkuRow = { id?: string; size: string; stock: number; itemNumber?: string };
@@ -124,6 +126,7 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
       position: g.position,
       required: g.required,
       feeKr: g.fee ? (g.fee / 100).toFixed(2) : "",
+      costFeeKr: g.costFee ? (g.costFee / 100).toFixed(2) : "",
       inputType: g.inputType ?? "",
       values: g.values.map((v) => ({
         id: v.id,
@@ -279,7 +282,7 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
     };
     setOptionGroups((prev) => [...prev, {
       _key: nextKey(), type, label: labels[type], position: prev.length,
-      required: type === "SIZE", feeKr: "", inputType: "text", values: [],
+      required: type === "SIZE", feeKr: "", costFeeKr: "", inputType: "text", values: [],
     }]);
   }
 
@@ -338,7 +341,7 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
         // Add rows for new color × all existing sizes
         for (const sv of sizeValues) {
           if (!next.find((c) => c.colorValueKey === newColorKey && c.sizeValueKey === sv._key)) {
-            next.push({ colorValueKey: newColorKey, sizeValueKey: sv._key, stock: 0, itemNumber: "", itemNumberOverride: false });
+            next.push({ colorValueKey: newColorKey, sizeValueKey: sv._key, stock: 0, itemNumber: "", itemNumberOverride: false, costPriceKr: "" });
           }
         }
       }
@@ -346,7 +349,7 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
         // Add columns for new size × all existing colors
         for (const cv of colorValues) {
           if (!next.find((c) => c.colorValueKey === cv._key && c.sizeValueKey === newSizeKey)) {
-            next.push({ colorValueKey: cv._key, sizeValueKey: newSizeKey, stock: 0, itemNumber: "", itemNumberOverride: false });
+            next.push({ colorValueKey: cv._key, sizeValueKey: newSizeKey, stock: 0, itemNumber: "", itemNumberOverride: false, costPriceKr: "" });
           }
         }
       }
@@ -391,6 +394,7 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
       position: optionGroups.length,
       required: tpl.required,
       feeKr: tpl.fee ? String(Math.round(tpl.fee / 100)) : "",
+      costFeeKr: "",
       inputType: tpl.inputType ?? "text",
       values,
     };
@@ -406,7 +410,7 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
           for (const cv of values) {
             for (const sv of sizeGrp.values) {
               if (!next.find((c) => c.colorValueKey === cv._key && c.sizeValueKey === sv._key)) {
-                next.push({ colorValueKey: cv._key, sizeValueKey: sv._key, stock: 0, itemNumber: "", itemNumberOverride: false });
+                next.push({ colorValueKey: cv._key, sizeValueKey: sv._key, stock: 0, itemNumber: "", itemNumberOverride: false, costPriceKr: "" });
               }
             }
           }
@@ -421,7 +425,7 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
           for (const sv of values) {
             for (const cv of colorGrp.values) {
               if (!next.find((c) => c.colorValueKey === cv._key && c.sizeValueKey === sv._key)) {
-                next.push({ colorValueKey: cv._key, sizeValueKey: sv._key, stock: 0, itemNumber: "", itemNumberOverride: false });
+                next.push({ colorValueKey: cv._key, sizeValueKey: sv._key, stock: 0, itemNumber: "", itemNumberOverride: false, costPriceKr: "" });
               }
             }
           }
@@ -491,6 +495,7 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
           position: gi,
           required: g.required,
           fee: g.feeKr ? Math.round(parseFloat(g.feeKr) * 100) : null,
+          costFee: g.costFeeKr ? Math.round(parseFloat(g.costFeeKr) * 100) : null,
           inputType: g.inputType || null,
           values: g.values.map((v, vi) => ({
             id: v.id,
@@ -509,6 +514,7 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
           stock: cell.stock,
           itemNumber: cell.itemNumberOverride ? (cell.itemNumber || null) : null,
           itemNumberOverride: cell.itemNumberOverride,
+          costPrice: cell.costPriceKr ? Math.round(parseFloat(cell.costPriceKr) * 100) : null,
         }));
 
         payload = {
@@ -615,7 +621,7 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Pris (kr) <span className="text-red-500">*</span>
+              Pris (kr, ekskl. moms) <span className="text-red-500">*</span>
             </label>
             <input type="number" min="0" step="0.01" value={priceKr} onChange={(e) => setPriceKr(e.target.value)} required
               className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
@@ -873,11 +879,37 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
                     if (existing) {
                       return prev.map((c) => c.sizeValueKey === sizeKey ? { ...c, ...patch } : c);
                     }
-                    return [...prev, { colorValueKey: "", sizeValueKey: sizeKey, stock: 0, itemNumber: "", itemNumberOverride: false, ...patch }];
+                    return [...prev, { colorValueKey: "", sizeValueKey: sizeKey, stock: 0, itemNumber: "", itemNumberOverride: false, costPriceKr: "", ...patch }];
                   });
                 }}
               />
             )}
+
+            {/* Live margin panel */}
+            {skuMatrix.some((c) => c.costPriceKr) && (() => {
+              const salg = parseFloat(priceKr) || 0;
+              const costs = skuMatrix
+                .map((c) => parseFloat(c.costPriceKr))
+                .filter((n) => !isNaN(n) && n > 0);
+              if (costs.length === 0 || salg === 0) return null;
+              const minCost = Math.min(...costs);
+              const maxCost = Math.max(...costs);
+              const minMargin = salg - maxCost;
+              const maxMargin = salg - minCost;
+              const minPct = Math.round((minMargin / salg) * 100);
+              const maxPct = Math.round((maxMargin / salg) * 100);
+              const sameRange = Math.abs(minCost - maxCost) < 0.01;
+              return (
+                <div className="border rounded-xl p-4 bg-blue-50 border-blue-200 text-sm space-y-1">
+                  <p className="font-semibold text-blue-800">Avance (ekskl. moms)</p>
+                  <div className="text-blue-700 space-y-0.5">
+                    <p>Salgspris: <span className="font-medium">{salg.toFixed(2)} kr</span></p>
+                    <p>Kostpris: <span className="font-medium">{sameRange ? `${minCost.toFixed(2)} kr` : `${minCost.toFixed(2)}–${maxCost.toFixed(2)} kr`}</span></p>
+                    <p>Avance: <span className="font-bold">{sameRange ? `${maxMargin.toFixed(2)} kr (${maxPct}%)` : `${minMargin.toFixed(2)}–${maxMargin.toFixed(2)} kr (${minPct}–${maxPct}%)`}</span></p>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -961,11 +993,19 @@ function OptionGroupEditor({
 
       {/* TEXT / CUSTOM fee */}
       {(group.type === "TEXT" || group.type === "CUSTOM") && (
-        <div className="flex gap-3 items-end">
+        <div className="flex gap-3 items-end flex-wrap">
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Gebyr (kr)</label>
+            <label className="block text-xs text-gray-500 mb-1">Gebyr ekskl. moms (kr)</label>
             <input type="number" min="0" step="0.01" value={group.feeKr}
               onChange={(e) => onUpdate({ feeKr: e.target.value })}
+              className="w-28 border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-secondary"
+              placeholder="0.00"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Kostpris ekskl. moms (kr)</label>
+            <input type="number" min="0" step="0.01" value={group.costFeeKr}
+              onChange={(e) => onUpdate({ costFeeKr: e.target.value })}
               className="w-28 border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-secondary"
               placeholder="0.00"
             />
@@ -1127,7 +1167,7 @@ function SkuMatrix({
   return (
     <div className="border rounded-xl overflow-hidden mt-4">
       <div className="px-4 py-2 bg-gray-50 border-b">
-        <p className="text-sm font-medium text-gray-700">Lager &amp; varenumre</p>
+        <p className="text-sm font-medium text-gray-700">Lager, varenumre &amp; kostpris</p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -1135,7 +1175,7 @@ function SkuMatrix({
             <tr className="border-b text-gray-500">
               <th className="px-3 py-2 text-left font-medium text-xs">Farve</th>
               {sizeGroup.values.map((sv) => (
-                <th key={sv._key} className="px-3 py-2 text-center font-medium text-xs min-w-[90px]">{sv.label}</th>
+                <th key={sv._key} className="px-3 py-2 text-center font-medium text-xs min-w-[110px]">{sv.label}</th>
               ))}
             </tr>
           </thead>
@@ -1180,6 +1220,11 @@ function SkuMatrix({
                               className="accent-secondary w-3 h-3 cursor-pointer"
                             />
                           </div>
+                          <input type="number" min="0" step="0.01" value={cell?.costPriceKr ?? ""}
+                            onChange={(e) => onUpdateCell(cv._key, sv._key, { costPriceKr: e.target.value })}
+                            className="w-full border rounded px-2 py-0.5 text-xs text-center focus:outline-none focus:ring-1 focus:ring-secondary text-gray-500"
+                            placeholder="kostpris kr"
+                          />
                         </div>
                       </td>
                     );
@@ -1215,6 +1260,7 @@ function FlatSizeTable({
             <th className="px-4 py-2 text-left font-medium text-xs">Størrelse</th>
             <th className="px-4 py-2 text-left font-medium text-xs">Varenummer</th>
             <th className="px-4 py-2 text-left font-medium text-xs">Lager</th>
+            <th className="px-4 py-2 text-left font-medium text-xs">Kostpris (kr)</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
@@ -1246,6 +1292,13 @@ function FlatSizeTable({
                   <input type="number" min="0" value={cell?.stock ?? 0}
                     onChange={(e) => onUpdateCell(sv._key, { stock: parseInt(e.target.value) || 0 })}
                     className="w-24 border rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-secondary"
+                  />
+                </td>
+                <td className="px-4 py-2">
+                  <input type="number" min="0" step="0.01" value={cell?.costPriceKr ?? ""}
+                    onChange={(e) => onUpdateCell(sv._key, { costPriceKr: e.target.value })}
+                    className="w-28 border rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-secondary text-gray-500"
+                    placeholder="0.00"
                   />
                 </td>
               </tr>

@@ -1,9 +1,10 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { getVatRate } from "@/lib/vat";
 import { ProductColorSection } from "@/components/shop/ProductColorSection";
 import { ProductOptionsSection } from "@/components/shop/ProductOptionsSection";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, withVat } from "@/lib/utils";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -15,30 +16,34 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ProductPage({ params }: Props) {
   const { slug } = await params;
-  const product = await prisma.product.findUnique({
-    where: { slug, published: true },
-    include: {
-      skus: {
-        where: { colorVariantId: null },
-        orderBy: { size: "asc" },
-        include: { optionValues: { select: { optionValueId: true } } },
-      },
-      category: true,
-      colorVariants: {
-        include: { skus: { orderBy: { size: "asc" } } },
-        orderBy: { position: "asc" },
-      },
-      optionGroups: {
-        include: {
-          values: {
-            include: { globalColor: true, skuValues: true },
-            orderBy: { position: "asc" },
-          },
+
+  const [product, vatPct] = await Promise.all([
+    prisma.product.findUnique({
+      where: { slug, published: true },
+      include: {
+        skus: {
+          where: { colorVariantId: null },
+          orderBy: { size: "asc" },
+          include: { optionValues: { select: { optionValueId: true } } },
         },
-        orderBy: { position: "asc" },
+        category: true,
+        colorVariants: {
+          include: { skus: { orderBy: { size: "asc" } } },
+          orderBy: { position: "asc" },
+        },
+        optionGroups: {
+          include: {
+            values: {
+              include: { globalColor: true, skuValues: true },
+              orderBy: { position: "asc" },
+            },
+          },
+          orderBy: { position: "asc" },
+        },
       },
-    },
-  });
+    }),
+    getVatRate(),
+  ]);
 
   if (!product) notFound();
 
@@ -72,10 +77,11 @@ export default async function ProductPage({ params }: Props) {
         )}
         <h1 className="text-2xl font-bold mb-1">{product.name}</h1>
         <p className="text-xl font-bold text-secondary mb-2">
-          {formatPrice(product.price)}
+          {formatPrice(withVat(product.price, vatPct))}
+          <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
           {product.customizationFee && (
             <span className="text-sm text-gray-500 font-normal ml-2">
-              + {formatPrice(product.customizationFee)} for tryk
+              + {formatPrice(withVat(product.customizationFee, vatPct))} for tryk
             </span>
           )}
         </p>
@@ -87,6 +93,7 @@ export default async function ProductPage({ params }: Props) {
           product={product}
           skus={product.skus}
           optionGroups={product.optionGroups}
+          vatPct={vatPct}
         />
       ) : (
         <ProductColorSection

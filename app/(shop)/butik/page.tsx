@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { getVatRate } from "@/lib/vat";
 import { ProductGrid } from "@/components/shop/ProductGrid";
 import { FilterContent } from "@/components/shop/FilterContent";
 import { MobileFilterDrawer } from "@/components/shop/MobileFilterDrawer";
@@ -88,11 +89,14 @@ export default async function ButikPage({ searchParams }: Props) {
         ? { price: "desc" }
         : { createdAt: "desc" };
 
-  const products = await prisma.product.findMany({
-    where,
-    include: { skus: { select: { stock: true } } },
-    orderBy,
-  });
+  const [products, vatPct] = await Promise.all([
+    prisma.product.findMany({
+      where,
+      include: { skus: { select: { stock: true } } },
+      orderBy,
+    }),
+    getVatRate(),
+  ]);
 
   // Active filter pills
   const activeFilters: { label: string; removeKey: string }[] = [];
@@ -219,7 +223,7 @@ export default async function ButikPage({ searchParams }: Props) {
               </Link>
             </div>
           ) : (
-            <ProductGrid products={products} />
+            <ProductGrid products={products} vatPct={vatPct} />
           )}
         </div>
       </div>

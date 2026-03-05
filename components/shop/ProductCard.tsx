@@ -1,12 +1,12 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Lock } from "lucide-react";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, withVat } from "@/lib/utils";
 import type { Product } from "@prisma/client";
 
 type ProductWithSkus = Product & { skus: { stock: number }[] };
 
-export function ProductCard({ product, index = 0 }: { product: ProductWithSkus; index?: number }) {
+export function ProductCard({ product, index = 0, vatPct = 25 }: { product: ProductWithSkus; index?: number; vatPct?: number }) {
   const inStock = product.skus.some((s) => s.stock > 0);
 
   return (
@@ -46,7 +46,8 @@ export function ProductCard({ product, index = 0 }: { product: ProductWithSkus; 
         <div>
           <h3 className="font-bold text-secondary text-sm leading-tight">{product.name}</h3>
           <p className="text-secondary/80 font-semibold mt-1 text-sm">
-            {formatPrice(product.price)}
+            {formatPrice(withVat(product.price, vatPct))}
+            <span className="text-xs font-normal text-gray-400 ml-1">inkl. moms</span>
           </p>
         </div>
         <Link

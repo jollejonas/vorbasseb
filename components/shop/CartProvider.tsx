@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useReducer,
+  useState,
   type ReactNode,
 } from "react";
 
@@ -80,7 +81,8 @@ type CartContextValue = {
   updateQty: (item: CartItem, qty: number) => void;
   clearCart: () => void;
   totalItems: number;
-  subtotal: number; // øre
+  subtotal: number; // øre, excl. VAT
+  vatPct: number;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -89,6 +91,7 @@ const STORAGE_KEY = "vbk_cart";
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, { items: [] });
+  const [vatPct, setVatPct] = useState(25);
 
   // Hydrate from localStorage
   useEffect(() => {
@@ -103,6 +106,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.items));
   }, [state.items]);
 
+  // Fetch VAT rate once
+  useEffect(() => {
+    fetch("/api/vat-rate")
+      .then((r) => r.json())
+      .then((d) => { if (typeof d.vatPct === "number") setVatPct(d.vatPct); })
+      .catch(() => {});
+  }, []);
+
   const value: CartContextValue = {
     items: state.items,
     addItem: (item) => dispatch({ type: "ADD", item }),
@@ -115,6 +126,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         s + (i.price + (i.customizationFee ?? 0)) * i.quantity,
       0,
     ),
+    vatPct,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

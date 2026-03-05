@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { useCart } from "./CartProvider";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, withVat } from "@/lib/utils";
 import type { Product, SKU, ProductOptionGroup, ProductOptionValue, GlobalColor, SKUOptionValue } from "@prisma/client";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -26,11 +26,12 @@ type Props = {
   product: Product;
   skus: SkuFull[];
   optionGroups: OptionGroupFull[];
+  vatPct?: number;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ProductOptionsSection({ product, skus, optionGroups }: Props) {
+export function ProductOptionsSection({ product, skus, optionGroups, vatPct = 25 }: Props) {
   const { addItem } = useCart();
 
   // For COLOR + SIZE groups: track selected value IDs
@@ -271,7 +272,7 @@ export function ProductOptionsSection({ product, skus, optionGroups }: Props) {
               {g.label}
               {g.fee && g.fee > 0 && (
                 <span className="ml-2 text-gray-500 font-normal text-xs">
-                  (+{formatPrice(g.fee)})
+                  (+{formatPrice(withVat(g.fee, vatPct))})
                 </span>
               )}
               {!g.required && <span className="ml-1 text-gray-400 font-normal text-xs">(valgfrit)</span>}
@@ -319,8 +320,8 @@ export function ProductOptionsSection({ product, skus, optionGroups }: Props) {
         {/* Price summary */}
         {extraFee > 0 && (
           <p className="text-sm text-gray-500">
-            Subtotal: <span className="font-bold text-gray-900">{formatPrice(product.price + extraFee)}</span>
-            <span className="ml-1 text-xs">(inkl. {formatPrice(extraFee)} for tryk)</span>
+            Subtotal: <span className="font-bold text-gray-900">{formatPrice(withVat(product.price + extraFee, vatPct))}</span>
+            <span className="ml-1 text-xs">inkl. moms (inkl. {formatPrice(withVat(extraFee, vatPct))} for tryk)</span>
           </p>
         )}
 
