@@ -2,10 +2,6 @@
 import { Share } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
-import { Header } from "@/components/shop/Header";
-import { Footer } from "@/components/shop/Footer";
-import { SportsTicker } from "@/components/shop/SportsTicker";
-import { CookieBanner } from "@/components/shop/CookieBanner";
 import { Toaster } from "sonner";
 
 const share = Share({ subsets: ["latin"], weight: ["400", "700"] });
@@ -28,11 +24,7 @@ export default function RootLayout({
     <html lang="da" className={share.className}>
       <body>
         <Providers>
-          <Header />
-          <SportsTicker />
-          <main className="min-h-screen">{children}</main>
-          <Footer />
-          <CookieBanner />
+          {children}
         </Providers>
         <Toaster richColors position="top-right" />
       </body>

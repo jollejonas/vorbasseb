@@ -20,7 +20,14 @@
       "WebFetch(domain:live-911-vorbasse-b-af-1912.umbraco-proxy.com)",
       "WebFetch(domain:www.aabshoppen.dk)",
       "WebFetch(domain:shop.wolves.co.uk)",
-      "WebFetch(domain:www.watfordfc.com)"
+      "WebFetch(domain:www.watfordfc.com)",
+      "WebFetch(domain:www.fodbolddbu.dk)",
+      "WebFetch(domain:vkv.sportyfied.com)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" issue create --repo jollejonas/vorbasseb --title \"Interaktiv produktdesigner \\(Phase 2\\)\" --body \"**Baggrund:**:*)",
+      "Bash(ls /c/Dev/vorbasseb/app/api /c/Dev/vorbasseb/app/\\\\\\(admin\\\\\\)/admin /c/Dev/vorbasseb/app/\\\\\\(shop\\\\\\))",
+      "Bash(ls /c/Dev/vorbasseb/app/\\\\\\(admin\\\\\\)/admin/produkter/)",
+      "Bash(find \"C:/Dev/vorbasseb/app/\\(admin\\)\" -type f)",
+      "Bash(cat \"c:/Dev/vorbasseb/app/\\(admin\\)/admin/page.tsx\")"
     ]
   }
 }
