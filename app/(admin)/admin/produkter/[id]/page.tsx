@@ -26,6 +26,7 @@ export default async function RedigerProduktPage({ params }: Props) {
         },
         orderBy: { position: "asc" },
       },
+      designerZones: { orderBy: { positionOrd: "asc" } },
     },
   });
 

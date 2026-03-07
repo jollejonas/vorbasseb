@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { revalidateTag } from "next/cache";
 
 export async function GET() {
   const session = await auth();
@@ -35,6 +36,11 @@ export async function PUT(req: NextRequest) {
       })
     )
   );
+
+  // Invalidate cached VAT rate if it was updated
+  if (settings.some((s) => s.key === "vat_rate")) {
+    revalidateTag("vat_rate", {});
+  }
 
   const updated = await prisma.siteSetting.findMany();
   return NextResponse.json(updated);

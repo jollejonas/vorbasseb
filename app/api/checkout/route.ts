@@ -134,7 +134,9 @@ export async function POST(req: NextRequest) {
               customName: item.customName ?? null,
               customNumber: item.customNumber ?? null,
               colorName: item.colorName ?? null,
-              optionSelections: item.optionSelections ?? [],
+              optionSelections: item.printElements?.length
+                ? { printElements: item.printElements }
+                : (item.optionSelections ?? []),
             })),
           },
         },
@@ -227,7 +229,9 @@ export async function POST(req: NextRequest) {
           customNumber: i.customNumber ?? "",
           customizationFee: i.customizationFee ?? 0,
           colorName: i.colorName ?? "",
-          optionSelections: i.optionSelections ?? [],
+          optionSelections: i.printElements?.length
+            ? { printElements: i.printElements }
+            : (i.optionSelections ?? []),
         })),
       ),
       shippingFee: String(shipping),

@@ -18,6 +18,7 @@ import {
   Menu,
   X,
   AlertTriangle,
+  Image,
 } from "lucide-react";
 
 type NavItem = {
@@ -42,6 +43,7 @@ function buildGroups(attentionCount: number): NavGroup[] {
         { href: "/admin/rabatkoder", label: "Rabatkoder", icon: Tag },
         { href: "/admin/farver", label: "Farvebibliotek", icon: Palette },
         { href: "/admin/tilvalg", label: "Tilvalg", icon: ListPlus },
+        { href: "/admin/designer-logoer", label: "Designer-logoer", icon: Image },
       ],
     },
     {

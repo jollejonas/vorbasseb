@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { slugify } from "@/lib/utils";
-import type { Product, SKU, Category, ClubRole, ColorVariant, ProductOptionGroup, ProductOptionValue, GlobalColor, OptionGroupTemplate, OptionGroupTemplateValue } from "@prisma/client";
+import type { Product, SKU, Category, ClubRole, ColorVariant, ProductOptionGroup, ProductOptionValue, GlobalColor, OptionGroupTemplate, OptionGroupTemplateValue, DesignerZone } from "@prisma/client";
 import { BookOpen, X } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -17,6 +17,7 @@ type ProductWithRelations = Product & {
   category: Category | null;
   colorVariants: ColorVariantWithSkus[];
   optionGroups: OptionGroupWithValues[];
+  designerZones: DesignerZone[];
 };
 
 type OptionType = "COLOR" | "SIZE" | "TEXT" | "SELECT" | "CUSTOM";
@@ -104,6 +105,74 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
   const [description, setDescription] = useState(product?.description ?? "");
   const [images, setImages] = useState<string[]>(product?.images ?? []);
   const [saving, setSaving] = useState(false);
+
+  // ── Jersey designer ─────────────────────────────────────────────────────────
+  const [designerEnabled, setDesignerEnabled] = useState(product?.designerEnabled ?? false);
+  const [designerFrontImageIdx, setDesignerFrontImageIdx] = useState<number | "">(
+    product?.designerFrontImageIdx ?? ""
+  );
+  const [designerBackImageIdx, setDesignerBackImageIdx] = useState<number | "">(
+    product?.designerBackImageIdx ?? ""
+  );
+  const [designerPrintColor, setDesignerPrintColor] = useState(product?.designerPrintColor ?? "#FFFFFF");
+  type ZoneRow = {
+    side: "front" | "back";
+    label: string;
+    position: string;
+    allowText: boolean;
+    allowLogo: boolean;
+    previewX: number;
+    previewY: number;
+    previewW: number;
+    previewH: number;
+  };
+
+  const [designerZones, setDesignerZones] = useState<ZoneRow[]>(
+    (product?.designerZones ?? []).map((z) => ({
+      side: z.side as "front" | "back",
+      label: z.label,
+      position: z.position,
+      allowText: z.allowText,
+      allowLogo: z.allowLogo,
+      previewX: z.previewX,
+      previewY: z.previewY,
+      previewW: z.previewW,
+      previewH: z.previewH,
+    }))
+  );
+  const [designerSaving, setDesignerSaving] = useState(false);
+  // Zone editor state
+  const [zoneEditorSide, setZoneEditorSide] = useState<"front" | "back">("front");
+  const [selectedZoneIdx, setSelectedZoneIdx] = useState<number | null>(null);
+  const [drawRect, setDrawRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [pendingArea, setPendingArea] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
+  const drawStart = useRef<{ x: number; y: number } | null>(null);
+  const zoneEditorRef = useRef<HTMLDivElement>(null);
+
+  async function saveDesigner() {
+    if (!isEdit) return;
+    setDesignerSaving(true);
+    try {
+      const res = await fetch(`/api/products/${product.id}/designer`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          designerEnabled,
+          designerFrontImageIdx: designerFrontImageIdx === "" ? null : designerFrontImageIdx,
+          designerBackImageIdx: designerBackImageIdx === "" ? null : designerBackImageIdx,
+          designerPrintColor: designerPrintColor || null,
+          zones: designerZones.map((z, i) => ({ ...z, positionOrd: i })),
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Fejl");
+      toast.success("Designer-opsætning gemt");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Noget gik galt");
+    } finally {
+      setDesignerSaving(false);
+    }
+  }
 
   // ── New option groups system ────────────────────────────────────────────────
   // New products always start in option groups mode; existing products follow their data
@@ -981,6 +1050,383 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
           />
         )}
       </section>
+
+      {/* ── Jersey Designer ─────────────────────────────────────────────────── */}
+      {isEdit && (
+        <section className="space-y-4 border rounded-xl p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-gray-700">Jersey Designer</h2>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={designerEnabled}
+                onChange={(e) => setDesignerEnabled(e.target.checked)}
+                className="rounded"
+              />
+              Aktivér designer til dette produkt
+            </label>
+          </div>
+
+          {designerEnabled && (
+            <div className="space-y-5">
+              {/* Front/back image selection */}
+              <div className="grid sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Forside-billede</label>
+                  <select
+                    value={designerFrontImageIdx}
+                    onChange={(e) => setDesignerFrontImageIdx(e.target.value === "" ? "" : parseInt(e.target.value))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="">Ingen</option>
+                    {images.map((_, i) => (
+                      <option key={i} value={i}>Billede {i + 1}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Bagside-billede</label>
+                  <select
+                    value={designerBackImageIdx}
+                    onChange={(e) => setDesignerBackImageIdx(e.target.value === "" ? "" : parseInt(e.target.value))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="">Ingen</option>
+                    {images.map((_, i) => (
+                      <option key={i} value={i}>Billede {i + 1}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Tryk-farve</label>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="color"
+                      value={designerPrintColor}
+                      onChange={(e) => setDesignerPrintColor(e.target.value)}
+                      className="h-9 w-12 cursor-pointer rounded border border-gray-200 p-0.5"
+                    />
+                    <span className="text-xs font-mono text-gray-500">{designerPrintColor}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Visual zone editor */}
+              {(() => {
+                const ZONE_COLORS = ["#3B82F6", "#10B981", "#F59E0B", "#8B5CF6", "#EF4444", "#06B6D4"];
+                const editorImgIdx = zoneEditorSide === "front"
+                  ? (designerFrontImageIdx === "" ? 0 : Number(designerFrontImageIdx))
+                  : (designerBackImageIdx === "" ? 0 : Number(designerBackImageIdx));
+                const editorImgUrl = images[editorImgIdx];
+
+                function getRelativePos(e: React.MouseEvent) {
+                  const rect = zoneEditorRef.current!.getBoundingClientRect();
+                  return {
+                    x: Math.min(100, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100)),
+                    y: Math.min(100, Math.max(0, ((e.clientY - rect.top) / rect.height) * 100)),
+                  };
+                }
+
+                const GRID_LABELS = [
+                  ["Øverst venstre", "Øverst", "Øverst højre"],
+                  ["Midt venstre",   "Midt",   "Midt højre"],
+                  ["Nederst venstre","Nederst", "Nederst højre"],
+                ];
+
+                function toggleCell(key: string) {
+                  setSelectedCells((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(key)) next.delete(key); else next.add(key);
+                    return next;
+                  });
+                }
+
+                function commitPendingArea() {
+                  if (!pendingArea) return;
+                  const newZones: ZoneRow[] = [];
+                  selectedCells.forEach((key) => {
+                    const [row, col] = key.split(",").map(Number);
+                    newZones.push({
+                      side: zoneEditorSide,
+                      label: GRID_LABELS[row][col],
+                      position: "custom",
+                      allowText: true,
+                      allowLogo: false,
+                      previewX: pendingArea.x + col * (pendingArea.w / 3),
+                      previewY: pendingArea.y + row * (pendingArea.h / 3),
+                      previewW: pendingArea.w / 3,
+                      previewH: pendingArea.h / 3,
+                    });
+                  });
+                  const nextIdx = designerZones.length + newZones.length - 1;
+                  setDesignerZones((prev) => [...prev, ...newZones]);
+                  setPendingArea(null);
+                  setSelectedCells(new Set());
+                  setSelectedZoneIdx(nextIdx);
+                }
+
+                function commitWholeArea() {
+                  if (!pendingArea) return;
+                  const newZone: ZoneRow = {
+                    side: zoneEditorSide,
+                    label: "Tryk",
+                    position: "custom",
+                    allowText: true,
+                    allowLogo: false,
+                    previewX: pendingArea.x,
+                    previewY: pendingArea.y,
+                    previewW: pendingArea.w,
+                    previewH: pendingArea.h,
+                  };
+                  setDesignerZones((prev) => [...prev, newZone]);
+                  setPendingArea(null);
+                  setSelectedCells(new Set());
+                  setSelectedZoneIdx(designerZones.length);
+                }
+
+                return (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-gray-700">Placeringszoner</p>
+                      <div className="flex gap-1 text-xs border rounded-lg p-0.5 bg-white">
+                        {(["front", "back"] as const).map((s) => (
+                          <button key={s} type="button"
+                            onClick={() => setZoneEditorSide(s)}
+                            className={`px-2 py-1 rounded-md transition ${zoneEditorSide === s ? "bg-secondary text-white" : "hover:bg-gray-100"}`}>
+                            {s === "front" ? "Forside" : "Bagside"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-4">
+                      {/* Jersey image + drawing canvas */}
+                      <div
+                        ref={zoneEditorRef}
+                        className="relative flex-1 select-none overflow-hidden rounded-lg border border-gray-200 bg-gray-50"
+                        style={{ cursor: "crosshair" }}
+                        onMouseDown={(e) => {
+                          if ((e.target as HTMLElement).closest("[data-zone]")) return;
+                          if (pendingArea) {
+                            setPendingArea(null);
+                            setSelectedCells(new Set());
+                            return;
+                          }
+                          const pos = getRelativePos(e);
+                          drawStart.current = pos;
+                          setDrawRect({ x: pos.x, y: pos.y, w: 0, h: 0 });
+                          e.preventDefault();
+                        }}
+                        onMouseMove={(e) => {
+                          if (!drawStart.current) return;
+                          const pos = getRelativePos(e);
+                          setDrawRect({
+                            x: Math.min(drawStart.current.x, pos.x),
+                            y: Math.min(drawStart.current.y, pos.y),
+                            w: Math.abs(pos.x - drawStart.current.x),
+                            h: Math.abs(pos.y - drawStart.current.y),
+                          });
+                        }}
+                        onMouseUp={(e) => {
+                          if (!drawStart.current) return;
+                          const pos = getRelativePos(e);
+                          const x = Math.min(drawStart.current.x, pos.x);
+                          const y = Math.min(drawStart.current.y, pos.y);
+                          const w = Math.abs(pos.x - drawStart.current.x);
+                          const h = Math.abs(pos.y - drawStart.current.y);
+                          drawStart.current = null;
+                          setDrawRect(null);
+                          if (w < 3 || h < 3) return;
+                          setPendingArea({ x, y, w, h });
+                          setSelectedCells(new Set());
+                        }}
+                        onMouseLeave={() => {
+                          if (drawStart.current) { drawStart.current = null; setDrawRect(null); }
+                        }}
+                      >
+                        {editorImgUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={editorImgUrl} alt="Jersey" className="w-full object-contain pointer-events-none" />
+                        ) : (
+                          <div className="aspect-[3/4] flex items-center justify-center text-gray-300 text-sm">
+                            Vælg et billede ovenfor
+                          </div>
+                        )}
+
+                        {/* Existing zones for current side */}
+                        {designerZones.map((zone, zi) => {
+                          if (zone.side !== zoneEditorSide) return null;
+                          const color = ZONE_COLORS[zi % ZONE_COLORS.length];
+                          return (
+                            <div
+                              key={zi}
+                              data-zone="true"
+                              className={`absolute transition ${selectedZoneIdx === zi ? "ring-2 ring-white ring-offset-1" : ""}`}
+                              style={{
+                                left: `${zone.previewX}%`, top: `${zone.previewY}%`,
+                                width: `${zone.previewW}%`, height: `${zone.previewH}%`,
+                                backgroundColor: color + "33",
+                                border: `2px solid ${color}`,
+                                borderRadius: 3,
+                                cursor: "pointer",
+                              }}
+                              onMouseDown={(e) => { e.stopPropagation(); setSelectedZoneIdx(zi); }}
+                            >
+                              <span className="absolute top-0.5 left-1 text-xs font-semibold leading-none select-none"
+                                style={{ color, textShadow: "0 0 4px white, 0 0 4px white" }}>
+                                {zone.label || `Zone ${zi + 1}`}
+                              </span>
+                              <button
+                                type="button"
+                                data-zone="true"
+                                className="absolute top-0.5 right-0.5 text-xs bg-white text-red-500 rounded-full w-4 h-4 flex items-center justify-center leading-none hover:bg-red-50"
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDesignerZones((prev) => prev.filter((_, i) => i !== zi));
+                                  setSelectedZoneIdx(null);
+                                }}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          );
+                        })}
+
+                        {/* Live drawing preview */}
+                        {drawRect && drawRect.w > 1 && drawRect.h > 1 && (
+                          <div
+                            className="absolute pointer-events-none border-2 border-dashed border-secondary bg-secondary/10"
+                            style={{ left: `${drawRect.x}%`, top: `${drawRect.y}%`, width: `${drawRect.w}%`, height: `${drawRect.h}%` }}
+                          />
+                        )}
+
+                        {/* 3×3 grid overlay for pending area */}
+                        {pendingArea && (
+                          <div
+                            className="absolute pointer-events-none"
+                            style={{ left: `${pendingArea.x}%`, top: `${pendingArea.y}%`, width: `${pendingArea.w}%`, height: `${pendingArea.h}%`, border: "2px dashed rgba(59,130,246,0.6)" }}
+                          >
+                            {[0, 1, 2].map((row) =>
+                              [0, 1, 2].map((col) => {
+                                const key = `${row},${col}`;
+                                const isSelected = selectedCells.has(key);
+                                return (
+                                  <button
+                                    key={key}
+                                    type="button"
+                                    data-zone="true"
+                                    className="absolute pointer-events-auto transition-colors"
+                                    style={{
+                                      left: `${col * 33.33}%`, top: `${row * 33.33}%`,
+                                      width: "33.34%", height: "33.34%",
+                                      border: isSelected ? "2px solid rgba(59,130,246,0.9)" : "1px dashed rgba(255,255,255,0.5)",
+                                      background: isSelected ? "rgba(59,130,246,0.35)" : "rgba(255,255,255,0.06)",
+                                    }}
+                                    onClick={(e) => { e.stopPropagation(); toggleCell(key); }}
+                                  >
+                                    {isSelected && (
+                                      <span className="absolute inset-0 flex items-center justify-center text-[9px] font-semibold text-white leading-tight text-center px-0.5">
+                                        {GRID_LABELS[row][col]}
+                                      </span>
+                                    )}
+                                  </button>
+                                );
+                              })
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Commit panel — shown when pendingArea is set */}
+                      {pendingArea && (
+                        <div className="mt-2 p-3 border border-blue-200 rounded-lg bg-blue-50 space-y-2">
+                          <p className="text-xs font-medium text-blue-800">
+                            Klik på celler i gitteret for at vælge zoner ({selectedCells.size} valgt)
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              disabled={selectedCells.size === 0}
+                              onClick={commitPendingArea}
+                              className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium disabled:opacity-40 hover:bg-blue-700 transition"
+                            >
+                              Tilføj {selectedCells.size} zone{selectedCells.size !== 1 ? "r" : ""}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={commitWholeArea}
+                              className="bg-white border border-blue-300 text-blue-700 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-blue-50 transition"
+                            >
+                              Hele området som én zone
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setPendingArea(null); setSelectedCells(new Set()); }}
+                              className="text-gray-500 hover:text-gray-700 text-xs px-2 py-1.5"
+                            >
+                              Annuller
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Properties panel */}
+                      {selectedZoneIdx !== null && designerZones[selectedZoneIdx] && (() => {
+                        const zone = designerZones[selectedZoneIdx];
+                        const update = (patch: Partial<ZoneRow>) =>
+                          setDesignerZones((prev) => prev.map((z, i) => i === selectedZoneIdx ? { ...z, ...patch } : z));
+                        return (
+                          <div className="w-44 shrink-0 space-y-3 text-sm">
+                            <p className="font-medium text-gray-700">Zone {selectedZoneIdx + 1}</p>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-500 mb-1">Label</label>
+                              <input type="text" placeholder="f.eks. Ryg øverst" value={zone.label}
+                                onChange={(e) => update({ label: e.target.value })}
+                                className="w-full border rounded-lg px-2 py-1.5 text-sm" autoFocus />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-500 mb-1">Side</label>
+                              <select value={zone.side}
+                                onChange={(e) => update({ side: e.target.value as "front" | "back" })}
+                                className="w-full border rounded-lg px-2 py-1.5 text-sm">
+                                <option value="front">Forside</option>
+                                <option value="back">Bagside</option>
+                              </select>
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="flex items-center gap-2 cursor-pointer text-xs">
+                                <input type="checkbox" checked={zone.allowText}
+                                  onChange={(e) => update({ allowText: e.target.checked })} className="rounded" />
+                                Tillad tekst
+                              </label>
+                              <label className="flex items-center gap-2 cursor-pointer text-xs">
+                                <input type="checkbox" checked={zone.allowLogo}
+                                  onChange={(e) => update({ allowLogo: e.target.checked })} className="rounded" />
+                                Tillad logo
+                              </label>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                    <p className="text-xs text-gray-400">Tegn et rektangel på billedet → vælg celler i gitteret → klik "Tilføj". Klik en eksisterende zone for at redigere den.</p>
+                  </div>
+                );
+              })()}
+
+              <button
+                type="button"
+                onClick={saveDesigner}
+                disabled={designerSaving}
+                className="bg-secondary text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+              >
+                {designerSaving ? "Gemmer…" : "Gem designer-opsætning"}
+              </button>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* ── Actions ─────────────────────────────────────────────────────────── */}
       <div className="flex gap-3 pt-2 border-t">

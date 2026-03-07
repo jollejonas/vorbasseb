@@ -11,6 +11,17 @@ import {
 
 export type OptionSelection = { groupLabel: string; value: string };
 
+export type PrintElement = {
+  side: "front" | "back";
+  zoneId: number;
+  zoneLabel: string;
+  position: string;
+  type: "text" | "logo";
+  value: string; // text content or logoId (stringified)
+  logoUrl?: string;
+  fontSize: "small" | "medium" | "large";
+};
+
 export type CartItem = {
   skuId: string;
   productId: string;
@@ -25,6 +36,7 @@ export type CartItem = {
   clubRoleRequired?: string | null; // null/undefined = public product; "TRAINER" = trainer-only
   colorName?: string;
   optionSelections?: OptionSelection[]; // snapshot of TEXT/SELECT/CUSTOM selections
+  printElements?: PrintElement[]; // jersey designer print specs
 };
 
 type CartState = { items: CartItem[] };
@@ -71,7 +83,8 @@ function reducer(state: CartState, action: Action): CartState {
 
 function itemKey(item: CartItem) {
   const selections = item.optionSelections?.map((s) => `${s.groupLabel}=${s.value}`).join(",") ?? "";
-  return `${item.skuId}::${item.customName ?? ""}::${item.customNumber ?? ""}::${item.colorName ?? ""}::${selections}`;
+  const prints = item.printElements?.map((p) => `${p.side}:${p.zoneId}:${p.type}:${p.value}:${p.fontSize}`).join(",") ?? "";
+  return `${item.skuId}::${item.customName ?? ""}::${item.customNumber ?? ""}::${item.colorName ?? ""}::${selections}::${prints}`;
 }
 
 type CartContextValue = {

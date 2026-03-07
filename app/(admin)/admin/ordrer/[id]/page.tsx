@@ -130,12 +130,46 @@ export default async function AdminOrderDetailPage({ params }: Params) {
                 <td className="px-5 py-3 text-gray-500">{item.colorName ?? "–"}</td>
                 <td className="px-5 py-3 text-gray-500">
                   {(() => {
+                    const raw = item.optionSelections as
+                      | { printElements: { side: string; zoneLabel: string; type: string; value: string; fontSize: string }[] }
+                      | { groupLabel: string; value: string }[]
+                      | null;
+
+                    // Designer order: show print spec table
+                    if (raw && !Array.isArray(raw) && raw.printElements?.length) {
+                      return (
+                        <table className="text-xs border-collapse w-full">
+                          <thead>
+                            <tr className="text-gray-400">
+                              <th className="text-left pr-2 font-medium">Side</th>
+                              <th className="text-left pr-2 font-medium">Zone</th>
+                              <th className="text-left pr-2 font-medium">Type</th>
+                              <th className="text-left pr-2 font-medium">Indhold</th>
+                              <th className="text-left font-medium">Str.</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {raw.printElements.map((p, pi) => (
+                              <tr key={pi} className="border-t border-gray-100">
+                                <td className="pr-2 py-0.5">{p.side === "front" ? "Forside" : "Bagside"}</td>
+                                <td className="pr-2 py-0.5">{p.zoneLabel}</td>
+                                <td className="pr-2 py-0.5">{p.type === "text" ? "Tekst" : "Logo"}</td>
+                                <td className="pr-2 py-0.5 font-mono">{p.value}</td>
+                                <td className="py-0.5">{p.fontSize === "small" ? "Lille" : p.fontSize === "large" ? "Stor" : "Medium"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      );
+                    }
+
+                    // Normal order
                     const parts: string[] = [];
                     if (item.customName || item.customNumber) {
                       parts.push([item.customName, item.customNumber ? `#${item.customNumber}` : null].filter(Boolean).join(" "));
                     }
-                    const selections = item.optionSelections as { groupLabel: string; value: string }[] | null;
-                    if (selections?.length) {
+                    const selections = Array.isArray(raw) ? raw : [];
+                    if (selections.length) {
                       parts.push(...selections.map((s) => `${s.groupLabel}: ${s.value}`));
                     }
                     return parts.length > 0 ? parts.join(" · ") : "–";

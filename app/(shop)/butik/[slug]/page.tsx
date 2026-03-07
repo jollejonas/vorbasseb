@@ -5,6 +5,7 @@ import { getVatRate } from "@/lib/vat";
 import { ProductColorSection } from "@/components/shop/ProductColorSection";
 import { ProductOptionsSection } from "@/components/shop/ProductOptionsSection";
 import { SimpleAddToCart } from "@/components/shop/SimpleAddToCart";
+import { JerseyDesignerSection } from "@/components/shop/JerseyDesignerSection";
 import { formatPrice, withVat } from "@/lib/utils";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -18,7 +19,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ProductPage({ params }: Props) {
   const { slug } = await params;
 
-  const [product, vatPct] = await Promise.all([
+  const [product, vatPct, designerLogos] = await Promise.all([
     prisma.product.findUnique({
       where: { slug, published: true },
       include: {
@@ -41,9 +42,11 @@ export default async function ProductPage({ params }: Props) {
           },
           orderBy: { position: "asc" },
         },
+        designerZones: { orderBy: { positionOrd: "asc" } },
       },
     }),
     getVatRate(),
+    prisma.designerLogo.findMany({ orderBy: { id: "asc" } }),
   ]);
 
   if (!product) notFound();
@@ -89,7 +92,16 @@ export default async function ProductPage({ params }: Props) {
         <p className="text-gray-600 leading-relaxed">{product.description}</p>
       </div>
 
-      {product.optionGroups.length > 0 ? (
+      {product.designerEnabled ? (
+        <JerseyDesignerSection
+          product={product}
+          zones={product.designerZones}
+          logos={designerLogos}
+          skus={product.skus}
+          vatPct={vatPct}
+          optionGroups={product.optionGroups}
+        />
+      ) : product.optionGroups.length > 0 ? (
         <ProductOptionsSection
           product={product}
           skus={product.skus}
