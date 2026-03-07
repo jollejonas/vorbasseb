@@ -19,6 +19,7 @@ import {
   X,
   AlertTriangle,
   Image,
+  TrendingUp,
 } from "lucide-react";
 
 type NavItem = {
@@ -65,6 +66,7 @@ function buildGroups(attentionCount: number): NavGroup[] {
       label: "Opsætning",
       items: [
         { href: "/admin/indstillinger", label: "Indstillinger", icon: Settings },
+        { href: "/admin/oekonomi", label: "Økonomi", icon: TrendingUp },
       ],
     },
   ];
