@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { slugify } from "@/lib/utils";
 import type { Product, SKU, Category, ClubRole, ColorVariant, ProductOptionGroup, ProductOptionValue, GlobalColor, OptionGroupTemplate, OptionGroupTemplateValue, DesignerZone } from "@prisma/client";
-import { BookOpen, X } from "lucide-react";
+import { X } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -182,11 +182,10 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
   const [globalColors, setGlobalColors] = useState<GlobalColor[]>([]);
 
   // ── Template library panel ──────────────────────────────────────────────────
-  const [libraryOpen, setLibraryOpen] = useState(false);
   const [libraryTemplates, setLibraryTemplates] = useState<TemplateFull[]>([]);
   const [libraryLoading, setLibraryLoading] = useState(false);
-  const [libraryFilterType, setLibraryFilterType] = useState<OptionType | "ALL">("ALL");
-  const [libraryFilterTag, setLibraryFilterTag] = useState<string | null>(null);
+  const [inlineExpandedType, setInlineExpandedType] = useState<OptionType | null>(null);
+  const [inlineFilterTag, setInlineFilterTag] = useState<string | null>(null);
 
   const [optionGroups, setOptionGroups] = useState<OptionGroupRow[]>(() => {
     if (!product?.optionGroups.length) return [];
@@ -437,12 +436,14 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
 
   // ── Template library helpers ─────────────────────────────────────────────────
 
-  function openLibrary(defaultType?: OptionType) {
-    setLibraryOpen(true);
-    if (defaultType) {
-      setLibraryFilterType(defaultType);
-      setLibraryFilterTag(null);
+  function toggleInlineType(type: OptionType) {
+    if (inlineExpandedType === type) {
+      setInlineExpandedType(null);
+      setInlineFilterTag(null);
+      return;
     }
+    setInlineExpandedType(type);
+    setInlineFilterTag(null);
     if (libraryTemplates.length === 0) {
       setLibraryLoading(true);
       fetch("/api/admin/option-templates")
@@ -510,7 +511,8 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
       }
     }
 
-    setLibraryOpen(false);
+    setInlineExpandedType(null);
+    setInlineFilterTag(null);
   }
 
   // ── Legacy helpers ────────────────────────────────────────────────────────────
@@ -835,141 +837,104 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
               />
             ))}
 
-            {/* Add group buttons */}
+            {/* Add group buttons — clicking expands inline template panel for that type */}
             <div className="flex flex-wrap gap-2">
               {(["COLOR", "SIZE", "TEXT", "SELECT", "CUSTOM"] as OptionType[]).map((type) => {
                 const hasType = optionGroups.some((g) => g.type === type);
                 const label: Record<OptionType, string> = {
                   COLOR: "Farve", SIZE: "Størrelse", TEXT: "Tryk/navn", SELECT: "Valgliste", CUSTOM: "Tilpasset"
                 };
-                // Only allow one COLOR and one SIZE group
                 const disabled = (type === "COLOR" || type === "SIZE") && hasType;
+                const isExpanded = inlineExpandedType === type;
                 return (
-                  <button key={type} type="button" onClick={() => addOptionGroup(type)} disabled={disabled}
-                    className="px-3 py-1.5 text-xs border rounded-lg hover:border-secondary hover:text-secondary transition disabled:opacity-40 disabled:cursor-not-allowed">
+                  <button key={type} type="button" disabled={disabled}
+                    onClick={() => toggleInlineType(type)}
+                    className={`px-3 py-1.5 text-xs border rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed ${
+                      isExpanded ? "bg-secondary text-white border-secondary" : "hover:border-secondary hover:text-secondary"
+                    }`}>
                     + {label[type]}
                   </button>
                 );
               })}
-              <button
-                type="button"
-                onClick={() => {
-                  if (libraryOpen) { setLibraryOpen(false); return; }
-                  // Smart default: pre-filter to a type the product is missing
-                  const missingType = !optionGroups.some((g) => g.type === "SIZE") ? "SIZE"
-                    : !optionGroups.some((g) => g.type === "COLOR") ? "COLOR"
-                    : undefined;
-                  openLibrary(missingType);
-                }}
-                className={`flex items-center gap-1 px-3 py-1.5 text-xs border rounded-lg transition ${
-                  libraryOpen ? "bg-secondary text-white border-secondary" : "hover:border-secondary hover:text-secondary"
-                }`}
-              >
-                <BookOpen size={12} />
-                Fra bibliotek
-              </button>
             </div>
 
-            {/* Template library panel */}
-            {libraryOpen && (
+            {/* Inline template panel — appears below buttons when a type is expanded */}
+            {inlineExpandedType && (
               <div className="border rounded-xl p-4 bg-gray-50 space-y-3">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">Vælg skabelon</p>
-                  <button type="button" onClick={() => setLibraryOpen(false)} className="text-gray-400 hover:text-gray-600">
+                  <p className="text-sm font-medium">
+                    {({ COLOR: "Farve", SIZE: "Størrelse", TEXT: "Tryk/navn", SELECT: "Valgliste", CUSTOM: "Tilpasset" } as Record<OptionType, string>)[inlineExpandedType]} — vælg skabelon
+                  </p>
+                  <button type="button" onClick={() => { setInlineExpandedType(null); setInlineFilterTag(null); }} className="text-gray-400 hover:text-gray-600">
                     <X size={16} />
                   </button>
                 </div>
 
-                {/* Filters */}
-                <div className="space-y-2">
-                  {/* Type filter */}
-                  <div className="flex gap-1 border rounded-lg p-0.5 bg-white text-xs self-start">
-                    {(["ALL", "COLOR", "SIZE", "TEXT", "SELECT", "CUSTOM"] as const).map((t) => {
-                      const lbl: Record<string, string> = { ALL: "Alle", COLOR: "Farve", SIZE: "Str.", TEXT: "Tekst", SELECT: "Valg", CUSTOM: "Custom" };
-                      return (
-                        <button key={t} type="button" onClick={() => { setLibraryFilterType(t); setLibraryFilterTag(null); }}
-                          className={`px-2 py-1 rounded-md transition ${libraryFilterType === t ? "bg-secondary text-white" : "hover:bg-gray-100"}`}>
-                          {lbl[t]}
+                {/* Tag filter */}
+                {(() => {
+                  const relevantTags = Array.from(new Set(
+                    libraryTemplates.filter((t) => t.type === inlineExpandedType).flatMap((t) => t.tags)
+                  )).sort();
+                  if (relevantTags.length === 0) return null;
+                  return (
+                    <div className="flex flex-wrap gap-1.5">
+                      {relevantTags.map((tag) => (
+                        <button key={tag} type="button" onClick={() => setInlineFilterTag(inlineFilterTag === tag ? null : tag)}
+                          className={`px-2.5 py-1 text-xs rounded-full font-medium transition ${
+                            inlineFilterTag === tag
+                              ? "bg-secondary text-white"
+                              : "bg-white border border-gray-300 text-gray-600 hover:border-secondary hover:text-secondary"
+                          }`}>
+                          {tag}
                         </button>
-                      );
-                    })}
-                  </div>
-                  {/* Tag filter — only tags from templates matching selected type */}
-                  {(() => {
-                    const relevantTags = Array.from(new Set(
-                      libraryTemplates
-                        .filter((t) => libraryFilterType === "ALL" || t.type === libraryFilterType)
-                        .flatMap((t) => t.tags)
-                    )).sort();
-                    if (relevantTags.length === 0) return null;
-                    return (
-                      <div className="flex flex-wrap gap-1.5">
-                        {relevantTags.map((tag) => (
-                          <button key={tag} type="button" onClick={() => setLibraryFilterTag(libraryFilterTag === tag ? null : tag)}
-                            className={`px-2.5 py-1 text-xs rounded-full font-medium transition ${
-                              libraryFilterTag === tag
-                                ? "bg-secondary text-white"
-                                : "bg-white border border-gray-300 text-gray-600 hover:border-secondary hover:text-secondary"
-                            }`}>
-                            {tag}
-                          </button>
-                        ))}
-                      </div>
-                    );
-                  })()}
-                </div>
+                      ))}
+                    </div>
+                  );
+                })()}
 
                 {/* Template list */}
                 {libraryLoading && <p className="text-xs text-gray-400">Henter skabeloner…</p>}
-                {!libraryLoading && libraryTemplates.length === 0 && (
-                  <p className="text-xs text-gray-400">Ingen skabeloner oprettet endnu.</p>
-                )}
                 <div className="space-y-2">
                   {libraryTemplates
                     .filter((t) => {
-                      if (libraryFilterType !== "ALL" && t.type !== libraryFilterType) return false;
-                      if (libraryFilterTag && !t.tags.includes(libraryFilterTag)) return false;
-                      // Disable if COLOR or SIZE already present
-                      const alreadyHas = (t.type === "COLOR" || t.type === "SIZE") && optionGroups.some((g) => g.type === t.type);
-                      return !alreadyHas;
+                      if (t.type !== inlineExpandedType) return false;
+                      if (inlineFilterTag && !t.tags.includes(inlineFilterTag)) return false;
+                      return true;
                     })
-                    .map((t) => {
-                      const typeBadge: Record<string, string> = {
-                        COLOR: "bg-pink-100 text-pink-700", SIZE: "bg-blue-100 text-blue-700",
-                        TEXT: "bg-yellow-100 text-yellow-700", SELECT: "bg-purple-100 text-purple-700", CUSTOM: "bg-gray-100 text-gray-700",
-                      };
-                      const typeLabel: Record<string, string> = {
-                        COLOR: "Farve", SIZE: "Størrelse", TEXT: "Tekst", SELECT: "Vælg", CUSTOM: "Custom",
-                      };
-                      return (
-                        <div key={t.id} className="flex items-center gap-3 bg-white border rounded-lg px-3 py-2">
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${typeBadge[t.type]}`}>
-                            {typeLabel[t.type]}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{t.name}</p>
-                            {t.values.length > 0 && (
-                              <p className="text-xs text-gray-500 truncate">
-                                {t.values.slice(0, 6).map((v) => v.label).join(" · ")}
-                                {t.values.length > 6 && <span className="text-gray-400"> …+{t.values.length - 6}</span>}
-                              </p>
-                            )}
-                            {t.tags.length > 0 && (
-                              <div className="flex gap-1 mt-0.5 flex-wrap">
-                                {t.tags.map((tag) => (
-                                  <span key={tag} className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">{tag}</span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                          <button type="button" onClick={() => applyTemplate(t)}
-                            className="text-xs font-medium text-secondary hover:underline shrink-0">
-                            Brug
-                          </button>
+                    .map((t) => (
+                      <div key={t.id} className="flex items-center gap-3 bg-white border rounded-lg px-3 py-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{t.name}</p>
+                          {t.values.length > 0 && (
+                            <p className="text-xs text-gray-500 truncate">
+                              {t.values.slice(0, 6).map((v) => v.label).join(" · ")}
+                              {t.values.length > 6 && <span className="text-gray-400"> …+{t.values.length - 6}</span>}
+                            </p>
+                          )}
+                          {t.tags.length > 0 && (
+                            <div className="flex gap-1 mt-0.5 flex-wrap">
+                              {t.tags.map((tag) => (
+                                <span key={tag} className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">{tag}</span>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      );
-                    })}
+                        <button type="button" onClick={() => applyTemplate(t)}
+                          className="text-xs font-medium text-secondary hover:underline shrink-0">
+                          Brug
+                        </button>
+                      </div>
+                    ))}
                 </div>
+
+                {/* Fallback: create empty group */}
+                <button
+                  type="button"
+                  onClick={() => { addOptionGroup(inlineExpandedType); setInlineExpandedType(null); setInlineFilterTag(null); }}
+                  className="text-xs text-gray-500 hover:text-secondary underline underline-offset-2 transition"
+                >
+                  Opret tom gruppe
+                </button>
               </div>
             )}
 

@@ -22,6 +22,7 @@ const FONT_SIZE_LABELS = { small: "Lille", medium: "Medium", large: "Stor" } as 
 export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25, optionGroups }: Props) {
   const { addItem } = useCart();
 
+  const [isDesignerOpen, setIsDesignerOpen] = useState(false);
   const [previewSide, setPreviewSide] = useState<"front" | "back">("front");
   const [printElements, setPrintElements] = useState<PrintElement[]>([]);
 
@@ -33,10 +34,14 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
   const [addFontSize, setAddFontSize] = useState<"small" | "medium" | "large">("medium");
   const [toast, setToast] = useState<string | null>(null);
 
-  const [selectedSize, setSelectedSize] = useState<string>("");
+  // Option selections (covers COLOR, SIZE, SELECT, CUSTOM)
+  const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
+  const [textInputs, setTextInputs] = useState<Record<string, string>>({});
   const [added, setAdded] = useState(false);
 
+  const colorGroup = optionGroups.find((g) => g.type === "COLOR");
   const sizeGroup = optionGroups.find((g) => g.type === "SIZE");
+  const otherGroups = optionGroups.filter((g) => g.type !== "COLOR" && g.type !== "SIZE");
 
   const frontImageIdx = product.designerFrontImageIdx ?? 0;
   const backImageIdx = product.designerBackImageIdx ?? 0;
@@ -45,6 +50,13 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
     : product.images[backImageIdx];
 
   const printColor = product.designerPrintColor ?? "#FFFFFF";
+
+  // Color-aware static image (shown when designer is closed)
+  const selectedColorValue = colorGroup?.values.find((v) => v.id === selectedOptions[colorGroup!.id]);
+  const activeStaticImage =
+    (selectedColorValue?.images ?? []).length > 0
+      ? selectedColorValue!.images[0]
+      : product.images[0];
 
   const visibleZones = zones.filter((z) => z.side === previewSide);
   const visibleElements = printElements.filter((p) => p.side === previewSide);
@@ -99,243 +111,286 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
   }
 
   const activeSku = useMemo((): SkuFull | null => {
-    if (!sizeGroup) {
-      return skus.find((s) => s.stock > 0) ?? skus[0] ?? null;
+    const required: string[] = [];
+    if (colorGroup) {
+      const id = selectedOptions[colorGroup.id];
+      if (!id) return null;
+      required.push(id);
     }
-    const sizeValue = sizeGroup.values.find((v) => v.label === selectedSize);
-    if (!sizeValue) return null;
-    return skus.find((sku) => {
-      const ids = sku.optionValues.map((sv) => sv.optionValueId);
-      return ids.includes(sizeValue.id) && sku.stock > 0;
-    }) ?? null;
-  }, [skus, sizeGroup, selectedSize]);
+    if (sizeGroup) {
+      const id = selectedOptions[sizeGroup.id];
+      if (!id) return null;
+      required.push(id);
+    }
+    if (!required.length) return skus.find((s) => s.stock > 0) ?? skus[0] ?? null;
+    return (
+      skus.find((sku) => {
+        const ids = sku.optionValues.map((sv) => sv.optionValueId);
+        return required.every((id) => ids.includes(id)) && sku.stock > 0;
+      }) ?? null
+    );
+  }, [skus, colorGroup, sizeGroup, selectedOptions]);
 
   function handleAddToCart() {
     if (!activeSku) return;
+    const selectedSizeLabel = sizeGroup
+      ? (sizeGroup.values.find((v) => v.id === selectedOptions[sizeGroup.id])?.label ?? activeSku.size ?? "One Size")
+      : (activeSku.size ?? "One Size");
+
+    const optionSelections = otherGroups.flatMap((g) => {
+      if (g.type === "TEXT" || g.type === "CUSTOM") {
+        const val = textInputs[g.id]?.trim();
+        return val ? [{ groupLabel: g.label, value: val }] : [];
+      }
+      const v = g.values.find((v) => v.id === selectedOptions[g.id]);
+      return v ? [{ groupLabel: g.label, value: v.label }] : [];
+    });
+
     addItem({
       skuId: activeSku.id,
       productId: product.id,
       productName: product.name,
-      size: selectedSize || activeSku.size || "One Size",
+      size: selectedSizeLabel,
       price: product.price,
       quantity: 1,
       image: product.images[0],
       clubRoleRequired: product.clubRoleRequired ?? null,
       printElements,
+      optionSelections: optionSelections.length > 0 ? optionSelections : undefined,
     });
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   }
 
   const canAddToCart = activeSku !== null && activeSku.stock > 0;
+  const isDisabled =
+    !canAddToCart ||
+    (!!colorGroup && !selectedOptions[colorGroup.id]) ||
+    (!!sizeGroup && !selectedOptions[sizeGroup.id]) ||
+    otherGroups.some((g) => g.required && !selectedOptions[g.id] && !textInputs[g.id]?.trim());
 
   return (
     <div className="grid md:grid-cols-[55%_45%] gap-8 items-start">
-      {/* LEFT — Jersey preview + add panel */}
+      {/* LEFT — product image (closed) or jersey canvas (open) */}
       <div className="space-y-4">
-      {/* Jersey preview */}
-      <div className="space-y-2">
-        {product.designerBackImageIdx !== null && (
-          <div className="flex gap-2">
-            <button
-              onClick={() => setPreviewSide("front")}
-              className={`px-3 py-1 text-sm rounded-lg border transition ${previewSide === "front" ? "bg-secondary text-white border-secondary" : "border-gray-200 text-gray-600 hover:border-gray-400"}`}
-            >
-              Forside
-            </button>
-            <button
-              onClick={() => setPreviewSide("back")}
-              className={`px-3 py-1 text-sm rounded-lg border transition ${previewSide === "back" ? "bg-secondary text-white border-secondary" : "border-gray-200 text-gray-600 hover:border-gray-400"}`}
-            >
-              Bagside
-            </button>
-          </div>
-        )}
-
-        {/* Jersey image with clickable zone rects + print overlays */}
-        <div className="relative w-full max-w-xs mx-auto rounded-xl overflow-hidden bg-gray-50 border border-gray-100">
-          {previewImage ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={previewImage} alt={`${product.name} ${previewSide}`} className="w-full object-contain" />
-          ) : (
-            <div className="aspect-square flex items-center justify-center text-gray-300 text-sm">Intet billede</div>
-          )}
-
-          {/* Clickable zone rectangles */}
-          {visibleZones.map((zone) => {
-            const isActive = zone.id === clickedZoneId;
-            return (
-              <button
-                key={zone.id}
-                type="button"
-                onClick={() => handleZoneClick(zone)}
-                className="absolute transition-all"
-                style={{
-                  left: `${zone.previewX}%`,
-                  top: `${zone.previewY}%`,
-                  width: `${zone.previewW}%`,
-                  height: `${zone.previewH}%`,
-                  border: isActive
-                    ? "2px solid rgba(59,130,246,0.9)"
-                    : "1.5px dashed rgba(255,255,255,0.65)",
-                  background: isActive ? "rgba(59,130,246,0.18)" : "rgba(255,255,255,0.04)",
-                  boxShadow: isActive ? "0 0 0 2px rgba(59,130,246,0.35)" : undefined,
-                  borderRadius: "3px",
-                  cursor: "pointer",
-                }}
-              ></button>
-            );
-          })}
-
-          {/* Print element overlays — centered within zone rect */}
-          {visibleElements.map((el, i) => {
-            const zone = zoneMap.get(el.zoneId);
-            if (!zone) return null;
-            const cx = zone.previewX + zone.previewW / 2;
-            const cy = zone.previewY + zone.previewH / 2;
-            const fontSizeClass = el.fontSize === "small" ? "text-xs" : el.fontSize === "large" ? "text-lg font-bold" : "text-sm font-semibold";
-            return (
-              <div
-                key={i}
-                className="absolute pointer-events-none"
-                style={{ left: `${cx}%`, top: `${cy}%`, transform: "translate(-50%, -50%)" }}
-              >
-                {el.type === "text" ? (
-                  <span
-                    className={`${fontSizeClass} drop-shadow`}
-                    style={{ color: printColor, textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}
-                  >
-                    {el.value}
-                  </span>
-                ) : el.logoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={el.logoUrl} alt={el.zoneLabel} className="h-8 w-auto object-contain drop-shadow" />
-                ) : null}
+        {isDesignerOpen ? (
+          <>
+            {/* Front/Back toggle */}
+            {product.designerBackImageIdx !== null && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPreviewSide("front")}
+                  className={`px-3 py-1 text-sm rounded-lg border transition ${previewSide === "front" ? "bg-secondary text-white border-secondary" : "border-gray-200 text-gray-600 hover:border-gray-400"}`}
+                >
+                  Forside
+                </button>
+                <button
+                  onClick={() => setPreviewSide("back")}
+                  className={`px-3 py-1 text-sm rounded-lg border transition ${previewSide === "back" ? "bg-secondary text-white border-secondary" : "border-gray-200 text-gray-600 hover:border-gray-400"}`}
+                >
+                  Bagside
+                </button>
               </div>
-            );
-          })}
-        </div>
+            )}
 
-        {visibleZones.length > 0 && !clickedZoneId && (
-          <p className="text-xs text-center text-gray-400">Klik på en zone på trøjen for at tilføje tryk</p>
-        )}
-        {toast && (
-          <p className="text-xs text-center text-green-600 font-medium">{toast}</p>
+            {/* Jersey image with clickable zone rects + print overlays */}
+            <div className="relative w-full max-w-xs mx-auto rounded-xl overflow-hidden bg-gray-50 border border-gray-100">
+              {previewImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={previewImage} alt={`${product.name} ${previewSide}`} className="w-full object-contain" />
+              ) : (
+                <div className="aspect-square flex items-center justify-center text-gray-300 text-sm">Intet billede</div>
+              )}
+
+              {/* Clickable zone rectangles */}
+              {visibleZones.map((zone) => {
+                const isActive = zone.id === clickedZoneId;
+                return (
+                  <button
+                    key={zone.id}
+                    type="button"
+                    onClick={() => handleZoneClick(zone)}
+                    className="absolute transition-all"
+                    style={{
+                      left: `${zone.previewX}%`,
+                      top: `${zone.previewY}%`,
+                      width: `${zone.previewW}%`,
+                      height: `${zone.previewH}%`,
+                      border: isActive
+                        ? "2px solid rgba(59,130,246,0.9)"
+                        : "1.5px dashed rgba(255,255,255,0.65)",
+                      background: isActive ? "rgba(59,130,246,0.18)" : "rgba(255,255,255,0.04)",
+                      boxShadow: isActive ? "0 0 0 2px rgba(59,130,246,0.35)" : undefined,
+                      borderRadius: "3px",
+                      cursor: "pointer",
+                    }}
+                  ></button>
+                );
+              })}
+
+              {/* Print element overlays — centered within zone rect */}
+              {visibleElements.map((el, i) => {
+                const zone = zoneMap.get(el.zoneId);
+                if (!zone) return null;
+                const cx = zone.previewX + zone.previewW / 2;
+                const cy = zone.previewY + zone.previewH / 2;
+                const fontSizeClass = el.fontSize === "small" ? "text-xs" : el.fontSize === "large" ? "text-lg font-bold" : "text-sm font-semibold";
+                return (
+                  <div
+                    key={i}
+                    className="absolute pointer-events-none"
+                    style={{ left: `${cx}%`, top: `${cy}%`, transform: "translate(-50%, -50%)" }}
+                  >
+                    {el.type === "text" ? (
+                      <span
+                        className={`${fontSizeClass} drop-shadow`}
+                        style={{ color: printColor, textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}
+                      >
+                        {el.value}
+                      </span>
+                    ) : el.logoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={el.logoUrl} alt={el.zoneLabel} className="h-8 w-auto object-contain drop-shadow" />
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+
+            {visibleZones.length > 0 && !clickedZoneId && (
+              <p className="text-xs text-center text-gray-400">Klik på en zone på trøjen for at tilføje tryk</p>
+            )}
+            {toast && (
+              <p className="text-xs text-center text-green-600 font-medium">{toast}</p>
+            )}
+
+            {/* Compact add panel — shown when a zone is clicked */}
+            {clickedZone && (
+              <div className="border rounded-xl p-4 space-y-4 bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-gray-700">
+                    {clickedZone.label}
+                    <span className="text-xs text-gray-400 font-normal ml-2">
+                      {clickedZone.side === "front" ? "Forside" : "Bagside"}
+                    </span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setClickedZoneId(null)}
+                    className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                {/* Type toggle — only when zone supports both */}
+                {clickedZone.allowText && clickedZone.allowLogo && (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAddType("text")}
+                      className={`px-3 py-1.5 text-sm rounded-lg border transition ${addType === "text" ? "bg-secondary text-white border-secondary" : "border-gray-200 hover:border-gray-400"}`}
+                    >
+                      Tekst
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAddType("logo")}
+                      className={`px-3 py-1.5 text-sm rounded-lg border transition ${addType === "logo" ? "bg-secondary text-white border-secondary" : "border-gray-200 hover:border-gray-400"}`}
+                    >
+                      Logo
+                    </button>
+                  </div>
+                )}
+
+                {/* Text input + font size */}
+                {clickedZone.allowText && addType === "text" && (
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      value={addText}
+                      onChange={(e) => setAddText(e.target.value.toUpperCase())}
+                      placeholder="f.eks. JENSEN eller 10"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                      style={{ textTransform: "uppercase" }}
+                      maxLength={30}
+                      autoFocus
+                    />
+                    <div className="flex gap-2">
+                      {(["small", "medium", "large"] as const).map((fs) => (
+                        <button
+                          key={fs}
+                          type="button"
+                          onClick={() => setAddFontSize(fs)}
+                          className={`px-3 py-1.5 text-sm rounded-lg border transition ${addFontSize === fs ? "bg-secondary text-white border-secondary" : "border-gray-200 hover:border-gray-400"}`}
+                        >
+                          {FONT_SIZE_LABELS[fs]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Logo picker */}
+                {clickedZone.allowLogo && addType === "logo" && (
+                  logos.length === 0 ? (
+                    <p className="text-xs text-gray-400">Ingen logoer tilgængelige.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-3">
+                      {logos.map((l) => (
+                        <button
+                          key={l.id}
+                          type="button"
+                          onClick={() => setAddLogoId(l.id)}
+                          className={`p-2 rounded-lg border transition ${addLogoId === l.id ? "border-secondary ring-2 ring-secondary/30" : "border-gray-200 hover:border-gray-400"}`}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={l.imageUrl} alt={l.name} className="h-12 w-12 object-contain" />
+                          <p className="text-xs text-center text-gray-500 mt-1">{l.name}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )
+                )}
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={confirmAddElement}
+                    disabled={(addType === "text" && !addText.trim()) || (addType === "logo" && addLogoId === null)}
+                    className="bg-secondary text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-40"
+                  >
+                    Tilføj
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setClickedZoneId(null)}
+                    className="border border-gray-200 px-4 py-2 rounded-lg text-sm text-gray-600 hover:border-gray-400"
+                  >
+                    Annuller
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          /* Static product image when designer is closed */
+          activeStaticImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={activeStaticImage}
+              alt={product.name}
+              className="w-full aspect-square object-cover rounded-2xl"
+            />
+          ) : (
+            <div className="w-full aspect-square bg-gray-100 rounded-2xl flex items-center justify-center text-gray-400">
+              Intet billede
+            </div>
+          )
         )}
       </div>
 
-      {/* Compact add panel — shown when a zone is clicked */}
-      {clickedZone && (
-        <div className="border rounded-xl p-4 space-y-4 bg-gray-50">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-gray-700">
-              {clickedZone.label}
-              <span className="text-xs text-gray-400 font-normal ml-2">
-                {clickedZone.side === "front" ? "Forside" : "Bagside"}
-              </span>
-            </p>
-            <button
-              type="button"
-              onClick={() => setClickedZoneId(null)}
-              className="text-gray-400 hover:text-gray-600 text-xl leading-none"
-            >
-              ×
-            </button>
-          </div>
-
-          {/* Type toggle — only when zone supports both */}
-          {clickedZone.allowText && clickedZone.allowLogo && (
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setAddType("text")}
-                className={`px-3 py-1.5 text-sm rounded-lg border transition ${addType === "text" ? "bg-secondary text-white border-secondary" : "border-gray-200 hover:border-gray-400"}`}
-              >
-                Tekst
-              </button>
-              <button
-                type="button"
-                onClick={() => setAddType("logo")}
-                className={`px-3 py-1.5 text-sm rounded-lg border transition ${addType === "logo" ? "bg-secondary text-white border-secondary" : "border-gray-200 hover:border-gray-400"}`}
-              >
-                Logo
-              </button>
-            </div>
-          )}
-
-          {/* Text input + font size */}
-          {clickedZone.allowText && addType === "text" && (
-            <div className="space-y-3">
-              <input
-                type="text"
-                value={addText}
-                onChange={(e) => setAddText(e.target.value.toUpperCase())}
-                placeholder="f.eks. JENSEN eller 10"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                style={{ textTransform: "uppercase" }}
-                maxLength={30}
-                autoFocus
-              />
-              <div className="flex gap-2">
-                {(["small", "medium", "large"] as const).map((fs) => (
-                  <button
-                    key={fs}
-                    type="button"
-                    onClick={() => setAddFontSize(fs)}
-                    className={`px-3 py-1.5 text-sm rounded-lg border transition ${addFontSize === fs ? "bg-secondary text-white border-secondary" : "border-gray-200 hover:border-gray-400"}`}
-                  >
-                    {FONT_SIZE_LABELS[fs]}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Logo picker */}
-          {clickedZone.allowLogo && addType === "logo" && (
-            logos.length === 0 ? (
-              <p className="text-xs text-gray-400">Ingen logoer tilgængelige.</p>
-            ) : (
-              <div className="flex flex-wrap gap-3">
-                {logos.map((l) => (
-                  <button
-                    key={l.id}
-                    type="button"
-                    onClick={() => setAddLogoId(l.id)}
-                    className={`p-2 rounded-lg border transition ${addLogoId === l.id ? "border-secondary ring-2 ring-secondary/30" : "border-gray-200 hover:border-gray-400"}`}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={l.imageUrl} alt={l.name} className="h-12 w-12 object-contain" />
-                    <p className="text-xs text-center text-gray-500 mt-1">{l.name}</p>
-                  </button>
-                ))}
-              </div>
-            )
-          )}
-
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={confirmAddElement}
-              disabled={(addType === "text" && !addText.trim()) || (addType === "logo" && addLogoId === null)}
-              className="bg-secondary text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-40"
-            >
-              Tilføj
-            </button>
-            <button
-              type="button"
-              onClick={() => setClickedZoneId(null)}
-              className="border border-gray-200 px-4 py-2 rounded-lg text-sm text-gray-600 hover:border-gray-400"
-            >
-              Annuller
-            </button>
-          </div>
-        </div>
-      )}
-
-      </div>{/* end left col */}
-
-      {/* RIGHT — title, description, prints, size, cart */}
+      {/* RIGHT — title, options, designer toggle, prints, cart */}
       <div className="space-y-5">
         {/* Product info */}
         <div>
@@ -357,73 +412,154 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
           <p className="text-gray-600 leading-relaxed">{product.description}</p>
         </div>
 
-        {/* Added prints list */}
-      <div className="space-y-2">
-        <p className="text-sm font-medium text-gray-700">Tryk ({printElements.length})</p>
-        {printElements.length === 0 ? (
-          <p className="text-sm text-gray-400">Ingen tryk tilføjet endnu.</p>
-        ) : (
-          printElements.map((el, i) => (
-            <div key={i} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 text-sm">
-              <div>
-                <span className="font-medium">{el.zoneLabel}</span>
-                <span className="text-gray-400 mx-1">·</span>
-                <span className="text-gray-500">{el.side === "front" ? "Forside" : "Bagside"}</span>
-                <span className="text-gray-400 mx-1">·</span>
-                {el.type === "text" ? (
-                  <span className="font-mono">{el.value} <span className="text-gray-400">({FONT_SIZE_LABELS[el.fontSize]})</span></span>
-                ) : (
-                  <span>Logo</span>
-                )}
-              </div>
-              <button onClick={() => removePrint(i)} className="text-red-400 hover:text-red-600 text-xs ml-2">Fjern</button>
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Size selection */}
-      {sizeGroup && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Størrelse</label>
-          <div className="flex flex-wrap gap-2">
-            {sizeGroup.values.map((v) => {
-              const sizeSkus = skus.filter((s) => s.optionValues.some((sv) => sv.optionValueId === v.id));
-              const inStock = sizeSkus.some((s) => s.stock > 0);
-              return (
+        {/* COLOR swatches */}
+        {colorGroup && (
+          <div>
+            <p className="text-sm font-medium text-gray-700 mb-2">
+              {colorGroup.label}
+              {selectedColorValue && (
+                <span className="ml-2 font-bold text-secondary">– {selectedColorValue.label}</span>
+              )}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {colorGroup.values.map((v) => (
                 <button
                   key={v.id}
                   type="button"
-                  disabled={!inStock}
-                  onClick={() => setSelectedSize(v.label)}
-                  className={`px-4 py-2 text-sm rounded-lg border transition ${
-                    selectedSize === v.label
-                      ? "bg-secondary text-white border-secondary"
-                      : inStock
-                      ? "border-gray-200 hover:border-secondary hover:text-secondary"
-                      : "border-gray-100 text-gray-300 cursor-not-allowed"
+                  onClick={() => setSelectedOptions((p) => ({ ...p, [colorGroup.id]: v.id }))}
+                  title={v.label}
+                  className={`w-9 h-9 rounded-full border-2 transition ${
+                    selectedOptions[colorGroup.id] === v.id
+                      ? "border-secondary scale-110 shadow-md"
+                      : "border-gray-200 hover:border-gray-400"
                   }`}
-                >
-                  {v.label}
-                </button>
-              );
-            })}
+                  style={{ background: v.globalColor?.hex ?? "#ccc" }}
+                  aria-label={v.label}
+                  aria-pressed={selectedOptions[colorGroup.id] === v.id}
+                />
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <button
-        onClick={handleAddToCart}
-        disabled={!canAddToCart || (!!sizeGroup && !selectedSize)}
-        className="w-full bg-primary hover:bg-primary-dark text-secondary font-bold py-3 px-6 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {!canAddToCart
-          ? "Ikke på lager"
-          : added
-          ? "Lagt i kurv ✓"
-          : "Læg i kurv"}
-      </button>
-      </div>{/* end right col */}
+        {/* SIZE buttons */}
+        {sizeGroup && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{sizeGroup.label}</label>
+            <div className="flex flex-wrap gap-2">
+              {sizeGroup.values.map((v) => {
+                const sizeSkus = skus.filter((s) => s.optionValues.some((sv) => sv.optionValueId === v.id));
+                const inStock = sizeSkus.some((s) => s.stock > 0);
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    disabled={!inStock}
+                    onClick={() => setSelectedOptions((p) => ({ ...p, [sizeGroup.id]: v.id }))}
+                    className={`px-4 py-2 text-sm rounded-lg border transition ${
+                      selectedOptions[sizeGroup.id] === v.id
+                        ? "bg-secondary text-white border-secondary"
+                        : inStock
+                        ? "border-gray-200 hover:border-secondary hover:text-secondary"
+                        : "border-gray-100 text-gray-300 cursor-not-allowed"
+                    }`}
+                  >
+                    {v.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* OTHER option groups (TEXT, SELECT, CUSTOM) */}
+        {otherGroups.map((g) => (
+          <div key={g.id}>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              {g.label}
+              {g.required && <span className="text-red-400 ml-1">*</span>}
+            </label>
+            {g.type === "SELECT" ? (
+              <div className="flex flex-wrap gap-2">
+                {g.values.map((v) => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => setSelectedOptions((p) => ({ ...p, [g.id]: v.id }))}
+                    className={`px-4 py-2 text-sm rounded-lg border transition ${
+                      selectedOptions[g.id] === v.id
+                        ? "bg-secondary text-white border-secondary"
+                        : "border-gray-200 hover:border-secondary hover:text-secondary"
+                    }`}
+                  >
+                    {v.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <input
+                type="text"
+                value={textInputs[g.id] ?? ""}
+                onChange={(e) => setTextInputs((p) => ({ ...p, [g.id]: e.target.value }))}
+                placeholder={g.inputType === "number" ? "f.eks. 10" : "f.eks. Jensen"}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+              />
+            )}
+          </div>
+        ))}
+
+        {/* Designer toggle button */}
+        <button
+          type="button"
+          onClick={() => {
+            setIsDesignerOpen(!isDesignerOpen);
+            setClickedZoneId(null);
+          }}
+          className="w-full border border-secondary text-secondary font-semibold py-2.5 px-6 rounded-xl hover:bg-secondary/5 transition text-sm"
+        >
+          {isDesignerOpen ? "Skjul designer ▲" : "Tilføj tryk til trøje ▼"}
+        </button>
+
+        {/* Prints list — only when designer is open */}
+        {isDesignerOpen && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-gray-700">Tryk ({printElements.length})</p>
+            {printElements.length === 0 ? (
+              <p className="text-sm text-gray-400">Ingen tryk tilføjet endnu.</p>
+            ) : (
+              printElements.map((el, i) => (
+                <div key={i} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 text-sm">
+                  <div>
+                    <span className="font-medium">{el.zoneLabel}</span>
+                    <span className="text-gray-400 mx-1">·</span>
+                    <span className="text-gray-500">{el.side === "front" ? "Forside" : "Bagside"}</span>
+                    <span className="text-gray-400 mx-1">·</span>
+                    {el.type === "text" ? (
+                      <span className="font-mono">{el.value} <span className="text-gray-400">({FONT_SIZE_LABELS[el.fontSize]})</span></span>
+                    ) : (
+                      <span>Logo</span>
+                    )}
+                  </div>
+                  <button onClick={() => removePrint(i)} className="text-red-400 hover:text-red-600 text-xs ml-2">Fjern</button>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* Add to cart */}
+        <button
+          onClick={handleAddToCart}
+          disabled={isDisabled}
+          className="w-full bg-primary hover:bg-primary-dark text-secondary font-bold py-3 px-6 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {!canAddToCart
+            ? "Ikke på lager"
+            : added
+            ? "Lagt i kurv ✓"
+            : "Læg i kurv"}
+        </button>
+      </div>
     </div>
   );
 }

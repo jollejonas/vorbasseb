@@ -464,7 +464,6 @@ export function OptionTemplateManager({
   globalColors: GlobalColor[];
 }) {
   const [templates, setTemplates] = useState<TemplateFull[]>(initialTemplates);
-  const [filterType, setFilterType] = useState<ProductOptionType | "ALL">("ALL");
   const [filterTag, setFilterTag] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null); // null = none, "NEW" = new
   const [draft, setDraft] = useState<TemplateDraft>(emptyDraft());
@@ -477,13 +476,16 @@ export function OptionTemplateManager({
     return Array.from(set).sort();
   }, [templates]);
 
-  const filtered = useMemo(() => {
-    return templates.filter((t) => {
-      if (filterType !== "ALL" && t.type !== filterType) return false;
-      if (filterTag && !t.tags.includes(filterTag)) return false;
-      return true;
-    });
-  }, [templates, filterType, filterTag]);
+  const templatesByType = useMemo(() => {
+    return OPTION_TYPES.map((typeObj) => ({
+      ...typeObj,
+      templates: templates.filter((t) => {
+        if (t.type !== typeObj.value) return false;
+        if (filterTag && !t.tags.includes(filterTag)) return false;
+        return true;
+      }),
+    }));
+  }, [templates, filterTag]);
 
   function startNew() {
     setDraft(emptyDraft());
@@ -566,29 +568,9 @@ export function OptionTemplateManager({
   }
 
   return (
-    <div className="space-y-6">
-      {/* Filter bar */}
+    <div className="space-y-8">
+      {/* Top bar */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex gap-1 border rounded-lg p-1 bg-gray-50">
-          <button
-            type="button"
-            onClick={() => setFilterType("ALL")}
-            className={`px-3 py-1 rounded-md text-sm font-medium transition ${filterType === "ALL" ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"}`}
-          >
-            Alle
-          </button>
-          {OPTION_TYPES.map((t) => (
-            <button
-              key={t.value}
-              type="button"
-              onClick={() => setFilterType(t.value)}
-              className={`px-3 py-1 rounded-md text-sm font-medium transition ${filterType === t.value ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"}`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
         {allTags.length > 0 && (
           <div className="flex gap-1 flex-wrap">
             {allTags.map((tag) => (
@@ -605,7 +587,6 @@ export function OptionTemplateManager({
             ))}
           </div>
         )}
-
         <button
           type="button"
           onClick={startNew}
@@ -629,69 +610,77 @@ export function OptionTemplateManager({
         />
       )}
 
-      {/* Template list */}
-      {filtered.length === 0 && editingId !== "NEW" && (
-        <p className="text-gray-400 text-sm py-8 text-center">Ingen skabeloner fundet.</p>
-      )}
+      {/* Grouped sections by type */}
+      {templatesByType.map((group) => (
+        <div key={group.value}>
+          <div className="flex items-center gap-3 mb-3">
+            <h2 className="text-base font-semibold text-gray-800">{group.label}</h2>
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${TYPE_BADGE[group.value]}`}>
+              {group.templates.length}
+            </span>
+          </div>
 
-      <div className="space-y-3">
-        {filtered.map((t) => (
-          <div key={t.id}>
-            {editingId === t.id ? (
-              <TemplateForm
-                draft={draft}
-                globalColors={globalColors}
-                onChange={setDraft}
-                onSave={handleSave}
-                onCancel={cancelEdit}
-                onDelete={() => handleDelete(t.id)}
-                saving={saving}
-              />
-            ) : (
-              <div className="flex items-start gap-4 border rounded-xl p-4 bg-white hover:shadow-sm transition">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${TYPE_BADGE[t.type]}`}>
-                      {TYPE_LABELS[t.type]}
-                    </span>
-                    <span className="font-semibold text-sm">{t.name}</span>
-                    {t.required && <span className="text-xs text-gray-400">(obligatorisk)</span>}
-                  </div>
+          {group.templates.length === 0 ? (
+            <p className="text-sm text-gray-400 italic pl-1">Ingen skabeloner endnu.</p>
+          ) : (
+            <div className="space-y-3">
+              {group.templates.map((t) => (
+                <div key={t.id}>
+                  {editingId === t.id ? (
+                    <TemplateForm
+                      draft={draft}
+                      globalColors={globalColors}
+                      onChange={setDraft}
+                      onSave={handleSave}
+                      onCancel={cancelEdit}
+                      onDelete={() => handleDelete(t.id)}
+                      saving={saving}
+                    />
+                  ) : (
+                    <div className="flex items-start gap-4 border rounded-xl p-4 bg-white hover:shadow-sm transition">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-semibold text-sm">{t.name}</span>
+                          {t.required && <span className="text-xs text-gray-400">(obligatorisk)</span>}
+                        </div>
 
-                  {t.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {t.tags.map((tag) => (
-                        <span key={tag} className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{tag}</span>
-                      ))}
+                        {t.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mb-2">
+                            {t.tags.map((tag) => (
+                              <span key={tag} className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{tag}</span>
+                            ))}
+                          </div>
+                        )}
+
+                        {t.values.length > 0 && (
+                          <p className="text-xs text-gray-500 truncate">
+                            {t.type === "COLOR"
+                              ? t.values.map((v) => v.label).join(", ")
+                              : t.values.map((v) => v.label).join(" · ")}
+                          </p>
+                        )}
+                        {(t.type === "TEXT" || t.type === "CUSTOM") && (
+                          <p className="text-xs text-gray-400 italic">Fritekst-input</p>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => startEdit(t)}
+                        disabled={editingId !== null}
+                        className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900 disabled:opacity-40 transition shrink-0"
+                      >
+                        <Pencil size={14} />
+                        Rediger
+                      </button>
                     </div>
                   )}
-
-                  {t.values.length > 0 && (
-                    <p className="text-xs text-gray-500 truncate">
-                      {t.type === "COLOR"
-                        ? t.values.map((v) => v.label).join(", ")
-                        : t.values.map((v) => v.label).join(" · ")}
-                    </p>
-                  )}
-                  {(t.type === "TEXT" || t.type === "CUSTOM") && (
-                    <p className="text-xs text-gray-400 italic">Fritekst-input</p>
-                  )}
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => startEdit(t)}
-                  disabled={editingId !== null}
-                  className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900 disabled:opacity-40 transition shrink-0"
-                >
-                  <Pencil size={14} />
-                  Rediger
-                </button>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
