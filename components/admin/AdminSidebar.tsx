@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   Image,
   TrendingUp,
+  ChevronDown,
 } from "lucide-react";
 
 type NavItem = {
@@ -29,9 +30,15 @@ type NavItem = {
   badge?: number;
 };
 
+type NavSubGroup = {
+  label: string;
+  items: NavItem[];
+};
+
 type NavGroup = {
   label: string;
   items: NavItem[];
+  subGroup?: NavSubGroup;
 };
 
 function buildGroups(attentionCount: number): NavGroup[] {
@@ -42,10 +49,15 @@ function buildGroups(attentionCount: number): NavGroup[] {
         { href: "/admin/produkter", label: "Produkter", icon: Package, badge: attentionCount || undefined },
         { href: "/admin/ordrer", label: "Ordrer", icon: ShoppingBag },
         { href: "/admin/rabatkoder", label: "Rabatkoder", icon: Tag },
-        { href: "/admin/farver", label: "Farvebibliotek", icon: Palette },
-        { href: "/admin/tilvalg", label: "Tilvalg", icon: ListPlus },
-        { href: "/admin/designer-logoer", label: "Designer-logoer", icon: Image },
       ],
+      subGroup: {
+        label: "Produkt opsætning",
+        items: [
+          { href: "/admin/farver", label: "Farvebibliotek", icon: Palette },
+          { href: "/admin/tilvalg", label: "Tilvalg", icon: ListPlus },
+          { href: "/admin/designer-logoer", label: "Designer-logoer", icon: Image },
+        ],
+      },
     },
     {
       label: "Indhold",
@@ -72,6 +84,8 @@ function buildGroups(attentionCount: number): NavGroup[] {
   ];
 }
 
+const SETUP_PATHS = ["/admin/farver", "/admin/tilvalg", "/admin/designer-logoer"];
+
 function SidebarContent({
   groups,
   pathname,
@@ -81,6 +95,12 @@ function SidebarContent({
   pathname: string;
   onClose?: () => void;
 }) {
+  const [openSubGroup, setOpenSubGroup] = useState<string | null>(() =>
+    SETUP_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))
+      ? "Produkt opsætning"
+      : null
+  );
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -132,6 +152,53 @@ function SidebarContent({
                 );
               })}
             </ul>
+
+            {/* Collapsible sub-group */}
+            {group.subGroup && (() => {
+              const sg = group.subGroup!;
+              const isOpen = openSubGroup === sg.label;
+              const anyActive = sg.items.some((i) => pathname === i.href || pathname.startsWith(i.href + "/"));
+              return (
+                <div className="mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setOpenSubGroup(isOpen ? null : sg.label)}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold uppercase tracking-wide transition ${
+                      anyActive ? "text-primary" : "text-white/40 hover:text-white/60"
+                    }`}
+                  >
+                    {sg.label}
+                    <ChevronDown
+                      size={12}
+                      className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                  {isOpen && (
+                    <ul className="space-y-0.5 pl-3 border-l border-white/10 ml-3 mt-0.5">
+                      {sg.items.map((item) => {
+                        const active = pathname === item.href || pathname.startsWith(item.href + "/");
+                        return (
+                          <li key={item.href}>
+                            <Link
+                              href={item.href}
+                              onClick={onClose}
+                              className={`flex items-center gap-3 px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                                active
+                                  ? "bg-primary text-secondary"
+                                  : "text-white/70 hover:bg-white/10 hover:text-white"
+                              }`}
+                            >
+                              <item.icon size={14} className={active ? "text-secondary" : "text-white/50"} />
+                              {item.label}
+                            </Link>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         ))}
       </nav>
