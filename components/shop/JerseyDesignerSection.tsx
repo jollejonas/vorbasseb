@@ -258,7 +258,7 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
             </div>
 
             {visibleZones.length > 0 && !clickedZoneId && (
-              <p className="text-xs text-center text-gray-400">Klik på en zone på trøjen for at tilføje tryk</p>
+              <p className="text-xs text-center text-gray-400">Klik på en zone for at tilføje tryk</p>
             )}
             {toast && (
               <p className="text-xs text-center text-green-600 font-medium">{toast}</p>
@@ -517,7 +517,7 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
           }}
           className="w-full border border-secondary text-secondary font-semibold py-2.5 px-6 rounded-xl hover:bg-secondary/5 transition text-sm"
         >
-          {isDesignerOpen ? "Skjul designer ▲" : "Tilføj tryk til trøje ▼"}
+          {isDesignerOpen ? "Skjul tryk-designer ▲" : "Tilføj tryk til produktet ▼"}
         </button>
 
         {/* Prints list — only when designer is open */}

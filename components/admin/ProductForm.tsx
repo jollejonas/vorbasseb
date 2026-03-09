@@ -1016,23 +1016,28 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
         )}
       </section>
 
-      {/* ── Jersey Designer ─────────────────────────────────────────────────── */}
-      {isEdit && (
-        <section className="space-y-4 border rounded-xl p-5">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-gray-700">Jersey Designer</h2>
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input
-                type="checkbox"
-                checked={designerEnabled}
-                onChange={(e) => setDesignerEnabled(e.target.checked)}
-                className="rounded"
-              />
-              Aktivér designer til dette produkt
-            </label>
-          </div>
+      {/* ── Tryk-designer ────────────────────────────────────────────────────── */}
+      <section className="space-y-4 border rounded-xl p-5">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-gray-700">Tryk-designer</h2>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={designerEnabled}
+              onChange={(e) => setDesignerEnabled(e.target.checked)}
+              className="rounded"
+            />
+            Aktivér tryk-designer til dette produkt
+          </label>
+        </div>
 
-          {designerEnabled && (
+        {!isEdit && designerEnabled && (
+          <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+            Gem produktet for at konfigurere designer-zoner og billeder.
+          </p>
+        )}
+
+        {isEdit && designerEnabled && (
             <div className="space-y-5">
               {/* Front/back image selection */}
               <div className="grid sm:grid-cols-3 gap-4">
@@ -1389,9 +1394,8 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
                 {designerSaving ? "Gemmer…" : "Gem designer-opsætning"}
               </button>
             </div>
-          )}
-        </section>
-      )}
+        )}
+      </section>
 
       {/* ── Actions ─────────────────────────────────────────────────────────── */}
       <div className="flex gap-3 pt-2 border-t">

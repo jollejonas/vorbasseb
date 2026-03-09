@@ -114,7 +114,7 @@ export function AddToCartSection({
               className="w-4 h-4 accent-secondary"
             />
             <span className="text-sm font-medium">
-              {product.customizationLabel ?? "Tilføj trøjetryk"}{" "}
+              {product.customizationLabel ?? "Tilføj tryk"}{" "}
               {product.customizationFee > 0 && (
                 <span className="text-gray-500 font-normal">
                   (+{formatPrice(product.customizationFee)})
