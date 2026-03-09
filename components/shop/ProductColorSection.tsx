@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ProductImageGallery } from "./ProductImageGallery";
 import { AddToCartSection } from "./AddToCartSection";
+import { formatPrice, withVat } from "@/lib/utils";
 import type { Product, SKU, ColorVariant } from "@prisma/client";
 
 type ColorVariantWithSkus = ColorVariant & { skus: SKU[] };
@@ -11,9 +12,10 @@ type Props = {
   product: Product;
   skus: SKU[]; // global skus (no color variant)
   colorVariants: ColorVariantWithSkus[];
+  vatPct: number;
 };
 
-export function ProductColorSection({ product, skus, colorVariants }: Props) {
+export function ProductColorSection({ product, skus, colorVariants, vatPct }: Props) {
   const [selectedColorIdx, setSelectedColorIdx] = useState(0);
 
   const hasColors = colorVariants.length > 0;
@@ -37,6 +39,24 @@ export function ProductColorSection({ product, skus, colorVariants }: Props) {
 
       {/* Info + color swatches + add to cart */}
       <div>
+        <div className="mb-4">
+          {product.membersOnly && (
+            <span className="inline-block bg-secondary text-white text-xs font-semibold px-3 py-1 rounded-full mb-3">
+              Kun for fanklubsmedlemmer
+            </span>
+          )}
+          <h1 className="text-2xl font-bold mb-1">{product.name}</h1>
+          <p className="text-xl font-bold text-secondary mb-2">
+            {formatPrice(withVat(product.price, vatPct))}
+            <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
+            {product.customizationFee && (
+              <span className="text-sm text-gray-500 font-normal ml-2">
+                + {formatPrice(withVat(product.customizationFee, vatPct))} for tryk
+              </span>
+            )}
+          </p>
+          <p className="text-gray-600 leading-relaxed mb-4">{product.description}</p>
+        </div>
         {hasColors && (
           <div className="mb-5">
             <p className="text-sm font-medium text-gray-700 mb-2">

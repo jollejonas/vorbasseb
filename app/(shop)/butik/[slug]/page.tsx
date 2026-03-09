@@ -6,7 +6,6 @@ import { ProductColorSection } from "@/components/shop/ProductColorSection";
 import { ProductOptionsSection } from "@/components/shop/ProductOptionsSection";
 import { SimpleAddToCart } from "@/components/shop/SimpleAddToCart";
 import { JerseyDesignerSection } from "@/components/shop/JerseyDesignerSection";
-import { formatPrice, withVat } from "@/lib/utils";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -73,25 +72,6 @@ export default async function ProductPage({ params }: Props) {
         <span className="text-gray-900">{product.name}</span>
       </nav>
 
-      <div className="mb-6">
-        {product.membersOnly && (
-          <span className="inline-block bg-secondary text-white text-xs font-semibold px-3 py-1 rounded-full mb-3">
-            Kun for fanklubsmedlemmer
-          </span>
-        )}
-        <h1 className="text-2xl font-bold mb-1">{product.name}</h1>
-        <p className="text-xl font-bold text-secondary mb-2">
-          {formatPrice(withVat(product.price, vatPct))}
-          <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
-          {product.customizationFee && (
-            <span className="text-sm text-gray-500 font-normal ml-2">
-              + {formatPrice(withVat(product.customizationFee, vatPct))} for tryk
-            </span>
-          )}
-        </p>
-        <p className="text-gray-600 leading-relaxed">{product.description}</p>
-      </div>
-
       {product.designerEnabled ? (
         <JerseyDesignerSection
           product={product}
@@ -113,9 +93,10 @@ export default async function ProductPage({ params }: Props) {
           product={product}
           skus={product.skus}
           colorVariants={product.colorVariants}
+          vatPct={vatPct}
         />
       ) : (
-        <SimpleAddToCart product={product} skus={product.skus} />
+        <SimpleAddToCart product={product} skus={product.skus} vatPct={vatPct} />
       )}
     </div>
   );

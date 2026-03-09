@@ -130,7 +130,9 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
   const canAddToCart = activeSku !== null && activeSku.stock > 0;
 
   return (
-    <div className="space-y-6">
+    <div className="grid md:grid-cols-[55%_45%] gap-8 items-start">
+      {/* LEFT — Jersey preview + add panel */}
+      <div className="space-y-4">
       {/* Jersey preview */}
       <div className="space-y-2">
         {product.designerBackImageIdx !== null && (
@@ -267,9 +269,10 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
               <input
                 type="text"
                 value={addText}
-                onChange={(e) => setAddText(e.target.value)}
+                onChange={(e) => setAddText(e.target.value.toUpperCase())}
                 placeholder="f.eks. JENSEN eller 10"
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                style={{ textTransform: "uppercase" }}
                 maxLength={30}
                 autoFocus
               />
@@ -330,7 +333,31 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
         </div>
       )}
 
-      {/* Added prints list */}
+      </div>{/* end left col */}
+
+      {/* RIGHT — title, description, prints, size, cart */}
+      <div className="space-y-5">
+        {/* Product info */}
+        <div>
+          {product.membersOnly && (
+            <span className="inline-block bg-secondary text-white text-xs font-semibold px-3 py-1 rounded-full mb-3">
+              Kun for fanklubsmedlemmer
+            </span>
+          )}
+          <h1 className="text-2xl font-bold mb-1">{product.name}</h1>
+          <p className="text-xl font-bold text-secondary mb-2">
+            {formatPrice(withVat(product.price, vatPct))}
+            <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
+            {product.customizationFee && (
+              <span className="text-sm text-gray-500 font-normal ml-2">
+                + {formatPrice(withVat(product.customizationFee, vatPct))} for tryk
+              </span>
+            )}
+          </p>
+          <p className="text-gray-600 leading-relaxed">{product.description}</p>
+        </div>
+
+        {/* Added prints list */}
       <div className="space-y-2">
         <p className="text-sm font-medium text-gray-700">Tryk ({printElements.length})</p>
         {printElements.length === 0 ? (
@@ -385,11 +412,6 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
         </div>
       )}
 
-      <p className="text-xl font-bold text-secondary">
-        {formatPrice(withVat(product.price, vatPct))}
-        <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
-      </p>
-
       <button
         onClick={handleAddToCart}
         disabled={!canAddToCart || (!!sizeGroup && !selectedSize)}
@@ -401,6 +423,7 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
           ? "Lagt i kurv ✓"
           : "Læg i kurv"}
       </button>
+      </div>{/* end right col */}
     </div>
   );
 }

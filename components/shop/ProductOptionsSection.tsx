@@ -196,6 +196,25 @@ export function ProductOptionsSection({ product, skus, optionGroups, vatPct = 25
 
       {/* Options + add to cart */}
       <div className="space-y-5">
+        <div className="mb-4">
+          {product.membersOnly && (
+            <span className="inline-block bg-secondary text-white text-xs font-semibold px-3 py-1 rounded-full mb-3">
+              Kun for fanklubsmedlemmer
+            </span>
+          )}
+          <h1 className="text-2xl font-bold mb-1">{product.name}</h1>
+          <p className="text-xl font-bold text-secondary mb-2">
+            {formatPrice(withVat(product.price, vatPct))}
+            <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
+            {product.customizationFee && (
+              <span className="text-sm text-gray-500 font-normal ml-2">
+                + {formatPrice(withVat(product.customizationFee, vatPct))} for tryk
+              </span>
+            )}
+          </p>
+          <p className="text-gray-600 leading-relaxed">{product.description}</p>
+        </div>
+
         {/* COLOR group */}
         {colorGroup && (
           <div>
