@@ -176,7 +176,7 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
 
   // ── New option groups system ────────────────────────────────────────────────
   // New products always start in option groups mode; existing products follow their data
-  const [useOptionGroups, setUseOptionGroups] = useState(!product || hasOptionGroups);
+  const [useOptionGroups, setUseOptionGroups] = useState(true);
   // Tracks when admin has clicked "Konverter" on a legacy product
   const [migratedToOptions, setMigratedToOptions] = useState(false);
   const [globalColors, setGlobalColors] = useState<GlobalColor[]>([]);
