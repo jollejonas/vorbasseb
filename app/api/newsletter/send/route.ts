@@ -50,9 +50,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ sent: 0 });
   }
 
-  const unsubscribeUrl = `${APP_URL}/konto`;
+  const bodyText = htmlToPlainText(html);
 
-  const emailHtml = `
+  function buildEmail(email: string) {
+    const unsubscribeUrl = `${APP_URL}/api/newsletter/unsubscribe?email=${encodeURIComponent(email)}`;
+    const emailHtml = `
     <!DOCTYPE html>
     <html lang="da">
     <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /></head>
@@ -61,35 +63,35 @@ export async function POST(req: NextRequest) {
       <hr style="margin-top:32px;border:none;border-top:1px solid #eee" />
       <p style="font-size:12px;color:#888;margin-top:16px">
         Du modtager denne e-mail fordi du har tilmeldt dig nyhedsbrevet fra VBK Shoppen.
-        Du kan til enhver tid <a href="${unsubscribeUrl}" style="color:#888">afmelde dig på din kontoside</a>.
+        Du kan til enhver tid <a href="${unsubscribeUrl}" style="color:#888">afmelde dig her</a>.
       </p>
       <p style="font-size:12px;color:#888">Mvh. Vorbasse Boldklub</p>
     </body>
     </html>
   `;
+    const emailText =
+      bodyText +
+      `\n\n---\nDu modtager denne e-mail fordi du har tilmeldt dig nyhedsbrevet fra VBK Shoppen.\nAfmeld: ${unsubscribeUrl}\n\nMvh. Vorbasse Boldklub`;
 
-  const emailText =
-    htmlToPlainText(html) +
-    `\n\n---\nDu modtager denne e-mail fordi du har tilmeldt dig nyhedsbrevet fra VBK Shoppen.\nAfmeld: ${unsubscribeUrl}\n\nMvh. Vorbasse Boldklub`;
+    return {
+      from: `Vorbasse Boldklub <${FROM}>`,
+      to: email,
+      subject,
+      html: emailHtml,
+      text: emailText,
+      headers: {
+        "List-Unsubscribe": `<${unsubscribeUrl}>`,
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      },
+    };
+  }
 
   // Send in batches of 50
   let sent = 0;
   for (let i = 0; i < subscribers.length; i += BATCH_SIZE) {
     const batch = subscribers.slice(i, i + BATCH_SIZE);
     try {
-      await resend.batch.send(
-        batch.map((s) => ({
-          from: `Vorbasse Boldklub <${FROM}>`,
-          to: s.email,
-          subject,
-          html: emailHtml,
-          text: emailText,
-          headers: {
-            "List-Unsubscribe": `<${unsubscribeUrl}>`,
-            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-          },
-        })),
-      );
+      await resend.batch.send(batch.map((s) => buildEmail(s.email)));
       sent += batch.length;
     } catch (err) {
       console.error("Resend batch failed:", err);
