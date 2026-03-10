@@ -243,6 +243,8 @@ export async function POST(req: NextRequest) {
       cartJson: JSON.stringify(
         items.map((i) => ({
           skuId: i.skuId,
+          productName: i.productName ?? "",
+          size: i.size ?? "",
           quantity: i.quantity,
           price: i.price,
           customName: i.customName ?? "",
