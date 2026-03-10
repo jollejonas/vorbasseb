@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
-import { sendOrderConfirmation, sendShippingNotification, sendLowStockAlert } from "@/lib/email";
+import { sendOrderConfirmation, sendLowStockAlert } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -59,6 +59,8 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
 
   type CartMeta = {
     skuId: string;
+    productName: string;
+    size: string;
     quantity: number;
     price: number;
     customName: string;
@@ -160,8 +162,18 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
   if (email) {
     await sendOrderConfirmation({
       to: email,
+      customerName: customerName,
       orderTotal: session.amount_total ?? 0,
-      items,
+      items: items.map((i) => ({
+        productName: i.productName,
+        size: i.size,
+        colorName: i.colorName,
+        quantity: i.quantity,
+        price: i.price,
+        customName: i.customName,
+        customNumber: i.customNumber,
+        customizationFee: i.customizationFee,
+      })),
     });
   }
 }
@@ -232,5 +244,3 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
   });
 }
 
-// Re-export sendShippingNotification to prevent unused import warning
-export { sendShippingNotification };

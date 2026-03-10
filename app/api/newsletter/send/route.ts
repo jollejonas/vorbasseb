@@ -55,15 +55,20 @@ export async function POST(req: NextRequest) {
   let sent = 0;
   for (let i = 0; i < subscribers.length; i += BATCH_SIZE) {
     const batch = subscribers.slice(i, i + BATCH_SIZE);
-    await resend.batch.send(
-      batch.map((s) => ({
-        from: FROM,
-        to: s.email,
-        subject,
-        html: emailHtml,
-      })),
-    );
-    sent += batch.length;
+    try {
+      await resend.batch.send(
+        batch.map((s) => ({
+          from: FROM,
+          to: s.email,
+          subject,
+          html: emailHtml,
+        })),
+      );
+      sent += batch.length;
+    } catch (err) {
+      console.error("Resend batch failed:", err);
+      return NextResponse.json({ error: "E-mail afsendelse fejlede. Tjek Resend-konfigurationen." }, { status: 500 });
+    }
   }
 
   return NextResponse.json({ sent });

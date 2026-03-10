@@ -12,6 +12,27 @@ async function requireAdmin() {
   return session;
 }
 
+async function resolveEmailAndItems(order: { guestEmail: string | null; userId: string | null; customerName: string | null }, id: string) {
+  const email = order.guestEmail
+    ?? (order.userId
+      ? (await prisma.user.findUnique({ where: { id: order.userId }, select: { email: true } }))?.email ?? null
+      : null);
+
+  const fullOrder = await prisma.order.findUnique({
+    where: { id },
+    include: { items: { include: { sku: { include: { product: true } } } } },
+  });
+
+  return {
+    email,
+    items: fullOrder?.items.map((i) => ({
+      productName: i.sku?.product.name ?? "–",
+      size: i.sku?.size,
+      quantity: i.quantity,
+    })),
+  };
+}
+
 export async function PUT(req: NextRequest, { params }: Params) {
   if (!(await requireAdmin())) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -20,21 +41,17 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const { id } = await params;
   const { status } = await req.json();
 
-  const order = await prisma.order.update({
-    where: { id },
-    data: { status },
-  });
+  const order = await prisma.order.update({ where: { id }, data: { status } });
 
-  // Send shipping email when marked as SHIPPED
   if (status === "SHIPPED") {
-    const email = order.guestEmail ?? null;
-    if (!email && order.userId) {
-      const user = await prisma.user.findUnique({ where: { id: order.userId } });
-      if (user?.email) {
-        await sendShippingNotification({ to: user.email, orderId: order.id });
-      }
-    } else if (email) {
-      await sendShippingNotification({ to: email, orderId: order.id });
+    const { email, items } = await resolveEmailAndItems(order, id);
+    if (email) {
+      await sendShippingNotification({
+        to: email,
+        customerName: order.customerName,
+        orderId: order.id,
+        items,
+      });
     }
   }
 
@@ -63,13 +80,16 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const order = await prisma.order.update({ where: { id }, data });
 
-  // If status changed to SHIPPED and a tracking number is provided, send email
   if (body.status === "SHIPPED") {
-    const email = order.guestEmail;
-    const userId = order.userId;
-    const resolvedEmail = email ?? (userId ? (await prisma.user.findUnique({ where: { id: userId }, select: { email: true } }))?.email : null);
-    if (resolvedEmail) {
-      await sendShippingNotification({ to: resolvedEmail, orderId: order.id });
+    const { email, items } = await resolveEmailAndItems(order, id);
+    if (email) {
+      await sendShippingNotification({
+        to: email,
+        customerName: order.customerName,
+        orderId: order.id,
+        trackingNumber: body.trackingNumber ?? order.trackingNumber,
+        items,
+      });
     }
   }
 
