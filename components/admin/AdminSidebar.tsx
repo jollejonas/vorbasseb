@@ -75,10 +75,17 @@ function buildGroups(attentionCount: number): NavGroup[] {
       ],
     },
     {
+      label: "Økonomi",
+      items: [
+        { href: "/admin/oekonomi", label: "Økonomi", icon: TrendingUp },
+      ],
+    },
+    {
       label: "Opsætning",
       items: [
-        { href: "/admin/indstillinger", label: "Indstillinger", icon: Settings },
-        { href: "/admin/oekonomi", label: "Økonomi", icon: TrendingUp },
+        { href: "/admin/indstillinger#generelt", label: "Generelt", icon: Settings },
+        { href: "/admin/indstillinger#hero-carousel", label: "Hero-carousel", icon: Settings },
+        { href: "/admin/indstillinger#email-skabeloner", label: "E-mail skabeloner", icon: Settings },
       ],
     },
   ];
@@ -125,7 +132,8 @@ function SidebarContent({
             </p>
             <ul className="space-y-0.5">
               {group.items.map((item) => {
-                const active = pathname === item.href || pathname.startsWith(item.href + "/");
+                const itemPath = item.href.split("#")[0];
+                const active = pathname === itemPath || pathname.startsWith(itemPath + "/");
                 return (
                   <li key={item.href}>
                     <Link

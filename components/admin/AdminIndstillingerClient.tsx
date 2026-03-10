@@ -221,7 +221,7 @@ export function AdminIndstillingerClient({ settings, slides: initialSlides, allN
   return (
     <div className="space-y-10">
       {/* ── Section A: Site settings ──────────────────────────────────────── */}
-      <section>
+      <section id="generelt">
         <h2 className="text-xl font-bold mb-5">Generelle indstillinger</h2>
         <form onSubmit={handleSaveSettings} className="max-w-lg space-y-4">
           {SETTING_KEYS.map((key) => (
@@ -250,7 +250,7 @@ export function AdminIndstillingerClient({ settings, slides: initialSlides, allN
       </section>
 
       {/* ── Section B: Hero slides ────────────────────────────────────────── */}
-      <section>
+      <section id="hero-carousel">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-xl font-bold">Hero-carousel slides</h2>
           <button
@@ -529,7 +529,7 @@ export function AdminIndstillingerClient({ settings, slides: initialSlides, allN
       </section>
 
       {/* ── Section C: Email templates ────────────────────────────────────── */}
-      <section>
+      <section id="email-skabeloner">
         <h2 className="text-xl font-bold mb-1">E-mail skabeloner</h2>
         <p className="text-sm text-gray-500 mb-5">
           Rediger indhold og emnelinjer for automatiske e-mails. Brug variablerne nedenfor — de erstattes automatisk med rigtige værdier når e-mailen sendes.
