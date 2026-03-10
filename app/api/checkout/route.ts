@@ -7,7 +7,7 @@ import type { CartItem } from "@/components/shop/CartProvider";
 export async function POST(req: NextRequest) {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
   const session = await auth();
-  const { items, deliveryMethod = "SHIPPING" }: { items: CartItem[]; deliveryMethod?: "SHIPPING" | "PICKUP" } = await req.json();
+  const { items, deliveryMethod = "SHIPPING", promoMode = false }: { items: CartItem[]; deliveryMethod?: "SHIPPING" | "PICKUP"; promoMode?: boolean } = await req.json();
 
   if (!items || items.length === 0) {
     return NextResponse.json({ error: "Tom kurv" }, { status: 400 });
@@ -192,23 +192,42 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Combined coupon for grants + member discount
+  // Discount / promo code logic
+  // Stripe does not allow allow_promotion_codes and discounts simultaneously.
   let discounts: Stripe.Checkout.SessionCreateParams["discounts"] = undefined;
-  if (totalDiscountOre > 0) {
-    const couponName =
-      grantDiscountTotal > 0 && memberDiscount > 0
-        ? `Tildeling + Fanklubsrabat ${discountPct}%`
-        : grantDiscountTotal > 0
-          ? "Tildelt produkt"
-          : `Fanklubsrabat ${discountPct}%`;
+  let allowPromoCodes = false;
 
-    const coupon = await stripe.coupons.create({
-      amount_off: totalDiscountOre,
-      currency: "dkk",
-      duration: "once",
-      name: couponName,
-    });
-    discounts = [{ coupon: coupon.id }];
+  if (appliedGrantIds.length > 0) {
+    // Grants present: apply combined grant + member coupon; no promo field
+    if (totalDiscountOre > 0) {
+      const couponName =
+        grantDiscountTotal > 0 && memberDiscount > 0
+          ? `Tildeling + Fanklubsrabat ${discountPct}%`
+          : grantDiscountTotal > 0
+            ? "Tildelt produkt"
+            : `Fanklubsrabat ${discountPct}%`;
+      const coupon = await stripe.coupons.create({
+        amount_off: totalDiscountOre,
+        currency: "dkk",
+        duration: "once",
+        name: couponName,
+      });
+      discounts = [{ coupon: coupon.id }];
+    }
+  } else if (isMember && !promoMode) {
+    // Member, default mode: apply member discount as coupon
+    if (memberDiscount > 0) {
+      const coupon = await stripe.coupons.create({
+        amount_off: memberDiscount,
+        currency: "dkk",
+        duration: "once",
+        name: `Fanklubsrabat ${discountPct}%`,
+      });
+      discounts = [{ coupon: coupon.id }];
+    }
+  } else {
+    // Non-member, or member who opted into promo mode: show promo code field
+    allowPromoCodes = true;
   }
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -217,6 +236,7 @@ export async function POST(req: NextRequest) {
     mode: "payment",
     line_items: lineItems,
     discounts,
+    ...(allowPromoCodes ? { allow_promotion_codes: true } : {}),
     customer_email: session?.user?.email ?? undefined,
     metadata: {
       userId: session?.user?.id ?? "",
