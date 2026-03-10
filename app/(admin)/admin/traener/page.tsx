@@ -63,9 +63,9 @@ export default async function AdminTraenerPage() {
     email: t.email,
     orderedItems: t.orders.flatMap((o) =>
       o.items.map((i) => ({
-        productId: i.sku.productId,
-        productName: i.sku.product.name,
-        size: i.sku.size,
+        productId: i.sku?.productId ?? "",
+        productName: i.sku?.product.name ?? "–",
+        size: i.sku?.size ?? "–",
       }))
     ),
     lastOrderDate: t.orders[0]?.createdAt?.toISOString() ?? null,

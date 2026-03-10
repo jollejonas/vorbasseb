@@ -108,7 +108,7 @@ export default async function AdminOrdrerPage({ searchParams }: Props) {
                     <ul className="space-y-0.5">
                       {order.items.map((item) => (
                         <li key={item.id} className="text-gray-600">
-                          {item.quantity}× {item.sku.product.name} ({item.sku.size})
+                          {item.quantity}× {item.sku?.product.name ?? "–"} ({item.sku?.size ?? "–"})
                         </li>
                       ))}
                     </ul>

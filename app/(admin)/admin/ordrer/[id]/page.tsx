@@ -122,11 +122,11 @@ export default async function AdminOrderDetailPage({ params }: Params) {
           <tbody className="divide-y divide-gray-100">
             {order.items.map((item) => (
               <tr key={item.id}>
-                <td className="px-5 py-3">{item.sku.product.name}</td>
+                <td className="px-5 py-3">{item.sku?.product.name ?? "–"}</td>
                 <td className="px-5 py-3 font-mono text-xs text-gray-500">
-                  {item.sku.itemNumber ?? "–"}
+                  {item.sku?.itemNumber ?? "–"}
                 </td>
-                <td className="px-5 py-3">{item.sku.size}</td>
+                <td className="px-5 py-3">{item.sku?.size ?? "–"}</td>
                 <td className="px-5 py-3 text-gray-500">{item.colorName ?? "–"}</td>
                 <td className="px-5 py-3 text-gray-500">
                   {(() => {

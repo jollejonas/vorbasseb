@@ -338,8 +338,8 @@ model OrderItem {
   id               String  @id @default(cuid())
   orderId          String
   order            Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  skuId            String
-  sku              SKU     @relation(fields: [skuId], references: [id])
+  skuId            String?
+  sku              SKU?    @relation(fields: [skuId], references: [id], onDelete: SetNull)
   quantity         Int
   priceAtPurchase  Int // øre
   customName       String?
