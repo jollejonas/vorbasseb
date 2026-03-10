@@ -6,6 +6,21 @@ import { Resend } from "resend";
 const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = process.env.RESEND_FROM_EMAIL;
 const BATCH_SIZE = 50;
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://vorbassebk.dk";
+
+/** Strip HTML tags for a basic plain-text fallback */
+function htmlToPlainText(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -35,6 +50,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ sent: 0 });
   }
 
+  const unsubscribeUrl = `${APP_URL}/konto`;
+
   const emailHtml = `
     <!DOCTYPE html>
     <html lang="da">
@@ -44,12 +61,16 @@ export async function POST(req: NextRequest) {
       <hr style="margin-top:32px;border:none;border-top:1px solid #eee" />
       <p style="font-size:12px;color:#888;margin-top:16px">
         Du modtager denne e-mail fordi du har tilmeldt dig nyhedsbrevet fra VBK Shoppen.
-        Du kan til enhver tid afmelde dig på din <a href="${process.env.NEXT_PUBLIC_APP_URL ?? "https://vorbassebk.dk"}/konto" style="color:#888">kontoside</a>.
+        Du kan til enhver tid <a href="${unsubscribeUrl}" style="color:#888">afmelde dig på din kontoside</a>.
       </p>
       <p style="font-size:12px;color:#888">Mvh. Vorbasse Boldklub</p>
     </body>
     </html>
   `;
+
+  const emailText =
+    htmlToPlainText(html) +
+    `\n\n---\nDu modtager denne e-mail fordi du har tilmeldt dig nyhedsbrevet fra VBK Shoppen.\nAfmeld: ${unsubscribeUrl}\n\nMvh. Vorbasse Boldklub`;
 
   // Send in batches of 50
   let sent = 0;
@@ -58,10 +79,15 @@ export async function POST(req: NextRequest) {
     try {
       await resend.batch.send(
         batch.map((s) => ({
-          from: FROM,
+          from: `Vorbasse Boldklub <${FROM}>`,
           to: s.email,
           subject,
           html: emailHtml,
+          text: emailText,
+          headers: {
+            "List-Unsubscribe": `<${unsubscribeUrl}>`,
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+          },
         })),
       );
       sent += batch.length;
