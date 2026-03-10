@@ -83,9 +83,9 @@ function buildGroups(attentionCount: number): NavGroup[] {
     {
       label: "Opsætning",
       items: [
-        { href: "/admin/indstillinger#generelt", label: "Generelt", icon: Settings },
-        { href: "/admin/indstillinger#hero-carousel", label: "Hero-carousel", icon: Settings },
-        { href: "/admin/indstillinger#email-skabeloner", label: "E-mail skabeloner", icon: Settings },
+        { href: "/admin/indstillinger/generelt", label: "Generelt", icon: Settings },
+        { href: "/admin/indstillinger/hero-carousel", label: "Hero-carousel", icon: Image },
+        { href: "/admin/indstillinger/email-skabeloner", label: "E-mail skabeloner", icon: Mail },
       ],
     },
   ];
