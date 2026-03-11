@@ -44,6 +44,8 @@ type OptionValueInput = {
   position: number;
   globalColorId?: string | null;
   images?: string[];
+  price?: number | null;
+  costPrice?: number | null;
 };
 
 type OptionGroupInput = {
@@ -105,12 +107,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
         categoryId: body.categoryId ?? null,
         price: body.price,
         modelNumber: body.modelNumber ?? null,
-        customizationFee: body.customizationFee ?? null,
         membersOnly: body.membersOnly,
         membersEarlyAccess: body.membersEarlyAccess ?? false,
         clubRoleRequired: body.clubRoleRequired ?? null,
-        customizationLabel: body.customizationLabel ?? null,
-        customizationShowNumber: body.customizationShowNumber ?? true,
         published: body.published,
         featured: body.featured,
         images: body.images,
@@ -168,6 +167,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
                 position: vi,
                 globalColorId: v.globalColorId ?? null,
                 images: v.images ?? [],
+                price: v.price ?? null,
+                costPrice: v.costPrice ?? null,
               },
             });
             valueId = v.id;
@@ -179,6 +180,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
                 position: vi,
                 globalColorId: v.globalColorId ?? null,
                 images: v.images ?? [],
+                price: v.price ?? null,
+                costPrice: v.costPrice ?? null,
               },
             });
             valueId = created.id;

@@ -483,53 +483,6 @@ function ItemStep({
         </>
       )}
 
-      {/* Customization (legacy name/number print) */}
-      {product.customizationFee != null && (
-        <div className="border rounded-xl p-4 bg-gray-50">
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={stepState.withCustomization}
-              onChange={(e) => onChange({ withCustomization: e.target.checked })}
-              className="w-4 h-4 accent-secondary"
-            />
-            <span className="text-sm font-medium">
-              {product.customizationLabel ?? "Tilføj tryk"}
-              {product.customizationFee > 0 && (
-                <span className="ml-1 text-gray-500 font-normal text-xs">
-                  (+{formatPrice(withVat(product.customizationFee, vatPct))})
-                </span>
-              )}
-            </span>
-          </label>
-          {stepState.withCustomization && (
-            <div className={`mt-3 grid gap-3 ${product.customizationShowNumber ? "grid-cols-2" : "grid-cols-1"}`}>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Navn (valgfrit)</label>
-                <input
-                  type="text"
-                  value={stepState.customName}
-                  onChange={(e) => onChange({ customName: e.target.value.toUpperCase().slice(0, 14) })}
-                  placeholder="JENSEN"
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
-                />
-              </div>
-              {product.customizationShowNumber && (
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Nummer (valgfrit)</label>
-                  <input
-                    type="text"
-                    value={stepState.customNumber}
-                    onChange={(e) => onChange({ customNumber: e.target.value.replace(/\D/g, "").slice(0, 2) })}
-                    placeholder="10"
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
-                  />
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 
@@ -657,14 +610,11 @@ function SummaryStep({
       }
       return t;
     }, 0);
-    const legacyFee = state.withCustomization && item.product.customizationFee
-      ? item.product.customizationFee
-      : 0;
     const designerFee = state.printElements.reduce((t, el) => {
       const zone = item.product.designerZones.find((z) => z.id === el.zoneId);
       return t + (zone?.price ?? 0);
     }, 0);
-    return total + optionGroupFee + legacyFee + designerFee;
+    return total + optionGroupFee + designerFee;
   }, 0);
 
   const totalPrice = pakketilbud.price + totalCustomizationFee;
@@ -812,14 +762,11 @@ export function PakketilbudWizard({
         }
         return t;
       }, 0);
-      const legacyFee = state.withCustomization && item.product.customizationFee
-        ? item.product.customizationFee
-        : 0;
       const designerFee = state.printElements.reduce((t, el) => {
         const zone = item.product.designerZones.find((z) => z.id === el.zoneId);
         return t + (zone?.price ?? 0);
       }, 0);
-      return total + optionGroupFee + legacyFee + designerFee;
+      return total + optionGroupFee + designerFee;
     }, 0);
 
     const pakketilbudItems = pakketilbud.items.map((item, idx) => {
@@ -865,11 +812,6 @@ export function PakketilbudWizard({
             : product.skus.find((s) => s.id === state.selectedLegacySkuId);
         skuId = sku?.id ?? "";
         size = sku?.size ?? "";
-        if (state.withCustomization && product.customizationFee != null) {
-          customName = state.customName || undefined;
-          customNumber = state.customNumber || undefined;
-          customizationFee = product.customizationFee > 0 ? product.customizationFee : undefined;
-        }
       }
 
       // Add designer zone fees

@@ -16,7 +16,7 @@ async function main() {
 
   // ── Products ──────────────────────────────────────────────────────────────
   const products = await prisma.product.findMany({
-    select: { id: true, price: true, customizationFee: true },
+    select: { id: true, price: true },
   });
 
   console.log(`Migrating ${products.length} products...`);
@@ -25,9 +25,6 @@ async function main() {
       where: { id: p.id },
       data: {
         price: Math.round(p.price / VAT_FACTOR),
-        customizationFee: p.customizationFee
-          ? Math.round(p.customizationFee / VAT_FACTOR)
-          : null,
       },
     });
   }

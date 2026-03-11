@@ -125,12 +125,9 @@ model Product {
   category         Category?   @relation(fields: [categoryId], references: [id])
   price            Int // øre (DKK × 100)
   modelNumber      String?     // e.g. "2001" — used in varenummer auto-generation
-  customizationFee Int? // øre, kun for trøjer med tryk
   membersOnly             Boolean     @default(false)
   membersEarlyAccess      Boolean     @default(false)
   clubRoleRequired        ClubRole?
-  customizationLabel      String?
-  customizationShowNumber Boolean     @default(true)
   published            Boolean     @default(true)
   featured             Boolean     @default(false)
   images           String[] // Cloudinary URLs (used when no color variants)
@@ -222,6 +219,8 @@ model ProductOptionValue {
   globalColorId String?
   globalColor   GlobalColor?        @relation(fields: [globalColorId], references: [id], onDelete: SetNull)
   images        String[]            // Cloudinary URLs — COLOR type only
+  price         Int?                // øre, ekskl. moms — SELECT type only
+  costPrice     Int?                // øre, ekskl. moms — SELECT type only
   skuValues     SKUOptionValue[]
 
   @@index([groupId, position])
@@ -414,6 +413,7 @@ model DesignerZone {
   allowText   Boolean @default(true)
   allowLogo   Boolean @default(false)
   price       Int     @default(0) // price in øre (added on top of product price per zone)
+  tipText     String? // hint shown to customer when zone is selected
   previewX    Float   @default(10) // % from left (top-left corner)
   previewY    Float   @default(10) // % from top (top-left corner)
   previewW    Float   @default(20) // % width

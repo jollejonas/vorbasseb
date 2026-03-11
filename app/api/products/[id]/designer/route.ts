@@ -40,6 +40,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       previewW: number;
       previewH: number;
       price: number;
+      tipText?: string;
       positionOrd: number;
     }[];
   };
@@ -69,6 +70,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
           previewW: z.previewW,
           previewH: z.previewH,
           price: z.price ?? 0,
+          tipText: z.tipText || null,
           positionOrd: i,
         },
       })

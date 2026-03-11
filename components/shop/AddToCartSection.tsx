@@ -4,7 +4,6 @@ import { useState } from "react";
 import { ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { useCart } from "./CartProvider";
-import { formatPrice } from "@/lib/utils";
 import type { Product, SKU } from "@prisma/client";
 
 const SIZES_ORDER = [
@@ -23,9 +22,6 @@ export function AddToCartSection({
 }) {
   const { addItem } = useCart();
   const [selectedSku, setSelectedSku] = useState<SKU | null>(null);
-  const [withCustomization, setWithCustomization] = useState(false);
-  const [customName, setCustomName] = useState("");
-  const [customNumber, setCustomNumber] = useState("");
 
   const sortedSkus = [...skus].sort(
     (a, b) => SIZES_ORDER.indexOf(a.size) - SIZES_ORDER.indexOf(b.size),
@@ -49,11 +45,6 @@ export function AddToCartSection({
       price: product.price,
       quantity: 1,
       image: product.images[0],
-      customName: withCustomization ? customName || undefined : undefined,
-      customNumber: withCustomization && product.customizationShowNumber ? customNumber || undefined : undefined,
-      customizationFee: withCustomization && product.customizationFee != null
-        ? product.customizationFee
-        : undefined,
       clubRoleRequired: product.clubRoleRequired ?? null,
       colorName: colorName || undefined,
     });
@@ -102,61 +93,6 @@ export function AddToCartSection({
           </p>
         )}
       </div>
-
-      {/* Optional jersey customization */}
-      {product.customizationFee != null && (
-        <div className="border rounded-xl p-4 bg-surface">
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={withCustomization}
-              onChange={(e) => setWithCustomization(e.target.checked)}
-              className="w-4 h-4 accent-secondary"
-            />
-            <span className="text-sm font-medium">
-              {product.customizationLabel ?? "Tilføj tryk"}{" "}
-              {product.customizationFee > 0 && (
-                <span className="text-gray-500 font-normal">
-                  (+{formatPrice(product.customizationFee)})
-                </span>
-              )}
-            </span>
-          </label>
-
-          {withCustomization && (
-            <div className={`mt-3 grid gap-3 ${product.customizationShowNumber ? "grid-cols-2" : "grid-cols-1"}`}>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">
-                  Navn (valgfrit)
-                </label>
-                <input
-                  value={customName}
-                  onChange={(e) =>
-                    setCustomName(e.target.value.toUpperCase().slice(0, 14))
-                  }
-                  placeholder="JENSEN"
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
-                />
-              </div>
-              {product.customizationShowNumber && (
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">
-                    Nummer (valgfrit)
-                  </label>
-                  <input
-                    value={customNumber}
-                    onChange={(e) =>
-                      setCustomNumber(e.target.value.replace(/\D/g, "").slice(0, 2))
-                    }
-                    placeholder="10"
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
-                  />
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Add to cart button */}
       <button

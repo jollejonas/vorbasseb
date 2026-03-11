@@ -94,10 +94,14 @@ export function ProductOptionsSection({ product, skus, optionGroups, vatPct = 25
     });
   }
 
-  // Compute extra fee from TEXT/CUSTOM groups
+  // Compute extra fee from TEXT/CUSTOM groups + SELECT per-value prices
   const extraFee = otherGroups.reduce((total, g) => {
     if ((g.type === "TEXT" || g.type === "CUSTOM") && g.fee && textInputs[g.id]) {
       return total + g.fee;
+    }
+    if (g.type === "SELECT" && textInputs[g.id]) {
+      const chosen = g.values.find((v) => v.label === textInputs[g.id]);
+      return total + (chosen?.price ?? 0);
     }
     return total;
   }, 0);
@@ -213,11 +217,6 @@ export function ProductOptionsSection({ product, skus, optionGroups, vatPct = 25
           <p className="text-xl font-bold text-secondary mb-2">
             {formatPrice(withVat(product.price, vatPct))}
             <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
-            {product.customizationFee && (
-              <span className="text-sm text-gray-500 font-normal ml-2">
-                + {formatPrice(withVat(product.customizationFee, vatPct))} for tryk
-              </span>
-            )}
           </p>
           <p className="text-gray-600 leading-relaxed">{product.description}</p>
         </div>
@@ -326,6 +325,11 @@ export function ProductOptionsSection({ product, skus, optionGroups, vatPct = 25
                       }`}
                     >
                       {v.label}
+                      {v.price != null && v.price > 0 && (
+                        <span className={`ml-1 text-xs font-normal ${selected ? "text-white/80" : "text-gray-400"}`}>
+                          (+{formatPrice(withVat(v.price, vatPct))})
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -333,12 +337,27 @@ export function ProductOptionsSection({ product, skus, optionGroups, vatPct = 25
             )}
 
             {g.type === "CUSTOM" && (
-              <input
-                type={g.inputType ?? "text"}
-                value={textInputs[g.id] ?? ""}
-                onChange={(e) => setTextInputs((prev) => ({ ...prev, [g.id]: e.target.value }))}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
-              />
+              g.inputType === "checkbox" ? (
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!textInputs[g.id]}
+                    onChange={(e) => setTextInputs((prev) => ({ ...prev, [g.id]: e.target.checked ? "true" : "" }))}
+                    className="rounded accent-secondary"
+                  />
+                  <span className="text-sm text-gray-700">{g.label}</span>
+                  {g.fee && g.fee > 0 && (
+                    <span className="text-xs text-gray-400">(+{formatPrice(withVat(g.fee, vatPct))})</span>
+                  )}
+                </label>
+              ) : (
+                <input
+                  type={g.inputType ?? "text"}
+                  value={textInputs[g.id] ?? ""}
+                  onChange={(e) => setTextInputs((prev) => ({ ...prev, [g.id]: e.target.value }))}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
+                />
+              )
             )}
           </div>
         ))}

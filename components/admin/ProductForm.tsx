@@ -31,6 +31,8 @@ type OptionValueRow = {
   globalColorId?: string | null;
   globalColorHex?: string;
   images: string[];
+  priceKr?: string;
+  costPriceKr?: string;
 };
 
 type OptionGroupRow = {
@@ -109,6 +111,8 @@ function buildInitialProductState(product: ProductWithRelations | undefined): {
         globalColorId: v.globalColorId,
         globalColorHex: v.globalColor?.hex,
         images: v.images,
+        priceKr: (v as typeof v & { price?: number | null }).price != null ? ((v as typeof v & { price?: number }).price! / 100).toFixed(2) : "",
+        costPriceKr: (v as typeof v & { costPrice?: number | null }).costPrice != null ? ((v as typeof v & { costPrice?: number }).costPrice! / 100).toFixed(2) : "",
       };
     }),
   }));
@@ -180,11 +184,6 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [priceKr, setPriceKr] = useState(product ? (product.price / 100).toFixed(2) : "");
   const [modelNumber, setModelNumber] = useState(product?.modelNumber ?? "");
-  const [customizationFeeKr, setCustomizationFeeKr] = useState(
-    product?.customizationFee != null ? (product.customizationFee / 100).toFixed(2) : ""
-  );
-  const [customizationLabel, setCustomizationLabel] = useState(product?.customizationLabel ?? "");
-  const [customizationShowNumber, setCustomizationShowNumber] = useState(product?.customizationShowNumber ?? true);
   const [membersOnly, setMembersOnly] = useState(product?.membersOnly ?? false);
   const [membersEarlyAccess, setMembersEarlyAccess] = useState(product?.membersEarlyAccess ?? false);
   const [clubRoleRequired, setClubRoleRequired] = useState<ClubRole | "">(product?.clubRoleRequired ?? "");
@@ -214,6 +213,7 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
     previewW: number;
     previewH: number;
     priceKr: string;
+    tipText: string;
   };
 
   const [designerZones, setDesignerZones] = useState<ZoneRow[]>(
@@ -228,6 +228,7 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
       previewW: z.previewW,
       previewH: z.previewH,
       priceKr: (z as typeof z & { price?: number }).price ? ((z as typeof z & { price?: number }).price! / 100).toFixed(2) : "",
+      tipText: (z as typeof z & { tipText?: string }).tipText ?? "",
     }))
   );
   const [designerSaving, setDesignerSaving] = useState(false);
@@ -621,6 +622,8 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
             position: vi,
             globalColorId: v.globalColorId ?? null,
             images: v.images,
+            price: v.priceKr ? Math.round(parseFloat(v.priceKr) * 100) : null,
+            costPrice: v.costPriceKr ? Math.round(parseFloat(v.costPriceKr) * 100) : null,
           })),
         }));
 
@@ -638,9 +641,6 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
           name, slug, categoryId: categoryId || null, price: Math.round(priceVal * 100),
           modelNumber: modelNumber || null, description, images,
           membersOnly, membersEarlyAccess, clubRoleRequired: clubRoleRequired || null,
-          customizationFee: customizationFeeKr !== "" ? Math.round(parseFloat(customizationFeeKr) * 100) : null,
-          customizationLabel: customizationLabel || null,
-          customizationShowNumber,
           published, featured, designerEnabled,
           optionGroups: groupsPayload,
           skuMatrix: matrixPayload,
@@ -652,9 +652,6 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
           name, slug, categoryId: categoryId || null, price: Math.round(priceVal * 100),
           modelNumber: modelNumber || null, description, images,
           membersOnly, membersEarlyAccess, clubRoleRequired: clubRoleRequired || null,
-          customizationFee: customizationFeeKr !== "" ? Math.round(parseFloat(customizationFeeKr) * 100) : null,
-          customizationLabel: customizationLabel || null,
-          customizationShowNumber,
           published, featured, designerEnabled,
           skus: legacyColorVariants.length === 0
             ? legacySkus.map(({ id, size, stock, itemNumber }) => ({ id, size, stock, itemNumber: itemNumber || null }))
@@ -773,37 +770,6 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
           />
         </div>
 
-        {/* ── Customization (name/number print) ───────────────────────────── */}
-        <div className="border rounded-xl p-4 space-y-3">
-          <p className="text-sm font-medium text-gray-700">Tryk / tilpasning</p>
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">
-                Trykpris (kr, ekskl. moms) — tomt = ingen tryk
-              </label>
-              <input type="number" min="0" step="0.01" value={customizationFeeKr}
-                onChange={(e) => setCustomizationFeeKr(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
-                placeholder="f.eks. 50.00 (0 = gratis tryk)"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">
-                Knaptext (standard: "Tilføj tryk")
-              </label>
-              <input type="text" value={customizationLabel}
-                onChange={(e) => setCustomizationLabel(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
-                placeholder="Tilføj tryk"
-              />
-            </div>
-          </div>
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input type="checkbox" checked={customizationShowNumber}
-              onChange={(e) => setCustomizationShowNumber(e.target.checked)} className="rounded" />
-            Vis nummer-felt (til trøjenummer)
-          </label>
-        </div>
       </section>
 
       {/* ── Flags ──────────────────────────────────────────────────────────── */}
@@ -1204,6 +1170,7 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
                       previewW: pendingArea.w / 3,
                       previewH: pendingArea.h / 3,
                       priceKr: "",
+                      tipText: "",
                     });
                   });
                   const nextIdx = designerZones.length + newZones.length - 1;
@@ -1226,6 +1193,7 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
                     previewW: pendingArea.w,
                     previewH: pendingArea.h,
                     priceKr: "",
+                    tipText: "",
                   };
                   setDesignerZones((prev) => [...prev, newZone]);
                   setPendingArea(null);
@@ -1462,6 +1430,13 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
                                 onChange={(e) => update({ priceKr: e.target.value })}
                                 className="w-full border rounded-lg px-2 py-1.5 text-sm" />
                             </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-500 mb-1">Hjælpetekst til kunden (valgfri)</label>
+                              <input type="text" placeholder="f.eks. Maks. 12 tegn"
+                                value={zone.tipText}
+                                onChange={(e) => update({ tipText: e.target.value })}
+                                className="w-full border rounded-lg px-2 py-1.5 text-sm" />
+                            </div>
                           </div>
                         );
                       })()}
@@ -1657,17 +1632,29 @@ function OptionGroupEditor({
         </div>
       )}
 
-      {/* SELECT values — add/remove text values */}
+      {/* SELECT values — add/remove text values with per-value pricing */}
       {group.type === "SELECT" && (
         <div>
           <div className="flex gap-2 mb-2">
             <SelectValueAdder onAdd={(label) => onAddValue({ label, position: group.values.length })} />
           </div>
           {group.values.length > 0 && (
-            <div className="flex flex-wrap gap-2">
+            <div className="space-y-1">
               {group.values.map((v) => (
-                <div key={v._key} className="flex items-center gap-1 bg-gray-50 border rounded-lg px-2.5 py-1">
-                  <span className="text-sm">{v.label}</span>
+                <div key={v._key} className="flex items-center gap-2 bg-gray-50 border rounded-lg px-2.5 py-1.5">
+                  <span className="text-sm flex-1 min-w-0 truncate">{v.label}</span>
+                  <input
+                    type="number" min="0" step="0.01" placeholder="Pris kr"
+                    value={v.priceKr ?? ""}
+                    onChange={(e) => onUpdateValue(v._key, { priceKr: e.target.value })}
+                    className="w-20 border rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-secondary"
+                  />
+                  <input
+                    type="number" min="0" step="0.01" placeholder="Kostpris kr"
+                    value={v.costPriceKr ?? ""}
+                    onChange={(e) => onUpdateValue(v._key, { costPriceKr: e.target.value })}
+                    className="w-24 border rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-secondary"
+                  />
                   <button type="button" onClick={() => onRemoveValue(v._key)} className="text-red-400 hover:text-red-600 text-xs ml-1">×</button>
                 </div>
               ))}

@@ -153,22 +153,6 @@ async function main() {
         }
       }
 
-      // ── Migrate legacy customizationFee to TEXT option group ─────────────
-      if (product.customizationFee) {
-        const textGroup = await tx.productOptionGroup.create({
-          data: {
-            productId: product.id,
-            type: "TEXT",
-            label: product.customizationLabel ?? "Tryk / navn",
-            position: 2,
-            required: false,
-            fee: product.customizationFee,
-          },
-        });
-        console.log(`  Created TEXT group for customization (fee: ${product.customizationFee} øre)`);
-        // TEXT groups don't have predefined values
-        void textGroup; // suppress unused warning
-      }
     });
 
     console.log(`  ✓ Migrated ${product.colorVariants.length} colors, ${[...new Set(product.colorVariants.flatMap((cv) => cv.skus.map((s) => s.size)))].length} sizes`);
@@ -224,18 +208,6 @@ async function main() {
         }
       }
 
-      if (product.customizationFee) {
-        await tx.productOptionGroup.create({
-          data: {
-            productId: product.id,
-            type: "TEXT",
-            label: product.customizationLabel ?? "Tryk / navn",
-            position: 1,
-            required: false,
-            fee: product.customizationFee,
-          },
-        });
-      }
     });
 
     console.log(`  ✓ Migrated ${product.skus.length} sizes`);

@@ -10,7 +10,7 @@ export function SimpleAddToCart({
   skus,
   vatPct,
 }: {
-  product: Pick<Product, "id" | "name" | "price" | "description" | "membersOnly" | "customizationFee" | "clubRoleRequired" | "images">;
+  product: Pick<Product, "id" | "name" | "price" | "description" | "membersOnly" | "clubRoleRequired" | "images">;
   skus: SKU[];
   vatPct: number;
 }) {
@@ -66,11 +66,6 @@ export function SimpleAddToCart({
           <p className="text-xl font-bold text-secondary mb-2">
             {formatPrice(withVat(product.price, vatPct))}
             <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
-            {product.customizationFee && (
-              <span className="text-sm text-gray-500 font-normal ml-2">
-                + {formatPrice(withVat(product.customizationFee, vatPct))} for tryk
-              </span>
-            )}
           </p>
           <p className="text-gray-600 leading-relaxed">{product.description ?? ""}</p>
         </div>

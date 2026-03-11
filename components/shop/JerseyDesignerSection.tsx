@@ -146,6 +146,11 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
       return v ? [{ groupLabel: g.label, value: v.label }] : [];
     });
 
+    const designerFee = printElements.reduce((sum, el) => {
+      const zone = zoneMap.get(el.zoneId);
+      return sum + (zone?.price ?? 0);
+    }, 0);
+
     addItem({
       skuId: activeSku.id,
       productId: product.id,
@@ -157,6 +162,7 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
       clubRoleRequired: product.clubRoleRequired ?? null,
       printElements,
       optionSelections: optionSelections.length > 0 ? optionSelections : undefined,
+      customizationFee: designerFee > 0 ? designerFee : undefined,
     });
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
@@ -268,12 +274,19 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
             {clickedZone && (
               <div className="border rounded-xl p-4 space-y-4 bg-gray-50">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-gray-700">
-                    {clickedZone.label}
-                    <span className="text-xs text-gray-400 font-normal ml-2">
-                      {clickedZone.side === "front" ? "Forside" : "Bagside"}
-                    </span>
-                  </p>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700">
+                      {clickedZone.label}
+                      <span className="text-xs text-gray-400 font-normal ml-2">
+                        {clickedZone.side === "front" ? "Forside" : "Bagside"}
+                      </span>
+                    </p>
+                    {(clickedZone as typeof clickedZone & { tipText?: string }).tipText && (
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {(clickedZone as typeof clickedZone & { tipText?: string }).tipText}
+                      </p>
+                    )}
+                  </div>
                   <button
                     type="button"
                     onClick={() => setClickedZoneId(null)}
@@ -403,11 +416,6 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
           <p className="text-xl font-bold text-secondary mb-2">
             {formatPrice(withVat(product.price, vatPct))}
             <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
-            {product.customizationFee && (
-              <span className="text-sm text-gray-500 font-normal ml-2">
-                + {formatPrice(withVat(product.customizationFee, vatPct))} for tryk
-              </span>
-            )}
           </p>
           <p className="text-gray-600 leading-relaxed">{product.description}</p>
         </div>
