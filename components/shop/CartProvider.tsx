@@ -34,6 +34,7 @@ export type PakketilbudItemSelection = {
   customName?: string;
   customNumber?: string;
   customizationFee?: number;
+  printElements?: PrintElement[];
 };
 
 export type CartItem = {

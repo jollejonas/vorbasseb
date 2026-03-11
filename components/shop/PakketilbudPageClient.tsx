@@ -12,6 +12,8 @@ type Item = {
 
 type PakketilbudData = Parameters<typeof PakketilbudWizard>[0]["pakketilbud"];
 
+import type { DesignerLogo } from "@prisma/client";
+
 type Props = {
   pakketilbud: PakketilbudData & {
     images: string[];
@@ -22,6 +24,7 @@ type Props = {
   vatPct: number;
   isSoldOut: boolean;
   soldOutItems: string[];
+  logos: DesignerLogo[];
 };
 
 function WizardView({
@@ -29,6 +32,7 @@ function WizardView({
   vatPct,
   isSoldOut,
   soldOutItems,
+  logos,
   onBack,
 }: Props & { onBack: () => void }) {
   useEffect(() => {
@@ -52,12 +56,12 @@ function WizardView({
         </div>
       )}
 
-      <PakketilbudWizard pakketilbud={pakketilbud} vatPct={vatPct} isSoldOut={isSoldOut} />
+      <PakketilbudWizard pakketilbud={pakketilbud} vatPct={vatPct} isSoldOut={isSoldOut} logos={logos} />
     </div>
   );
 }
 
-export function PakketilbudPageClient({ pakketilbud, vatPct, isSoldOut, soldOutItems }: Props) {
+export function PakketilbudPageClient({ pakketilbud, vatPct, isSoldOut, soldOutItems, logos }: Props) {
   const [started, setStarted] = useState(false);
 
   if (started) {
@@ -67,6 +71,7 @@ export function PakketilbudPageClient({ pakketilbud, vatPct, isSoldOut, soldOutI
         vatPct={vatPct}
         isSoldOut={isSoldOut}
         soldOutItems={soldOutItems}
+        logos={logos}
         onBack={() => setStarted(false)}
       />
     );

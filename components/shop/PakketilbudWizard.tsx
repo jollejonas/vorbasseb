@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Check, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
-import { useCart } from "./CartProvider";
+import { useCart, type PrintElement } from "./CartProvider";
+import { JerseyDesignerCanvas, JerseyDesignerControls } from "./JerseyDesignerPanel";
 import { formatPrice, withVat } from "@/lib/utils";
 import type {
   Product,
@@ -13,6 +14,8 @@ import type {
   ProductOptionValue,
   GlobalColor,
   SKUOptionValue,
+  DesignerZone,
+  DesignerLogo,
 } from "@prisma/client";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -29,6 +32,7 @@ type ProductFull = Product & {
   optionGroups: OptionGroupFull[];
   skus: SkuWithOptions[];
   colorVariants: ColorVariantWithSkus[];
+  designerZones: DesignerZone[];
 };
 
 type PakketilbudItemData = {
@@ -56,6 +60,12 @@ type StepState = {
   // Legacy colorVariants mode
   selectedColorVariantId: string | null;
   selectedLegacySkuId: string | null;
+  // Legacy customization (name/number print)
+  withCustomization: boolean;
+  customName: string;
+  customNumber: string;
+  // Jersey designer print elements
+  printElements: PrintElement[];
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -96,12 +106,28 @@ function isSizeAvailableForOptions(
   });
 }
 
-function initialStep(): StepState {
+function initialStep(product: ProductFull): StepState {
+  const selectedOptions: Record<string, string> = {};
+  const colorGroup = product.optionGroups.find((g) => g.type === "COLOR");
+  if (colorGroup) {
+    const firstInStock = colorGroup.values.find((v) =>
+      product.skus.some((sku) =>
+        sku.optionValues.some((ov) => ov.optionValueId === v.id) && sku.stock > 0
+      )
+    );
+    if (firstInStock) selectedOptions[colorGroup.id] = firstInStock.id;
+  }
+  // Legacy: pre-select first color variant with stock
+  const firstLegacyCv = product.colorVariants.find((cv) => cv.skus.some((s) => s.stock > 0)) ?? null;
   return {
-    selectedOptions: {},
+    selectedOptions,
     textInputs: {},
-    selectedColorVariantId: null,
+    selectedColorVariantId: firstLegacyCv?.id ?? null,
     selectedLegacySkuId: null,
+    withCustomization: false,
+    customName: "",
+    customNumber: "",
+    printElements: [],
   };
 }
 
@@ -142,16 +168,76 @@ function ItemStep({
   stepState,
   onChange,
   vatPct,
+  logos,
 }: {
   item: PakketilbudItemData;
   stepState: StepState;
   onChange: (patch: Partial<StepState>) => void;
   vatPct: number;
+  logos: DesignerLogo[];
 }) {
   const { product } = item;
   const hasOptionGroups = product.optionGroups.length > 0;
+  const hasDesigner = product.designerEnabled && product.designerZones.length > 0;
 
-  // ── New option groups mode ────────────────────────────────────────────────
+  // ── Designer local ephemeral state ────────────────────────────────────────
+  const [designerOpen, setDesignerOpen] = useState(false);
+  const [previewSide, setPreviewSide] = useState<"front" | "back">("front");
+  const [clickedZoneId, setClickedZoneId] = useState<number | null>(null);
+  const [addType, setAddType] = useState<"text" | "logo">("text");
+  const [addText, setAddText] = useState("");
+  const [addLogoId, setAddLogoId] = useState<number | null>(null);
+  const [addFontSize, setAddFontSize] = useState<"small" | "medium" | "large">("medium");
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const zoneMap = useMemo(() => {
+    const m = new Map<number, DesignerZone>();
+    product.designerZones.forEach((z) => m.set(z.id, z));
+    return m;
+  }, [product.designerZones]);
+
+  const clickedZone = clickedZoneId !== null ? (zoneMap.get(clickedZoneId) ?? null) : null;
+
+  const handleZoneClick = useCallback((zone: DesignerZone) => {
+    setClickedZoneId(zone.id);
+    if (zone.allowText && !zone.allowLogo) setAddType("text");
+    else if (!zone.allowText && zone.allowLogo) setAddType("logo");
+    else setAddType("text");
+    setAddText("");
+    setAddLogoId(null);
+    setAddFontSize("medium");
+    setPreviewSide(zone.side as "front" | "back");
+  }, []);
+
+  const handleConfirmAdd = useCallback(() => {
+    if (!clickedZone) return;
+    const logo =
+      addType === "logo" && addLogoId !== null ? logos.find((l) => l.id === addLogoId) : undefined;
+    if (addType === "text" && !addText.trim()) return;
+    if (addType === "logo" && !logo) return;
+
+    onChange({
+      printElements: [
+        ...stepState.printElements,
+        {
+          side: clickedZone.side as "front" | "back",
+          zoneId: clickedZone.id,
+          zoneLabel: clickedZone.label,
+          position: clickedZone.position,
+          type: addType,
+          value: addType === "text" ? addText.trim() : String(addLogoId),
+          logoUrl: logo?.imageUrl,
+          fontSize: addFontSize,
+        },
+      ],
+    });
+
+    setToastMsg(`Tryk tilføjet til ${clickedZone.label}`);
+    setClickedZoneId(null);
+    setTimeout(() => setToastMsg(null), 2500);
+  }, [clickedZone, addType, addText, addLogoId, addFontSize, logos, stepState.printElements, onChange]);
+
+  // ── Option groups ─────────────────────────────────────────────────────────
   const colorGroup = product.optionGroups.find((g) => g.type === "COLOR");
   const sizeGroup = product.optionGroups.find((g) => g.type === "SIZE");
   const otherGroups = product.optionGroups.filter(
@@ -167,7 +253,7 @@ function ItemStep({
       : product.images
     : product.images;
 
-  // ── Legacy color variants mode ─────────────────────────────────────────────
+  // ── Legacy color variants ─────────────────────────────────────────────────
   const selectedColorVariant = product.colorVariants.find(
     (cv) => cv.id === stepState.selectedColorVariantId,
   );
@@ -183,19 +269,321 @@ function ItemStep({
       ? selectedColorVariant?.skus ?? []
       : product.skus;
 
-  // Fee
-  const customizationFee = hasOptionGroups
-    ? otherGroups.reduce((total, g) => {
-        if ((g.type === "TEXT" || g.type === "CUSTOM") && g.fee && stepState.textInputs[g.id]) {
-          return total + g.fee;
-        }
-        return total;
-      }, 0)
-    : 0;
+  const optionGroupFee = otherGroups.reduce((total, g) => {
+    if ((g.type === "TEXT" || g.type === "CUSTOM") && g.fee && stepState.textInputs[g.id]) {
+      return total + g.fee;
+    }
+    return total;
+  }, 0);
 
+  // ── Shared options JSX (always visible in right column) ───────────────────
+  const optionsJsx = (
+    <div className="space-y-5">
+      <div>
+        <h3 className="text-xl font-bold mb-1">{item.label ?? product.name}</h3>
+        {item.label && item.label !== product.name && (
+          <p className="text-sm text-gray-500 mb-2">{product.name}</p>
+        )}
+        {product.description && (
+          <p className="text-gray-600 text-sm leading-relaxed">{product.description}</p>
+        )}
+        {optionGroupFee > 0 && (
+          <p className="text-sm text-gray-500 mt-1">
+            + {formatPrice(withVat(optionGroupFee, vatPct))} for tryk
+          </p>
+        )}
+      </div>
+
+      {hasOptionGroups ? (
+        <>
+          {/* COLOR group */}
+          {colorGroup && (
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">
+                {colorGroup.label}
+                {selectedColorValue && (
+                  <span className="ml-2 text-secondary font-bold">– {selectedColorValue.label}</span>
+                )}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {colorGroup.values.map((v) => {
+                  const selected = stepState.selectedOptions[colorGroup.id] === v.id;
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() =>
+                        onChange({
+                          selectedOptions: { ...stepState.selectedOptions, [colorGroup.id]: v.id },
+                        })
+                      }
+                      title={v.label}
+                      className={`w-9 h-9 rounded-full border-2 transition ${
+                        selected
+                          ? "border-secondary scale-110 shadow-md"
+                          : "border-gray-200 hover:border-gray-400"
+                      }`}
+                      style={{ background: v.globalColor?.hex ?? "#ccc" }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* SIZE group */}
+          {sizeGroup && (
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">
+                {sizeGroup.label}
+                {stepState.selectedOptions[sizeGroup.id] && (
+                  <span className="ml-2 text-secondary font-bold">
+                    – {sizeGroup.values.find((v) => v.id === stepState.selectedOptions[sizeGroup.id])?.label}
+                  </span>
+                )}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {sizeGroup.values.map((v) => {
+                  const available = isSizeAvailableForOptions(
+                    product.skus,
+                    v,
+                    colorGroup,
+                    stepState.selectedOptions,
+                  );
+                  const selected = stepState.selectedOptions[sizeGroup.id] === v.id;
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() =>
+                        available &&
+                        onChange({
+                          selectedOptions: { ...stepState.selectedOptions, [sizeGroup.id]: v.id },
+                        })
+                      }
+                      disabled={!available}
+                      className={`w-14 h-10 rounded-lg border text-sm font-medium transition ${
+                        selected
+                          ? "bg-secondary text-white border-secondary"
+                          : !available
+                            ? "border-gray-200 text-gray-300 cursor-not-allowed line-through"
+                            : "border-gray-300 hover:border-secondary text-gray-800"
+                      }`}
+                    >
+                      {v.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Other groups */}
+          {otherGroups.map((g) => (
+            <div key={g.id} className="border rounded-xl p-4 bg-gray-50">
+              <p className="text-sm font-medium text-gray-700 mb-2">
+                {g.label}
+                {g.fee && g.fee > 0 && (
+                  <span className="ml-2 text-gray-500 font-normal text-xs">
+                    (+{formatPrice(withVat(g.fee, vatPct))})
+                  </span>
+                )}
+                {!g.required && (
+                  <span className="ml-1 text-gray-400 font-normal text-xs">(valgfrit)</span>
+                )}
+              </p>
+              {g.type === "SELECT" ? (
+                <select
+                  value={stepState.textInputs[g.id] ?? ""}
+                  onChange={(e) =>
+                    onChange({ textInputs: { ...stepState.textInputs, [g.id]: e.target.value } })
+                  }
+                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="">Vælg...</option>
+                  {g.values.map((v) => (
+                    <option key={v.id} value={v.label}>
+                      {v.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={stepState.textInputs[g.id] ?? ""}
+                  onChange={(e) =>
+                    onChange({ textInputs: { ...stepState.textInputs, [g.id]: e.target.value } })
+                  }
+                  placeholder={g.label}
+                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                />
+              )}
+            </div>
+          ))}
+        </>
+      ) : (
+        <>
+          {/* Legacy color variant picker */}
+          {product.colorVariants.length > 0 && (
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">Farve</p>
+              <div className="flex flex-wrap gap-2">
+                {product.colorVariants.map((cv) => {
+                  const selected = stepState.selectedColorVariantId === cv.id;
+                  return (
+                    <button
+                      key={cv.id}
+                      type="button"
+                      onClick={() =>
+                        onChange({ selectedColorVariantId: cv.id, selectedLegacySkuId: null })
+                      }
+                      title={cv.name}
+                      className={`w-9 h-9 rounded-full border-2 transition ${
+                        selected
+                          ? "border-secondary scale-110 shadow-md"
+                          : "border-gray-200 hover:border-gray-400"
+                      }`}
+                      style={{ background: cv.hex }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Legacy size picker */}
+          {legacySkus.length > 0 && (
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">Størrelse</p>
+              <div className="flex flex-wrap gap-2">
+                {legacySkus.map((sku) => {
+                  const available = sku.stock > 0;
+                  const selected = stepState.selectedLegacySkuId === sku.id;
+                  return (
+                    <button
+                      key={sku.id}
+                      type="button"
+                      onClick={() => available && onChange({ selectedLegacySkuId: sku.id })}
+                      disabled={!available}
+                      className={`w-14 h-10 rounded-lg border text-sm font-medium transition ${
+                        selected
+                          ? "bg-secondary text-white border-secondary"
+                          : !available
+                            ? "border-gray-200 text-gray-300 cursor-not-allowed line-through"
+                            : "border-gray-300 hover:border-secondary text-gray-800"
+                      }`}
+                    >
+                      {sku.size}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Customization (legacy name/number print) */}
+      {product.customizationFee != null && (
+        <div className="border rounded-xl p-4 bg-gray-50">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={stepState.withCustomization}
+              onChange={(e) => onChange({ withCustomization: e.target.checked })}
+              className="w-4 h-4 accent-secondary"
+            />
+            <span className="text-sm font-medium">
+              {product.customizationLabel ?? "Tilføj tryk"}
+              {product.customizationFee > 0 && (
+                <span className="ml-1 text-gray-500 font-normal text-xs">
+                  (+{formatPrice(withVat(product.customizationFee, vatPct))})
+                </span>
+              )}
+            </span>
+          </label>
+          {stepState.withCustomization && (
+            <div className={`mt-3 grid gap-3 ${product.customizationShowNumber ? "grid-cols-2" : "grid-cols-1"}`}>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Navn (valgfrit)</label>
+                <input
+                  type="text"
+                  value={stepState.customName}
+                  onChange={(e) => onChange({ customName: e.target.value.toUpperCase().slice(0, 14) })}
+                  placeholder="JENSEN"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
+                />
+              </div>
+              {product.customizationShowNumber && (
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Nummer (valgfrit)</label>
+                  <input
+                    type="text"
+                    value={stepState.customNumber}
+                    onChange={(e) => onChange({ customNumber: e.target.value.replace(/\D/g, "").slice(0, 2) })}
+                    placeholder="10"
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  // ── Designer open: canvas replaces gallery in left column ─────────────────
+  if (hasDesigner && designerOpen) {
+    return (
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* Left: jersey canvas */}
+        <JerseyDesignerCanvas
+          product={product}
+          zones={product.designerZones}
+          printElements={stepState.printElements}
+          previewSide={previewSide}
+          clickedZoneId={clickedZoneId}
+          onZoneClick={handleZoneClick}
+          toastMsg={toastMsg}
+        />
+
+        {/* Right: options + designer controls */}
+        <div className="space-y-5">
+          {optionsJsx}
+          <JerseyDesignerControls
+            zones={product.designerZones}
+            logos={logos}
+            vatPct={vatPct}
+            printElements={stepState.printElements}
+            onRemovePrint={(i) =>
+              onChange({ printElements: stepState.printElements.filter((_, idx) => idx !== i) })
+            }
+            clickedZone={clickedZone}
+            onClosePanel={() => setClickedZoneId(null)}
+            addType={addType}
+            onAddTypeChange={setAddType}
+            addText={addText}
+            onAddTextChange={setAddText}
+            addLogoId={addLogoId}
+            onAddLogoIdChange={setAddLogoId}
+            addFontSize={addFontSize}
+            onAddFontSizeChange={setAddFontSize}
+            onConfirmAdd={handleConfirmAdd}
+            hasBack={product.designerBackImageIdx !== null}
+            previewSide={previewSide}
+            onPreviewSideChange={setPreviewSide}
+            onCloseDesigner={() => { setDesignerOpen(false); setClickedZoneId(null); }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Default: gallery left, options + toggle right ─────────────────────────
   return (
     <div className="grid md:grid-cols-2 gap-6">
-      {/* Gallery */}
+      {/* Left: product gallery */}
       <div>
         {displayImages.length > 0 ? (
           <div className="space-y-2">
@@ -226,210 +614,19 @@ function ItemStep({
         )}
       </div>
 
-      {/* Selections */}
-      <div className="space-y-5">
-        <div>
-          <h3 className="text-xl font-bold mb-1">{item.label ?? product.name}</h3>
-          {item.label && item.label !== product.name && (
-            <p className="text-sm text-gray-500 mb-2">{product.name}</p>
-          )}
-          {product.description && (
-            <p className="text-gray-600 text-sm leading-relaxed">{product.description}</p>
-          )}
-          {customizationFee > 0 && (
-            <p className="text-sm text-gray-500 mt-1">
-              + {formatPrice(withVat(customizationFee, vatPct))} for tryk
-            </p>
-          )}
-        </div>
-
-        {hasOptionGroups ? (
-          <>
-            {/* COLOR group */}
-            {colorGroup && (
-              <div>
-                <p className="text-sm font-medium text-gray-700 mb-2">
-                  {colorGroup.label}
-                  {selectedColorValue && (
-                    <span className="ml-2 text-secondary font-bold">– {selectedColorValue.label}</span>
-                  )}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {colorGroup.values.map((v) => {
-                    const selected = stepState.selectedOptions[colorGroup.id] === v.id;
-                    return (
-                      <button
-                        key={v.id}
-                        type="button"
-                        onClick={() =>
-                          onChange({
-                            selectedOptions: { ...stepState.selectedOptions, [colorGroup.id]: v.id },
-                          })
-                        }
-                        title={v.label}
-                        className={`w-9 h-9 rounded-full border-2 transition ${
-                          selected
-                            ? "border-secondary scale-110 shadow-md"
-                            : "border-gray-200 hover:border-gray-400"
-                        }`}
-                        style={{ background: v.globalColor?.hex ?? "#ccc" }}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* SIZE group */}
-            {sizeGroup && (
-              <div>
-                <p className="text-sm font-medium text-gray-700 mb-2">
-                  {sizeGroup.label}
-                  {stepState.selectedOptions[sizeGroup.id] && (
-                    <span className="ml-2 text-secondary font-bold">
-                      – {sizeGroup.values.find((v) => v.id === stepState.selectedOptions[sizeGroup.id])?.label}
-                    </span>
-                  )}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {sizeGroup.values.map((v) => {
-                    const available = isSizeAvailableForOptions(
-                      product.skus,
-                      v,
-                      colorGroup,
-                      stepState.selectedOptions,
-                    );
-                    const selected = stepState.selectedOptions[sizeGroup.id] === v.id;
-                    return (
-                      <button
-                        key={v.id}
-                        type="button"
-                        onClick={() =>
-                          available &&
-                          onChange({
-                            selectedOptions: { ...stepState.selectedOptions, [sizeGroup.id]: v.id },
-                          })
-                        }
-                        disabled={!available}
-                        className={`w-14 h-10 rounded-lg border text-sm font-medium transition ${
-                          selected
-                            ? "bg-secondary text-white border-secondary"
-                            : !available
-                              ? "border-gray-200 text-gray-300 cursor-not-allowed line-through"
-                              : "border-gray-300 hover:border-secondary text-gray-800"
-                        }`}
-                      >
-                        {v.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Other groups */}
-            {otherGroups.map((g) => (
-              <div key={g.id} className="border rounded-xl p-4 bg-gray-50">
-                <p className="text-sm font-medium text-gray-700 mb-2">
-                  {g.label}
-                  {g.fee && g.fee > 0 && (
-                    <span className="ml-2 text-gray-500 font-normal text-xs">
-                      (+{formatPrice(withVat(g.fee, vatPct))})
-                    </span>
-                  )}
-                  {!g.required && (
-                    <span className="ml-1 text-gray-400 font-normal text-xs">(valgfrit)</span>
-                  )}
-                </p>
-                {g.type === "SELECT" ? (
-                  <select
-                    value={stepState.textInputs[g.id] ?? ""}
-                    onChange={(e) =>
-                      onChange({ textInputs: { ...stepState.textInputs, [g.id]: e.target.value } })
-                    }
-                    className="w-full border rounded-lg px-3 py-2 text-sm"
-                  >
-                    <option value="">Vælg...</option>
-                    {g.values.map((v) => (
-                      <option key={v.id} value={v.label}>
-                        {v.label}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type="text"
-                    value={stepState.textInputs[g.id] ?? ""}
-                    onChange={(e) =>
-                      onChange({ textInputs: { ...stepState.textInputs, [g.id]: e.target.value } })
-                    }
-                    placeholder={g.label}
-                    className="w-full border rounded-lg px-3 py-2 text-sm"
-                  />
-                )}
-              </div>
-            ))}
-          </>
-        ) : (
-          <>
-            {/* Legacy color variant picker */}
-            {product.colorVariants.length > 0 && (
-              <div>
-                <p className="text-sm font-medium text-gray-700 mb-2">Farve</p>
-                <div className="flex flex-wrap gap-2">
-                  {product.colorVariants.map((cv) => {
-                    const selected = stepState.selectedColorVariantId === cv.id;
-                    return (
-                      <button
-                        key={cv.id}
-                        type="button"
-                        onClick={() =>
-                          onChange({ selectedColorVariantId: cv.id, selectedLegacySkuId: null })
-                        }
-                        title={cv.name}
-                        className={`w-9 h-9 rounded-full border-2 transition ${
-                          selected
-                            ? "border-secondary scale-110 shadow-md"
-                            : "border-gray-200 hover:border-gray-400"
-                        }`}
-                        style={{ background: cv.hex }}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Legacy size picker */}
-            {legacySkus.length > 0 && (
-              <div>
-                <p className="text-sm font-medium text-gray-700 mb-2">Størrelse</p>
-                <div className="flex flex-wrap gap-2">
-                  {legacySkus.map((sku) => {
-                    const available = sku.stock > 0;
-                    const selected = stepState.selectedLegacySkuId === sku.id;
-                    return (
-                      <button
-                        key={sku.id}
-                        type="button"
-                        onClick={() => available && onChange({ selectedLegacySkuId: sku.id })}
-                        disabled={!available}
-                        className={`w-14 h-10 rounded-lg border text-sm font-medium transition ${
-                          selected
-                            ? "bg-secondary text-white border-secondary"
-                            : !available
-                              ? "border-gray-200 text-gray-300 cursor-not-allowed line-through"
-                              : "border-gray-300 hover:border-secondary text-gray-800"
-                        }`}
-                      >
-                        {sku.size}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </>
+      {/* Right: options + toggle button */}
+      <div>
+        {optionsJsx}
+        {hasDesigner && (
+          <div className="mt-5">
+            <button
+              type="button"
+              onClick={() => setDesignerOpen(true)}
+              className="w-full border border-secondary text-secondary font-semibold py-2.5 px-6 rounded-xl hover:bg-secondary/5 transition text-sm"
+            >
+              Tilføj tryk til produktet ▼
+            </button>
+          </div>
         )}
       </div>
     </div>
@@ -454,15 +651,20 @@ function SummaryStep({
     const otherGroups = item.product.optionGroups.filter(
       (g) => g.type !== "COLOR" && g.type !== "SIZE",
     );
-    return (
-      total +
-      otherGroups.reduce((t, g) => {
-        if ((g.type === "TEXT" || g.type === "CUSTOM") && g.fee && state.textInputs[g.id]) {
-          return t + g.fee;
-        }
-        return t;
-      }, 0)
-    );
+    const optionGroupFee = otherGroups.reduce((t, g) => {
+      if ((g.type === "TEXT" || g.type === "CUSTOM") && g.fee && state.textInputs[g.id]) {
+        return t + g.fee;
+      }
+      return t;
+    }, 0);
+    const legacyFee = state.withCustomization && item.product.customizationFee
+      ? item.product.customizationFee
+      : 0;
+    const designerFee = state.printElements.reduce((t, el) => {
+      const zone = item.product.designerZones.find((z) => z.id === el.zoneId);
+      return t + (zone?.price ?? 0);
+    }, 0);
+    return total + optionGroupFee + legacyFee + designerFee;
   }, 0);
 
   const totalPrice = pakketilbud.price + totalCustomizationFee;
@@ -510,6 +712,18 @@ function SummaryStep({
                     ? cv?.skus.find((s) => s.id === state.selectedLegacySkuId)
                     : product.skus.find((s) => s.id === state.selectedLegacySkuId);
                 sizeName = sku?.size ?? "";
+                if (state.withCustomization) {
+                  const parts = [state.customName, state.customNumber].filter(Boolean);
+                  printText = parts.join(" / ");
+                }
+              }
+
+              // Designer prints
+              if (state.printElements.length > 0) {
+                const designerParts = state.printElements.map(
+                  (el) => `${el.zoneLabel}: ${el.type === "text" ? el.value : "Logo"}`,
+                );
+                printText = [printText, ...designerParts].filter(Boolean).join(", ");
               }
 
               return (
@@ -552,15 +766,17 @@ export function PakketilbudWizard({
   pakketilbud,
   vatPct,
   isSoldOut = false,
+  logos = [],
 }: {
   pakketilbud: PakketilbudData;
   vatPct: number;
   isSoldOut?: boolean;
+  logos?: DesignerLogo[];
 }) {
   const { addItem } = useCart();
   const [currentStep, setCurrentStep] = useState(0);
   const [stepStates, setStepStates] = useState<StepState[]>(() =>
-    pakketilbud.items.map(() => initialStep()),
+    pakketilbud.items.map((item) => initialStep(item.product)),
   );
 
   const totalSteps = pakketilbud.items.length; // last "step" = summary (index = totalSteps)
@@ -590,15 +806,20 @@ export function PakketilbudWizard({
       const otherGroups = item.product.optionGroups.filter(
         (g) => g.type !== "COLOR" && g.type !== "SIZE",
       );
-      return (
-        total +
-        otherGroups.reduce((t, g) => {
-          if ((g.type === "TEXT" || g.type === "CUSTOM") && g.fee && state.textInputs[g.id]) {
-            return t + g.fee;
-          }
-          return t;
-        }, 0)
-      );
+      const optionGroupFee = otherGroups.reduce((t, g) => {
+        if ((g.type === "TEXT" || g.type === "CUSTOM") && g.fee && state.textInputs[g.id]) {
+          return t + g.fee;
+        }
+        return t;
+      }, 0);
+      const legacyFee = state.withCustomization && item.product.customizationFee
+        ? item.product.customizationFee
+        : 0;
+      const designerFee = state.printElements.reduce((t, el) => {
+        const zone = item.product.designerZones.find((z) => z.id === el.zoneId);
+        return t + (zone?.price ?? 0);
+      }, 0);
+      return total + optionGroupFee + legacyFee + designerFee;
     }, 0);
 
     const pakketilbudItems = pakketilbud.items.map((item, idx) => {
@@ -623,13 +844,8 @@ export function PakketilbudWizard({
 
         const textGroups = product.optionGroups.filter((g) => g.type !== "COLOR" && g.type !== "SIZE");
         for (const g of textGroups) {
-          if (state.textInputs[g.id]) {
-            if (g.type === "TEXT" || g.type === "CUSTOM") {
-              // Map first text group to customName, handle number-like inputs as customNumber
-              if (!customName) {
-                customName = state.textInputs[g.id];
-              }
-            }
+          if (state.textInputs[g.id] && (g.type === "TEXT" || g.type === "CUSTOM")) {
+            if (!customName) customName = state.textInputs[g.id];
           }
         }
 
@@ -649,7 +865,19 @@ export function PakketilbudWizard({
             : product.skus.find((s) => s.id === state.selectedLegacySkuId);
         skuId = sku?.id ?? "";
         size = sku?.size ?? "";
+        if (state.withCustomization && product.customizationFee != null) {
+          customName = state.customName || undefined;
+          customNumber = state.customNumber || undefined;
+          customizationFee = product.customizationFee > 0 ? product.customizationFee : undefined;
+        }
       }
+
+      // Add designer zone fees
+      const designerFee = state.printElements.reduce((t, el) => {
+        const zone = product.designerZones.find((z) => z.id === el.zoneId);
+        return t + (zone?.price ?? 0);
+      }, 0);
+      if (designerFee > 0) customizationFee = (customizationFee ?? 0) + designerFee;
 
       return {
         itemId: item.id,
@@ -662,6 +890,7 @@ export function PakketilbudWizard({
         customName,
         customNumber,
         customizationFee,
+        printElements: state.printElements.length > 0 ? state.printElements : undefined,
       };
     });
 
@@ -803,6 +1032,7 @@ export function PakketilbudWizard({
             stepState={stepStates[currentStep]}
             onChange={(patch) => updateStep(currentStep, patch)}
             vatPct={vatPct}
+            logos={logos}
           />
         )}
 

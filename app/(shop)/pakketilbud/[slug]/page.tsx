@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function PakketilbudPage({ params }: Props) {
   const { slug } = await params;
 
-  const [pakketilbud, vatPct] = await Promise.all([
+  const [pakketilbud, vatPct, logos] = await Promise.all([
     prisma.pakketilbud.findUnique({
       where: { slug, published: true },
       include: {
@@ -42,6 +42,7 @@ export default async function PakketilbudPage({ params }: Props) {
                   include: { skus: { orderBy: { size: "asc" } } },
                   orderBy: { position: "asc" },
                 },
+                designerZones: { orderBy: { positionOrd: "asc" } },
               },
             },
           },
@@ -50,6 +51,7 @@ export default async function PakketilbudPage({ params }: Props) {
       },
     }),
     getVatRate(),
+    prisma.designerLogo.findMany({ orderBy: { id: "asc" } }),
   ]);
 
   if (!pakketilbud) notFound();
@@ -78,6 +80,7 @@ export default async function PakketilbudPage({ params }: Props) {
         vatPct={vatPct}
         isSoldOut={isSoldOut}
         soldOutItems={soldOutItems}
+        logos={logos}
       />
     </div>
   );

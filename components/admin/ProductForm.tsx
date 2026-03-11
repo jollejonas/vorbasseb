@@ -180,6 +180,11 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [priceKr, setPriceKr] = useState(product ? (product.price / 100).toFixed(2) : "");
   const [modelNumber, setModelNumber] = useState(product?.modelNumber ?? "");
+  const [customizationFeeKr, setCustomizationFeeKr] = useState(
+    product?.customizationFee != null ? (product.customizationFee / 100).toFixed(2) : ""
+  );
+  const [customizationLabel, setCustomizationLabel] = useState(product?.customizationLabel ?? "");
+  const [customizationShowNumber, setCustomizationShowNumber] = useState(product?.customizationShowNumber ?? true);
   const [membersOnly, setMembersOnly] = useState(product?.membersOnly ?? false);
   const [membersEarlyAccess, setMembersEarlyAccess] = useState(product?.membersEarlyAccess ?? false);
   const [clubRoleRequired, setClubRoleRequired] = useState<ClubRole | "">(product?.clubRoleRequired ?? "");
@@ -633,6 +638,9 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
           name, slug, categoryId: categoryId || null, price: Math.round(priceVal * 100),
           modelNumber: modelNumber || null, description, images,
           membersOnly, membersEarlyAccess, clubRoleRequired: clubRoleRequired || null,
+          customizationFee: customizationFeeKr !== "" ? Math.round(parseFloat(customizationFeeKr) * 100) : null,
+          customizationLabel: customizationLabel || null,
+          customizationShowNumber,
           published, featured, designerEnabled,
           optionGroups: groupsPayload,
           skuMatrix: matrixPayload,
@@ -644,6 +652,9 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
           name, slug, categoryId: categoryId || null, price: Math.round(priceVal * 100),
           modelNumber: modelNumber || null, description, images,
           membersOnly, membersEarlyAccess, clubRoleRequired: clubRoleRequired || null,
+          customizationFee: customizationFeeKr !== "" ? Math.round(parseFloat(customizationFeeKr) * 100) : null,
+          customizationLabel: customizationLabel || null,
+          customizationShowNumber,
           published, featured, designerEnabled,
           skus: legacyColorVariants.length === 0
             ? legacySkus.map(({ id, size, stock, itemNumber }) => ({ id, size, stock, itemNumber: itemNumber || null }))
@@ -760,6 +771,38 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
             className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary resize-y"
             placeholder="Kort beskrivelse af produktet..."
           />
+        </div>
+
+        {/* ── Customization (name/number print) ───────────────────────────── */}
+        <div className="border rounded-xl p-4 space-y-3">
+          <p className="text-sm font-medium text-gray-700">Tryk / tilpasning</p>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">
+                Trykpris (kr, ekskl. moms) — tomt = ingen tryk
+              </label>
+              <input type="number" min="0" step="0.01" value={customizationFeeKr}
+                onChange={(e) => setCustomizationFeeKr(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
+                placeholder="f.eks. 50.00 (0 = gratis tryk)"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">
+                Knaptext (standard: "Tilføj tryk")
+              </label>
+              <input type="text" value={customizationLabel}
+                onChange={(e) => setCustomizationLabel(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
+                placeholder="Tilføj tryk"
+              />
+            </div>
+          </div>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="checkbox" checked={customizationShowNumber}
+              onChange={(e) => setCustomizationShowNumber(e.target.checked)} className="rounded" />
+            Vis nummer-felt (til trøjenummer)
+          </label>
         </div>
       </section>
 

@@ -34,8 +34,15 @@ type Props = {
 export function ProductOptionsSection({ product, skus, optionGroups, vatPct = 25 }: Props) {
   const { addItem } = useCart();
 
-  // For COLOR + SIZE groups: track selected value IDs
-  const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
+  // For COLOR + SIZE groups: track selected value IDs (pre-select first in-stock color)
+  const colorGroupInit = optionGroups.find((g) => g.type === "COLOR");
+  const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>(() => {
+    if (!colorGroupInit) return {};
+    const firstInStock = colorGroupInit.values.find((v) =>
+      skus.some((sku) => sku.optionValues.some((ov) => ov.optionValueId === v.id) && sku.stock > 0)
+    );
+    return firstInStock ? { [colorGroupInit.id]: firstInStock.id } : {};
+  });
   // For TEXT + CUSTOM + SELECT groups: track text inputs
   const [textInputs, setTextInputs] = useState<Record<string, string>>({});
 
