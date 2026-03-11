@@ -92,12 +92,25 @@ export function CartView() {
 
               <div className="flex-1 min-w-0">
                 <p className="font-medium truncate">{item.productName}</p>
-                <p className="text-sm text-gray-500">
-                  Størrelse: {item.size}
-                  {item.colorName && ` · ${item.colorName}`}
-                  {item.customName && ` · Tryk: ${item.customName}`}
-                  {item.customNumber && ` #${item.customNumber}`}
-                </p>
+                {item.isPakketilbud && item.pakketilbudItems ? (
+                  <ul className="mt-1 space-y-0.5">
+                    {item.pakketilbudItems.map((c, ci) => (
+                      <li key={ci} className="text-xs text-gray-500 flex flex-wrap gap-1">
+                        <span className="font-medium text-gray-700">{c.label ?? c.productName}</span>
+                        <span>· {c.size}{c.colorName ? ` · ${c.colorName}` : ""}</span>
+                        {c.customName && <span>· Tryk: {c.customName}</span>}
+                        {c.customNumber && <span>#{c.customNumber}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-gray-500">
+                    Størrelse: {item.size}
+                    {item.colorName && ` · ${item.colorName}`}
+                    {item.customName && ` · Tryk: ${item.customName}`}
+                    {item.customNumber && ` #${item.customNumber}`}
+                  </p>
+                )}
                 {isGranted ? (
                   <p className="text-sm font-bold text-green-600 mt-1">Gratis (tildelt af klub)</p>
                 ) : (

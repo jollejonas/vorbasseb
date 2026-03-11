@@ -11,5 +11,7 @@ export default defineConfig({
   },
   datasource: {
     url: process.env["DATABASE_URL"],
+    // @ts-expect-error directUrl added for Supabase session-mode DDL support
+    directUrl: process.env["DIRECT_URL"],
   },
 });

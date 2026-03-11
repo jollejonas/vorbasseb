@@ -114,6 +114,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
         published: body.published,
         featured: body.featured,
         images: body.images,
+        designerEnabled: body.designerEnabled ?? false,
       },
     });
 

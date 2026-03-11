@@ -13,10 +13,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Tom kurv" }, { status: 400 });
   }
 
+  // Flatten SKU IDs — pakketilbud contribute multiple item SKUs
+  const allSkuIds = items.flatMap((i) =>
+    i.isPakketilbud ? (i.pakketilbudItems ?? []).map((c) => c.skuId) : [i.skuId],
+  );
+
   // Enforce clubRoleRequired: look up products for each cart item
-  const skuIds = items.map((i) => i.skuId);
   const skusWithProducts = await prisma.sKU.findMany({
-    where: { id: { in: skuIds } },
+    where: { id: { in: allSkuIds } },
     select: { id: true, productId: true, product: { select: { clubRoleRequired: true } } },
   });
   for (const sku of skusWithProducts) {
@@ -34,7 +38,7 @@ export async function POST(req: NextRequest) {
   const effectiveDelivery: "SHIPPING" | "PICKUP" = hasTrainerItem ? "PICKUP" : deliveryMethod;
   const isPickup = effectiveDelivery === "PICKUP";
 
-  // Build skuId → productId map for grant matching
+  // Build skuId → productId map for grant matching (non-bundle items only)
   const skuProductMap = new Map(skusWithProducts.map((s) => [s.id, s.productId]));
 
   // Read shipping rules, member discount, and VAT rate from DB
@@ -110,10 +114,13 @@ export async function POST(req: NextRequest) {
     const order = await prisma.$transaction(async (tx) => {
       // Decrement stock
       for (const item of items) {
-        await tx.sKU.update({
-          where: { id: item.skuId },
-          data: { stock: { decrement: item.quantity } },
-        });
+        if (item.isPakketilbud) {
+          for (const comp of (item.pakketilbudItems ?? [])) {
+            await tx.sKU.update({ where: { id: comp.skuId }, data: { stock: { decrement: item.quantity } } });
+          }
+        } else {
+          await tx.sKU.update({ where: { id: item.skuId }, data: { stock: { decrement: item.quantity } } });
+        }
       }
 
       // Create order
@@ -127,17 +134,30 @@ export async function POST(req: NextRequest) {
           shippingFee: 0,
           discountApplied: grantDiscountTotal,
           items: {
-            create: items.map((item) => ({
-              skuId: item.skuId,
-              quantity: item.quantity,
-              priceAtPurchase: 0,
-              customName: item.customName ?? null,
-              customNumber: item.customNumber ?? null,
-              colorName: item.colorName ?? null,
-              optionSelections: item.printElements?.length
-                ? { printElements: item.printElements }
-                : (item.optionSelections ?? []),
-            })),
+            create: items.map((item) => {
+              if (item.isPakketilbud) {
+                return {
+                  skuId: null,
+                  quantity: item.quantity,
+                  priceAtPurchase: 0,
+                  customName: null,
+                  customNumber: null,
+                  colorName: null,
+                  optionSelections: { isPakketilbud: true, pakketilbudName: item.productName, items: item.pakketilbudItems ?? [] },
+                };
+              }
+              return {
+                skuId: item.skuId,
+                quantity: item.quantity,
+                priceAtPurchase: 0,
+                customName: item.customName ?? null,
+                customNumber: item.customNumber ?? null,
+                colorName: item.colorName ?? null,
+                optionSelections: item.printElements?.length
+                  ? { printElements: item.printElements }
+                  : (item.optionSelections ?? []),
+              };
+            }),
           },
         },
         select: { id: true, orderNumber: true },
@@ -166,11 +186,19 @@ export async function POST(req: NextRequest) {
   for (const item of items) {
     const unitPriceExclVat = item.price + (item.customizationFee ?? 0);
     const unitPriceInclVat = Math.round(unitPriceExclVat * (1 + vatRate / 100));
-    const name = `${item.productName} (${item.size})${
-      item.customName || item.customNumber
-        ? ` · Tryk: ${item.customName ?? ""} ${item.customNumber ?? ""}`.trim()
-        : ""
-    }`;
+    let name: string;
+    if (item.isPakketilbud) {
+      const summary = (item.pakketilbudItems ?? [])
+        .map((c) => `${(c.label ?? c.productName).slice(0, 30)} (${c.size})`)
+        .join(", ");
+      name = `${item.productName}: ${summary}`.slice(0, 250);
+    } else {
+      name = `${item.productName} (${item.size})${
+        item.customName || item.customNumber
+          ? ` · Tryk: ${item.customName ?? ""} ${item.customNumber ?? ""}`.trim()
+          : ""
+      }`;
+    }
     lineItems.push({
       price_data: {
         currency: "dkk",
@@ -241,26 +269,53 @@ export async function POST(req: NextRequest) {
     metadata: {
       userId: session?.user?.id ?? "",
       cartJson: JSON.stringify(
-        items.map((i) => ({
-          skuId: i.skuId,
-          productName: i.productName ?? "",
-          size: i.size ?? "",
-          quantity: i.quantity,
-          price: i.price,
-          customName: i.customName ?? "",
-          customNumber: i.customNumber ?? "",
-          customizationFee: i.customizationFee ?? 0,
-          colorName: i.colorName ?? "",
-          optionSelections: i.printElements?.length
-            ? { printElements: i.printElements }
-            : (i.optionSelections ?? []),
-        })),
+        items.map((i) => {
+          if (i.isPakketilbud) {
+            return {
+              skuId: i.skuId,
+              isPakketilbud: true,
+              productName: i.productName ?? "",
+              size: "",
+              quantity: i.quantity,
+              price: i.price,
+              customizationFee: i.customizationFee ?? 0,
+              colorName: "",
+              optionSelections: [],
+              pakketilbudItems: (i.pakketilbudItems ?? []).map((c) => ({
+                itemId: c.itemId,
+                productId: c.productId,
+                productName: c.productName.slice(0, 40),
+                label: c.label ?? "",
+                skuId: c.skuId,
+                size: c.size,
+                colorName: c.colorName ?? "",
+                customName: c.customName ?? "",
+                customNumber: c.customNumber ?? "",
+              })),
+            };
+          }
+          return {
+            skuId: i.skuId,
+            productName: i.productName ?? "",
+            size: i.size ?? "",
+            quantity: i.quantity,
+            price: i.price,
+            customName: i.customName ?? "",
+            customNumber: i.customNumber ?? "",
+            customizationFee: i.customizationFee ?? 0,
+            colorName: i.colorName ?? "",
+            optionSelections: i.printElements?.length
+              ? { printElements: i.printElements }
+              : (i.optionSelections ?? []),
+          };
+        }),
       ),
       shippingFee: String(shipping),
       isMember: String(isMember),
       deliveryMethod: effectiveDelivery,
       grantIds: JSON.stringify(appliedGrantIds),
       totalDiscountApplied: String(totalDiscountOre),
+      vatRate: String(vatRate),
     },
     success_url: `${baseUrl}/ordre-bekraeftelse?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${baseUrl}/kurv`,

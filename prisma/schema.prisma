@@ -145,8 +145,36 @@ model Product {
   designerZones    DesignerZone[]
   heroSlides       HeroSlide[]
   trainerGrants    TrainerGrant[]
+  pakketilbudItems PakketilbudItem[]
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
+}
+
+model Pakketilbud {
+  id          String            @id @default(cuid())
+  name        String
+  slug        String            @unique
+  description String            @default("")
+  price       Int               // base price in øre
+  images      String[]
+  published   Boolean           @default(true)
+  featured    Boolean           @default(false)
+  position    Int               @default(0)
+  items       PakketilbudItem[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model PakketilbudItem {
+  id            String      @id @default(cuid())
+  pakketilbudId String
+  pakketilbud   Pakketilbud @relation(fields: [pakketilbudId], references: [id], onDelete: Cascade)
+  productId     String
+  product       Product     @relation(fields: [productId], references: [id], onDelete: Restrict)
+  position      Int         @default(0)
+  label         String?
+
+  @@index([pakketilbudId, position])
 }
 
 model GlobalColor {

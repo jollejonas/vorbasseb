@@ -5,6 +5,7 @@ import { getVatRate } from "@/lib/vat";
 import { ProductGrid } from "@/components/shop/ProductGrid";
 import { FilterContent } from "@/components/shop/FilterContent";
 import { MobileFilterDrawer } from "@/components/shop/MobileFilterDrawer";
+import { PakketilbudCard } from "@/components/shop/PakketilbudCard";
 import type { Prisma } from "@prisma/client";
 import { X } from "lucide-react";
 
@@ -89,13 +90,31 @@ export default async function ButikPage({ searchParams }: Props) {
         ? { price: "desc" }
         : { createdAt: "desc" };
 
-  const [products, vatPct] = await Promise.all([
+  const [products, vatPct, pakketilbud] = await Promise.all([
     prisma.product.findMany({
       where,
       include: { skus: { select: { stock: true } } },
       orderBy,
     }),
     getVatRate(),
+    prisma.pakketilbud.findMany({
+      where: { published: true },
+      include: {
+        items: {
+          include: {
+            product: {
+              select: {
+                name: true,
+                skus: { select: { stock: true } },
+                colorVariants: { include: { skus: { select: { stock: true } } } },
+              },
+            },
+          },
+          orderBy: { position: "asc" },
+        },
+      },
+      orderBy: [{ position: "asc" }, { createdAt: "desc" }],
+    }),
   ]);
 
   // Active filter pills
@@ -227,6 +246,30 @@ export default async function ButikPage({ searchParams }: Props) {
           )}
         </div>
       </div>
+
+      {/* Pakketilbud section */}
+      {pakketilbud.length > 0 && (
+        <section className="mt-16">
+          <div className="flex items-center gap-3 mb-6">
+            <h2 className="text-2xl font-black uppercase tracking-tight">Pakketilbud</h2>
+            <span className="text-xs bg-secondary text-white font-bold px-2.5 py-1 rounded-full uppercase tracking-wide">
+              Sæt
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {pakketilbud.map((p) => {
+              const isSoldOut = p.items.some((it) => {
+                const allSkus = [
+                  ...it.product.skus,
+                  ...it.product.colorVariants.flatMap((cv) => cv.skus),
+                ];
+                return allSkus.length > 0 && allSkus.every((s) => s.stock === 0);
+              });
+              return <PakketilbudCard key={p.id} pakketilbud={p} vatPct={vatPct} isSoldOut={isSoldOut} />;
+            })}
+          </div>
+        </section>
+      )}
     </div>
     </div>
   );

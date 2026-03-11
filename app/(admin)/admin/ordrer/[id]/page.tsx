@@ -120,23 +120,41 @@ export default async function AdminOrderDetailPage({ params }: Params) {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {order.items.map((item) => (
+            {order.items.map((item) => {
+              type PakketilbudItemMeta = { itemId: string; productId: string; productName: string; label?: string; skuId: string; size: string; colorName?: string; customName?: string; customNumber?: string };
+              type PakketilbudOrderMeta = { isPakketilbud: true; pakketilbudName: string; items: PakketilbudItemMeta[] };
+              const rawOpt = item.optionSelections as PakketilbudOrderMeta | { printElements: { side: string; zoneLabel: string; type: string; value: string; fontSize: string }[] } | { groupLabel: string; value: string }[] | null;
+              const pakkeMeta = rawOpt && !Array.isArray(rawOpt) && (rawOpt as PakketilbudOrderMeta).isPakketilbud === true ? (rawOpt as PakketilbudOrderMeta) : null;
+              return (
               <tr key={item.id}>
-                <td className="px-5 py-3">{item.sku?.product.name ?? "–"}</td>
+                <td className="px-5 py-3">{pakkeMeta ? pakkeMeta.pakketilbudName : (item.sku?.product.name ?? "–")}</td>
                 <td className="px-5 py-3 font-mono text-xs text-gray-500">
                   {item.sku?.itemNumber ?? "–"}
                 </td>
-                <td className="px-5 py-3">{item.sku?.size ?? "–"}</td>
-                <td className="px-5 py-3 text-gray-500">{item.colorName ?? "–"}</td>
+                <td className="px-5 py-3">{pakkeMeta ? "Pakke" : (item.sku?.size ?? "–")}</td>
+                <td className="px-5 py-3 text-gray-500">{pakkeMeta ? "–" : (item.colorName ?? "–")}</td>
                 <td className="px-5 py-3 text-gray-500">
                   {(() => {
-                    const raw = item.optionSelections as
-                      | { printElements: { side: string; zoneLabel: string; type: string; value: string; fontSize: string }[] }
-                      | { groupLabel: string; value: string }[]
-                      | null;
+                    const raw = rawOpt;
+
+                    // Pakketilbud order: show item list
+                    if (pakkeMeta) {
+                      return (
+                        <ul className="space-y-0.5">
+                          {pakkeMeta.items.map((c, ci) => (
+                            <li key={ci} className="text-xs">
+                              <span className="font-medium text-gray-700">{c.label || c.productName}</span>
+                              <span className="text-gray-500"> · {c.size}{c.colorName ? ` · ${c.colorName}` : ""}</span>
+                              {c.customName && <span className="text-gray-500"> · Tryk: {c.customName}</span>}
+                              {c.customNumber && <span className="text-gray-500"> #{c.customNumber}</span>}
+                            </li>
+                          ))}
+                        </ul>
+                      );
+                    }
 
                     // Designer order: show print spec table
-                    if (raw && !Array.isArray(raw) && raw.printElements?.length) {
+                    if (raw && !Array.isArray(raw) && (raw as { printElements?: unknown[] }).printElements && (raw as { printElements: unknown[] }).printElements.length) {
                       return (
                         <table className="text-xs border-collapse w-full">
                           <thead>
@@ -149,7 +167,7 @@ export default async function AdminOrderDetailPage({ params }: Params) {
                             </tr>
                           </thead>
                           <tbody>
-                            {raw.printElements.map((p, pi) => (
+                            {((raw as { printElements: { side: string; zoneLabel: string; type: string; value: string; fontSize: string }[] }).printElements).map((p, pi) => (
                               <tr key={pi} className="border-t border-gray-100">
                                 <td className="pr-2 py-0.5">{p.side === "front" ? "Forside" : "Bagside"}</td>
                                 <td className="pr-2 py-0.5">{p.zoneLabel}</td>
@@ -180,7 +198,8 @@ export default async function AdminOrderDetailPage({ params }: Params) {
                   {formatPrice(item.priceAtPurchase * item.quantity)}
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </section>

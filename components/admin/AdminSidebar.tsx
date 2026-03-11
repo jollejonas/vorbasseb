@@ -47,6 +47,7 @@ function buildGroups(attentionCount: number): NavGroup[] {
       label: "Butik",
       items: [
         { href: "/admin/produkter", label: "Produkter", icon: Package, badge: attentionCount || undefined },
+        { href: "/admin/pakketilbud", label: "Pakketilbud", icon: Package },
         { href: "/admin/ordrer", label: "Ordrer", icon: ShoppingBag },
         { href: "/admin/rabatkoder", label: "Rabatkoder", icon: Tag },
       ],

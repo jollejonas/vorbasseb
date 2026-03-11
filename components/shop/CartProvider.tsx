@@ -22,6 +22,20 @@ export type PrintElement = {
   fontSize: "small" | "medium" | "large";
 };
 
+export type PakketilbudItemSelection = {
+  itemId: string;
+  productId: string;
+  productName: string;
+  label?: string;
+  skuId: string;
+  size: string;
+  colorName?: string;
+  optionSelections?: OptionSelection[];
+  customName?: string;
+  customNumber?: string;
+  customizationFee?: number;
+};
+
 export type CartItem = {
   skuId: string;
   productId: string;
@@ -37,6 +51,8 @@ export type CartItem = {
   colorName?: string;
   optionSelections?: OptionSelection[]; // snapshot of TEXT/SELECT/CUSTOM selections
   printElements?: PrintElement[]; // jersey designer print specs
+  isPakketilbud?: boolean;
+  pakketilbudItems?: PakketilbudItemSelection[];
 };
 
 type CartState = { items: CartItem[] };
@@ -82,6 +98,12 @@ function reducer(state: CartState, action: Action): CartState {
 }
 
 function itemKey(item: CartItem) {
+  if (item.isPakketilbud) {
+    const parts = (item.pakketilbudItems ?? [])
+      .map((c) => `${c.productId}:${c.skuId}:${c.customName ?? ""}:${c.customNumber ?? ""}`)
+      .join("|");
+    return `pakke::${item.productId}::${parts}`;
+  }
   const selections = item.optionSelections?.map((s) => `${s.groupLabel}=${s.value}`).join(",") ?? "";
   const prints = item.printElements?.map((p) => `${p.side}:${p.zoneId}:${p.type}:${p.value}:${p.fontSize}`).join(",") ?? "";
   return `${item.skuId}::${item.customName ?? ""}::${item.customNumber ?? ""}::${item.colorName ?? ""}::${selections}::${prints}`;

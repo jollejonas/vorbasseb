@@ -57,8 +57,20 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
   });
   if (existing) return;
 
+  type PakketilbudItemMeta = {
+    itemId: string;
+    productId: string;
+    productName: string;
+    label: string;
+    skuId: string;
+    size: string;
+    colorName: string;
+    customName: string;
+    customNumber: string;
+  };
   type CartMeta = {
     skuId: string;
+    isPakketilbud?: boolean;
     productName: string;
     size: string;
     quantity: number;
@@ -68,11 +80,13 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
     customizationFee: number;
     colorName: string;
     optionSelections: { groupLabel: string; value: string }[];
+    pakketilbudItems?: PakketilbudItemMeta[];
   };
   const items: CartMeta[] = JSON.parse(cartJson);
 
   // Use the combined discount value stored in metadata (grants + member discount)
   const discountApplied = Number(totalDiscountApplied ?? 0);
+  const vatRate = Number(session.metadata?.vatRate ?? 25);
 
   const customerName = session.customer_details?.name ?? null;
   const phone = session.customer_details?.phone ?? null;
@@ -112,15 +126,28 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
           deliveryMethod: deliveryMethod === "PICKUP" ? "PICKUP" : "SHIPPING",
           addressId,
           items: {
-            create: items.map((i) => ({
-              skuId: i.skuId,
-              quantity: i.quantity,
-              priceAtPurchase: i.price + i.customizationFee,
-              customName: i.customName || null,
-              customNumber: i.customNumber || null,
-              colorName: i.colorName || null,
-              optionSelections: i.optionSelections ?? [],
-            })),
+            create: items.map((i) => {
+              if (i.isPakketilbud) {
+                return {
+                  skuId: null,
+                  quantity: i.quantity,
+                  priceAtPurchase: i.price + i.customizationFee,
+                  customName: null,
+                  customNumber: null,
+                  colorName: null,
+                  optionSelections: { isPakketilbud: true, pakketilbudName: i.productName, items: i.pakketilbudItems ?? [] },
+                };
+              }
+              return {
+                skuId: i.skuId,
+                quantity: i.quantity,
+                priceAtPurchase: i.price + i.customizationFee,
+                customName: i.customName || null,
+                customNumber: i.customNumber || null,
+                colorName: i.colorName || null,
+                optionSelections: i.optionSelections ?? [],
+              };
+            }),
           },
         },
         select: { id: true },
@@ -137,24 +164,30 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
 
       // Decrement stock for each item
       for (const item of items) {
-        await tx.sKU.update({
-          where: { id: item.skuId },
-          data: { stock: { decrement: item.quantity } },
-        });
+        if (item.isPakketilbud) {
+          for (const comp of (item.pakketilbudItems ?? [])) {
+            await tx.sKU.update({ where: { id: comp.skuId }, data: { stock: { decrement: item.quantity } } });
+          }
+        } else {
+          await tx.sKU.update({ where: { id: item.skuId }, data: { stock: { decrement: item.quantity } } });
+        }
       }
     },
   );
 
   // Send low-stock alerts outside the transaction (external service)
   for (const item of items) {
-    const sku = await prisma.sKU.findUnique({
-      where: { id: item.skuId },
-      include: { product: { select: { name: true } } },
-    });
-    if (sku && sku.stock <= 2) {
-      await sendLowStockAlert(sku.product.name, sku.size, sku.stock).catch(
-        () => {},
-      );
+    const skuIdsToCheck = item.isPakketilbud
+      ? (item.pakketilbudItems ?? []).map((c) => c.skuId)
+      : [item.skuId];
+    for (const skuId of skuIdsToCheck) {
+      const sku = await prisma.sKU.findUnique({
+        where: { id: skuId },
+        include: { product: { select: { name: true } } },
+      });
+      if (sku && sku.stock <= 2) {
+        await sendLowStockAlert(sku.product.name, sku.size, sku.stock).catch(() => {});
+      }
     }
   }
 
@@ -164,16 +197,31 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       to: email,
       customerName: customerName,
       orderTotal: session.amount_total ?? 0,
-      items: items.map((i) => ({
-        productName: i.productName,
-        size: i.size,
-        colorName: i.colorName,
-        quantity: i.quantity,
-        price: i.price,
-        customName: i.customName,
-        customNumber: i.customNumber,
-        customizationFee: i.customizationFee,
-      })),
+      items: items.map((i) => {
+        if (i.isPakketilbud) {
+          const compNames = (i.pakketilbudItems ?? [])
+            .map((c) => `${c.label || c.productName} (${c.size}${c.colorName ? ` / ${c.colorName}` : ""})`)
+            .join(", ");
+          return {
+            productName: i.productName,
+            size: compNames,
+            colorName: undefined,
+            quantity: i.quantity,
+            price: Math.round((i.price + i.customizationFee) * (1 + vatRate / 100)),
+            customName: undefined,
+            customNumber: undefined,
+          };
+        }
+        return {
+          productName: i.productName,
+          size: i.size,
+          colorName: i.colorName,
+          quantity: i.quantity,
+          price: Math.round((i.price + i.customizationFee) * (1 + vatRate / 100)),
+          customName: i.customName,
+          customNumber: i.customNumber,
+        };
+      }),
     });
   }
 }
