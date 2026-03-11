@@ -39,6 +39,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       previewY: number;
       previewW: number;
       previewH: number;
+      price: number;
       positionOrd: number;
     }[];
   };
@@ -67,6 +68,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
           previewY: z.previewY,
           previewW: z.previewW,
           previewH: z.previewH,
+          price: z.price ?? 0,
           positionOrd: i,
         },
       })

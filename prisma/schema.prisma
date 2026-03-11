@@ -413,6 +413,7 @@ model DesignerZone {
   position    String  // "top-left" | "top-center" | "top-right" | "middle-left" | "middle-center" | "middle-right" | "bottom-left" | "bottom-center" | "bottom-right"
   allowText   Boolean @default(true)
   allowLogo   Boolean @default(false)
+  price       Int     @default(0) // price in øre (added on top of product price per zone)
   previewX    Float   @default(10) // % from left (top-left corner)
   previewY    Float   @default(10) // % from top (top-left corner)
   previewW    Float   @default(20) // % width

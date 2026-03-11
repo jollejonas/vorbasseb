@@ -12,8 +12,9 @@ import { X } from "lucide-react";
 type OptionValueWithColor = ProductOptionValue & { globalColor: GlobalColor | null };
 type OptionGroupWithValues = ProductOptionGroup & { values: OptionValueWithColor[] };
 type ColorVariantWithSkus = ColorVariant & { skus: SKU[] };
+type SkuWithOptions = SKU & { optionValues: { optionValueId: string }[] };
 type ProductWithRelations = Product & {
-  skus: SKU[];
+  skus: SkuWithOptions[];
   category: Category | null;
   colorVariants: ColorVariantWithSkus[];
   optionGroups: OptionGroupWithValues[];
@@ -79,6 +80,88 @@ function generatePreviewItemNumber(
   return `${modelNumber}${colorCode ?? ""}${sizeLabel}`;
 }
 
+/** Builds both optionGroups and skuMatrix with a shared key sequence so keys are consistent. */
+function buildInitialProductState(product: ProductWithRelations | undefined): {
+  optionGroups: OptionGroupRow[];
+  skuMatrix: SkuMatrixCell[];
+} {
+  if (!product?.optionGroups.length) return { optionGroups: [], skuMatrix: [] };
+
+  const valueIdToKey = new Map<string, string>();
+  const optionGroups: OptionGroupRow[] = product.optionGroups.map((g) => ({
+    id: g.id,
+    _key: nextKey(),
+    type: g.type as OptionType,
+    label: g.label,
+    position: g.position,
+    required: g.required,
+    feeKr: g.fee ? (g.fee / 100).toFixed(2) : "",
+    costFeeKr: g.costFee ? (g.costFee / 100).toFixed(2) : "",
+    inputType: g.inputType ?? "",
+    values: g.values.map((v) => {
+      const key = nextKey();
+      if (v.id) valueIdToKey.set(v.id, key);
+      return {
+        id: v.id,
+        _key: key,
+        label: v.label,
+        position: v.position,
+        globalColorId: v.globalColorId,
+        globalColorHex: v.globalColor?.hex,
+        images: v.images,
+      };
+    }),
+  }));
+
+  const colorGroup = optionGroups.find((g) => g.type === "COLOR");
+  const sizeGroup = optionGroups.find((g) => g.type === "SIZE");
+
+  // Pre-fill the full grid so every cell is always editable (even without SKUOptionValue records)
+  const skuMatrix: SkuMatrixCell[] = [];
+  if (colorGroup && sizeGroup) {
+    for (const cv of colorGroup.values) {
+      for (const sv of sizeGroup.values) {
+        skuMatrix.push({ colorValueKey: cv._key, sizeValueKey: sv._key, stock: 0, itemNumber: "", itemNumberOverride: false, costPriceKr: "" });
+      }
+    }
+  } else if (sizeGroup) {
+    for (const sv of sizeGroup.values) {
+      skuMatrix.push({ colorValueKey: "", sizeValueKey: sv._key, stock: 0, itemNumber: "", itemNumberOverride: false, costPriceKr: "" });
+    }
+  }
+
+  // Overlay actual SKU data on matching cells (matched via SKUOptionValue links)
+  for (const sku of product.skus) {
+    if ((sku as SKU & { colorVariantId?: string | null }).colorVariantId) continue;
+    const optionValueIds = sku.optionValues.map((ov) => ov.optionValueId);
+
+    let colorValueKey = "";
+    let sizeValueKey = "";
+    if (colorGroup) {
+      const cv = colorGroup.values.find((v) => v.id && optionValueIds.includes(v.id));
+      colorValueKey = cv?._key ?? "";
+    }
+    if (sizeGroup) {
+      const sv = sizeGroup.values.find((v) => v.id && optionValueIds.includes(v.id));
+      sizeValueKey = sv?._key ?? "";
+    }
+    const idx = skuMatrix.findIndex((c) => c.colorValueKey === colorValueKey && c.sizeValueKey === sizeValueKey);
+    if (idx !== -1) {
+      skuMatrix[idx] = {
+        id: sku.id,
+        colorValueKey,
+        sizeValueKey,
+        stock: sku.stock,
+        itemNumber: sku.itemNumber ?? "",
+        itemNumberOverride: sku.itemNumberOverride,
+        costPriceKr: sku.costPrice ? (sku.costPrice / 100).toFixed(2) : "",
+      };
+    }
+  }
+
+  return { optionGroups, skuMatrix };
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function ProductForm({ product }: { product?: ProductWithRelations }) {
@@ -125,6 +208,7 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
     previewY: number;
     previewW: number;
     previewH: number;
+    priceKr: string;
   };
 
   const [designerZones, setDesignerZones] = useState<ZoneRow[]>(
@@ -138,6 +222,7 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
       previewY: z.previewY,
       previewW: z.previewW,
       previewH: z.previewH,
+      priceKr: (z as typeof z & { price?: number }).price ? ((z as typeof z & { price?: number }).price! / 100).toFixed(2) : "",
     }))
   );
   const [designerSaving, setDesignerSaving] = useState(false);
@@ -162,7 +247,11 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
           designerFrontImageIdx: designerFrontImageIdx === "" ? null : designerFrontImageIdx,
           designerBackImageIdx: designerBackImageIdx === "" ? null : designerBackImageIdx,
           designerPrintColor: designerPrintColor || null,
-          zones: designerZones.map((z, i) => ({ ...z, positionOrd: i })),
+          zones: designerZones.map((z, i) => ({
+            ...z,
+            positionOrd: i,
+            price: z.priceKr ? Math.round(parseFloat(z.priceKr) * 100) : 0,
+          })),
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Fejl");
@@ -187,66 +276,11 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
   const [inlineExpandedType, setInlineExpandedType] = useState<OptionType | null>(null);
   const [inlineFilterTag, setInlineFilterTag] = useState<string | null>(null);
 
-  const [optionGroups, setOptionGroups] = useState<OptionGroupRow[]>(() => {
-    if (!product?.optionGroups.length) return [];
-    return product.optionGroups.map((g) => ({
-      id: g.id,
-      _key: nextKey(),
-      type: g.type as OptionType,
-      label: g.label,
-      position: g.position,
-      required: g.required,
-      feeKr: g.fee ? (g.fee / 100).toFixed(2) : "",
-      costFeeKr: g.costFee ? (g.costFee / 100).toFixed(2) : "",
-      inputType: g.inputType ?? "",
-      values: g.values.map((v) => ({
-        id: v.id,
-        _key: nextKey(),
-        label: v.label,
-        position: v.position,
-        globalColorId: v.globalColorId,
-        globalColorHex: v.globalColor?.hex,
-        images: v.images,
-      })),
-    }));
-  });
-
-  const [skuMatrix, setSkuMatrix] = useState<SkuMatrixCell[]>(() => {
-    if (!product?.optionGroups.length) return [];
-    const colorGroup = product.optionGroups.find((g) => g.type === "COLOR");
-    const sizeGroup = product.optionGroups.find((g) => g.type === "SIZE");
-    if (!colorGroup || !sizeGroup) return [];
-
-    // Map DB value ids to the _key we assign during optionGroups initialization
-    // We need to rebuild this by re-running the initialization logic
-    // For simplicity during first load, we build a map from DB ids to keys
-    const colorValueKeyMap = new Map<string, string>();
-    const sizeValueKeyMap = new Map<string, string>();
-
-    // We need the keys from the optionGroups state above — but since we're in
-    // the same initializer, we re-generate them inline
-    let tempKeySeq = _keySeq;
-    const getKey = () => `k${++tempKeySeq}`;
-
-    const builtGroups = product.optionGroups.map((g) => ({
-      id: g.id,
-      type: g.type,
-      values: g.values.map((v) => ({ id: v.id, key: getKey() })),
-    }));
-
-    const builtColorGroup = builtGroups.find((g) => g.type === "COLOR");
-    const builtSizeGroup = builtGroups.find((g) => g.type === "SIZE");
-
-    builtColorGroup?.values.forEach((v, i) => {
-      colorValueKeyMap.set(colorGroup.values[i]?.id ?? "", v.key);
-    });
-    builtSizeGroup?.values.forEach((v, i) => {
-      sizeValueKeyMap.set(sizeGroup.values[i]?.id ?? "", v.key);
-    });
-
-    // SKU matrix from existing SKUs — populated after migration via seed script
-    return [];
-  });
+  // Build option groups and SKU matrix together using a shared key sequence
+  // so that colorValueKey/sizeValueKey in matrix cells match the _key in optionGroups.
+  const _initialState = useRef(buildInitialProductState(product));
+  const [optionGroups, setOptionGroups] = useState<OptionGroupRow[]>(_initialState.current.optionGroups);
+  const [skuMatrix, setSkuMatrix] = useState<SkuMatrixCell[]>(_initialState.current.skuMatrix);
 
   // ── Legacy color variant system ─────────────────────────────────────────────
   const [legacySkus, setLegacySkus] = useState<LegacySkuRow[]>(
@@ -599,7 +633,7 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
           name, slug, categoryId: categoryId || null, price: Math.round(priceVal * 100),
           modelNumber: modelNumber || null, description, images,
           membersOnly, membersEarlyAccess, clubRoleRequired: clubRoleRequired || null,
-          published, featured,
+          published, featured, designerEnabled,
           optionGroups: groupsPayload,
           skuMatrix: matrixPayload,
           clearColorVariants: migratedToOptions,
@@ -610,7 +644,7 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
           name, slug, categoryId: categoryId || null, price: Math.round(priceVal * 100),
           modelNumber: modelNumber || null, description, images,
           membersOnly, membersEarlyAccess, clubRoleRequired: clubRoleRequired || null,
-          published, featured,
+          published, featured, designerEnabled,
           skus: legacyColorVariants.length === 0
             ? legacySkus.map(({ id, size, stock, itemNumber }) => ({ id, size, stock, itemNumber: itemNumber || null }))
             : [],
@@ -1126,6 +1160,7 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
                       previewY: pendingArea.y + row * (pendingArea.h / 3),
                       previewW: pendingArea.w / 3,
                       previewH: pendingArea.h / 3,
+                      priceKr: "",
                     });
                   });
                   const nextIdx = designerZones.length + newZones.length - 1;
@@ -1147,6 +1182,7 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
                     previewY: pendingArea.y,
                     previewW: pendingArea.w,
                     previewH: pendingArea.h,
+                    priceKr: "",
                   };
                   setDesignerZones((prev) => [...prev, newZone]);
                   setPendingArea(null);
@@ -1375,6 +1411,13 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
                                   onChange={(e) => update({ allowLogo: e.target.checked })} className="rounded" />
                                 Tillad logo
                               </label>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-500 mb-1">Pris (kr)</label>
+                              <input type="number" min="0" step="0.01" placeholder="0.00"
+                                value={zone.priceKr}
+                                onChange={(e) => update({ priceKr: e.target.value })}
+                                className="w-full border rounded-lg px-2 py-1.5 text-sm" />
                             </div>
                           </div>
                         );
@@ -1661,7 +1704,7 @@ function SkuMatrix({
                       <td key={sv._key} className="px-2 py-2 text-center">
                         <div className="space-y-1">
                           <input type="number" min="0" value={cell?.stock ?? 0}
-                            onChange={(e) => onUpdateCell(cv._key, sv._key, { stock: parseInt(e.target.value) || 0 })}
+                            onChange={(e) => onUpdateCell(cv._key, sv._key, { stock: parseInt(e.target.value, 10) || 0 })}
                             className="w-full border rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-secondary"
                             placeholder="0"
                           />
@@ -1754,7 +1797,7 @@ function FlatSizeTable({
                 </td>
                 <td className="px-4 py-2">
                   <input type="number" min="0" value={cell?.stock ?? 0}
-                    onChange={(e) => onUpdateCell(sv._key, { stock: parseInt(e.target.value) || 0 })}
+                    onChange={(e) => onUpdateCell(sv._key, { stock: parseInt(e.target.value, 10) || 0 })}
                     className="w-24 border rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-secondary"
                   />
                 </td>
@@ -1882,7 +1925,7 @@ function LegacyVariantSection({
                                 className="w-32 border rounded px-2 py-1 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-secondary" />
                             </td>
                             <td className="px-3 py-2">
-                              <input type="number" min="0" value={sku.stock} onChange={(e) => onUpdateColorSku(cvIdx, sku.size, { stock: parseInt(e.target.value) || 0 })}
+                              <input type="number" min="0" value={sku.stock} onChange={(e) => onUpdateColorSku(cvIdx, sku.size, { stock: parseInt(e.target.value, 10) || 0 })}
                                 className="w-20 border rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-secondary" />
                             </td>
                             <td className="px-3 py-2 text-right">
@@ -1933,7 +1976,7 @@ function LegacyVariantSection({
                           className="w-36 border rounded px-2 py-1 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-secondary" />
                       </td>
                       <td className="px-4 py-2">
-                        <input type="number" min="0" value={sku.stock} onChange={(e) => onUpdateSku(sku.size, { stock: parseInt(e.target.value) || 0 })}
+                        <input type="number" min="0" value={sku.stock} onChange={(e) => onUpdateSku(sku.size, { stock: parseInt(e.target.value, 10) || 0 })}
                           className="w-24 border rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-secondary" />
                       </td>
                       <td className="px-4 py-2 text-right">
