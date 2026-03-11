@@ -134,20 +134,14 @@ export function PakketilbudPageClient({ pakketilbud, vatPct, isSoldOut, soldOutI
           </ul>
         </div>
 
-        {isSoldOut ? (
-          <p className="text-sm text-orange-700 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
-            <strong>Midlertidigt udsolgt:</strong>{" "}
-            {soldOutItems.join(", ")} er i øjeblikket ikke tilgængelig.
-          </p>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setStarted(true)}
-            className="w-full bg-primary text-secondary font-bold py-3 px-6 rounded-xl hover:bg-primary-dark transition text-sm"
-          >
-            Sammensæt din pakke →
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => !isSoldOut && setStarted(true)}
+          disabled={isSoldOut}
+          className="w-full bg-primary text-secondary font-bold py-3 px-6 rounded-xl hover:bg-primary-dark transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isSoldOut ? "Midlertidigt udsolgt" : "Sammensæt din pakke →"}
+        </button>
       </div>
     </div>
   );
