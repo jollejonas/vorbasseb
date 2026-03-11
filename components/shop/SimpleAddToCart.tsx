@@ -45,7 +45,7 @@ export function SimpleAddToCart({
           <img
             src={product.images[0]}
             alt={product.name}
-            className="w-full aspect-square object-cover rounded-2xl"
+            className="w-full aspect-square object-contain rounded-2xl"
           />
         ) : (
           <div className="w-full aspect-square bg-gray-100 rounded-2xl flex items-center justify-center text-gray-400">

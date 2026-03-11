@@ -27,7 +27,7 @@ export function ProductImageGallery({ images, name }: Props) {
           src={images[selectedIndex]}
           alt={`${name} ${selectedIndex + 1}`}
           fill
-          className="object-cover transition-opacity duration-200"
+          className="object-contain transition-opacity duration-200"
           sizes="(max-width: 768px) 100vw, 50vw"
           priority={selectedIndex === 0}
         />

@@ -178,7 +178,7 @@ export function ProductOptionsSection({ product, skus, optionGroups, vatPct = 25
             <img
               src={activeImages[0]}
               alt={product.name}
-              className="w-full aspect-square object-cover rounded-2xl"
+              className="w-full aspect-square object-contain rounded-2xl"
             />
             {activeImages.length > 1 && (
               <div className="flex gap-2 overflow-x-auto pb-1">
