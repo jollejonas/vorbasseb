@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { slugify } from "@/lib/utils";
+import { slugify, formatPrice } from "@/lib/utils";
 import { X, GripVertical, ChevronUp, ChevronDown } from "lucide-react";
 
 type ProductResult = {
@@ -12,6 +12,7 @@ type ProductResult = {
   images: string[];
   price: number;
   slug: string;
+  skus: { costPrice: number | null }[];
 };
 
 type ItemRow = {
@@ -21,6 +22,7 @@ type ItemRow = {
   productImage?: string;
   label: string;
   position: number;
+  avgCostOre: number | null;
 };
 
 type PakketilbudData = {
@@ -38,6 +40,7 @@ type PakketilbudData = {
     productId: string;
     label: string | null;
     position: number;
+    avgCostOre?: number | null;
     product: { id: string; name: string; images: string[] };
   }[];
 };
@@ -67,6 +70,7 @@ export function PakketilbudForm({ pakketilbud }: { pakketilbud?: PakketilbudData
       productImage: it.product.images[0],
       label: it.label ?? "",
       position: it.position ?? i,
+      avgCostOre: it.avgCostOre ?? null,
     }))
   );
 
@@ -76,6 +80,20 @@ export function PakketilbudForm({ pakketilbud }: { pakketilbud?: PakketilbudData
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [saving, setSaving] = useState(false);
+
+  const costSummary = useMemo(() => {
+    if (items.length === 0) return null;
+    const allHaveCost = items.every((it) => it.avgCostOre !== null);
+    const someHaveCost = items.some((it) => it.avgCostOre !== null);
+    if (!someHaveCost) return null;
+    const totalCostOre = allHaveCost
+      ? items.reduce((sum, it) => sum + it.avgCostOre!, 0)
+      : null;
+    const priceOre = Math.round(parseFloat(priceKr.replace(",", ".")) * 100) || null;
+    const marginOre = totalCostOre !== null && priceOre !== null ? priceOre - totalCostOre : null;
+    const marginPct = marginOre !== null && priceOre ? (marginOre / priceOre) * 100 : null;
+    return { totalCostOre, allHaveCost, marginOre, marginPct };
+  }, [items, priceKr]);
 
   // Cloudinary widget
   const widgetRef = useRef<{ open: () => void } | null>(null);
@@ -132,6 +150,10 @@ export function PakketilbudForm({ pakketilbud }: { pakketilbud?: PakketilbudData
   }, [productSearch]);
 
   function addProduct(product: ProductResult) {
+    const skusWithCost = product.skus?.filter((s) => s.costPrice !== null) ?? [];
+    const avgCostOre = skusWithCost.length > 0
+      ? Math.round(skusWithCost.reduce((sum, s) => sum + s.costPrice!, 0) / skusWithCost.length)
+      : null;
     setItems((prev) => [
       ...prev,
       {
@@ -141,6 +163,7 @@ export function PakketilbudForm({ pakketilbud }: { pakketilbud?: PakketilbudData
         productImage: product.images[0],
         label: "",
         position: prev.length,
+        avgCostOre,
       },
     ]);
     setProductSearch("");
@@ -259,7 +282,7 @@ export function PakketilbudForm({ pakketilbud }: { pakketilbud?: PakketilbudData
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Pris (kr, inkl. moms)</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Pris (kr, ekskl. moms)</label>
           <input
             type="number"
             step="0.01"
@@ -336,7 +359,13 @@ export function PakketilbudForm({ pakketilbud }: { pakketilbud?: PakketilbudData
                   <img src={item.productImage} alt="" className="w-10 h-10 object-cover rounded shrink-0" />
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{item.productName}</p>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className="text-sm font-medium truncate">{item.productName}</p>
+                    {item.avgCostOre !== null
+                      ? <span className="text-xs text-gray-400 shrink-0">kostpris {formatPrice(item.avgCostOre)}</span>
+                      : <span className="text-xs text-orange-400 shrink-0">ingen kostpris</span>
+                    }
+                  </div>
                   <input
                     type="text"
                     placeholder="Valgfri label (f.eks. &quot;Din trøje&quot;)"
@@ -359,6 +388,32 @@ export function PakketilbudForm({ pakketilbud }: { pakketilbud?: PakketilbudData
               </li>
             ))}
           </ul>
+        )}
+
+        {/* Cost summary */}
+        {costSummary && (
+          <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 text-sm space-y-1">
+            <div className="flex justify-between text-gray-600">
+              <span>Total kostpris ({costSummary.allHaveCost ? "alle produkter" : "delvise data"})</span>
+              <span className="font-medium tabular-nums">
+                {costSummary.totalCostOre !== null ? formatPrice(costSummary.totalCostOre) : "—"}
+              </span>
+            </div>
+            {costSummary.marginOre !== null && (
+              <div className="flex justify-between">
+                <span className="text-gray-600">Avance (ekskl. moms)</span>
+                <span className={`font-semibold tabular-nums ${costSummary.marginOre >= 0 ? "text-green-600" : "text-red-500"}`}>
+                  {formatPrice(costSummary.marginOre)}
+                  {costSummary.marginPct !== null && (
+                    <span className="ml-1 font-normal text-xs text-gray-400">({costSummary.marginPct.toFixed(1)} %)</span>
+                  )}
+                </span>
+              </div>
+            )}
+            {!costSummary.allHaveCost && (
+              <p className="text-xs text-orange-500">Nogle produkter mangler kostpris — avance kan ikke beregnes præcist.</p>
+            )}
+          </div>
         )}
 
         {/* Search */}

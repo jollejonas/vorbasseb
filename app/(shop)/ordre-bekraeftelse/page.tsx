@@ -1,8 +1,27 @@
 import { CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { CartClearer } from "@/components/shop/CartClearer";
+import Stripe from "stripe";
+import { fulfillOrder } from "@/lib/fulfillOrder";
 
-export default function OrdrebekraefdelsePage() {
+export default async function OrdrebekraefdelsePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ session_id?: string }>;
+}) {
+  const { session_id } = await searchParams;
+
+  // Fallback fulfillment — in case the webhook hasn't fired yet
+  if (session_id) {
+    try {
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+      const session = await stripe.checkout.sessions.retrieve(session_id);
+      await fulfillOrder(session);
+    } catch (err) {
+      console.error("[ordre-bekraeftelse] fulfillOrder failed:", err);
+    }
+  }
+
   return (
     <div className="min-h-[70vh] flex items-center justify-center px-4">
       <CartClearer />

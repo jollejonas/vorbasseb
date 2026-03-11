@@ -16,17 +16,29 @@ export default async function AdminEditPakketilbudPage({ params }: Params) {
 
   const { id } = await params;
 
-  const pakketilbud = await prisma.pakketilbud.findUnique({
+  const raw = await prisma.pakketilbud.findUnique({
     where: { id },
     include: {
       items: {
-        include: { product: { select: { id: true, name: true, images: true } } },
+        include: { product: { select: { id: true, name: true, images: true, skus: { select: { costPrice: true } } } } },
         orderBy: { position: "asc" },
       },
     },
   });
 
-  if (!pakketilbud) notFound();
+  if (!raw) notFound();
+
+  // Compute avgCostOre per item so the form can show a total cost
+  const pakketilbud = {
+    ...raw,
+    items: raw.items.map((item) => {
+      const skusWithCost = item.product.skus.filter((s) => s.costPrice !== null);
+      const avgCostOre = skusWithCost.length > 0
+        ? Math.round(skusWithCost.reduce((sum, s) => sum + s.costPrice!, 0) / skusWithCost.length)
+        : null;
+      return { ...item, avgCostOre };
+    }),
+  };
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-10">

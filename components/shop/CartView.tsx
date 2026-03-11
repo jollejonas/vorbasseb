@@ -306,7 +306,7 @@ export function CartView() {
 }
 
 function CheckoutButton({ deliveryMethod, promoMode }: { deliveryMethod: DeliveryMethod; promoMode: boolean }) {
-  const { items, clearCart } = useCart();
+  const { items } = useCart();
   const [loading, setLoading] = useState(false);
 
   async function handleCheckout() {
@@ -327,7 +327,6 @@ function CheckoutButton({ deliveryMethod, promoMode }: { deliveryMethod: Deliver
     }
 
     const data = await res.json();
-    clearCart();
     window.location.href = data.redirect ?? data.url;
   }
 

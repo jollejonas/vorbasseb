@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     i.isPakketilbud ? (i.pakketilbudItems ?? []).map((c) => c.skuId) : [i.skuId],
   );
 
-  // Enforce clubRoleRequired: look up products for each cart item
+  // Enforce clubRoleRequired
   const skusWithProducts = await prisma.sKU.findMany({
     where: { id: { in: allSkuIds } },
     select: { id: true, productId: true, product: { select: { clubRoleRequired: true } } },
@@ -33,15 +33,14 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Force PICKUP if any item requires a club role (all restricted items are pickup-only)
+  // Force PICKUP if any item requires a club role
   const hasTrainerItem = skusWithProducts.some((s) => s.product.clubRoleRequired === "TRAINER");
   const effectiveDelivery: "SHIPPING" | "PICKUP" = hasTrainerItem ? "PICKUP" : deliveryMethod;
   const isPickup = effectiveDelivery === "PICKUP";
 
-  // Build skuId → productId map for grant matching (non-bundle items only)
   const skuProductMap = new Map(skusWithProducts.map((s) => [s.id, s.productId]));
 
-  // Read shipping rules, member discount, and VAT rate from DB
+  // Read settings
   const cfg = await prisma.siteSetting
     .findMany({ where: { key: { in: ["shipping_flat_ore", "shipping_free_ore", "member_discount_pct", "vat_rate"] } } })
     .catch(() => []);
@@ -50,14 +49,14 @@ export async function POST(req: NextRequest) {
   const discountPct = parseInt(cfg.find((s) => s.key === "member_discount_pct")?.value ?? "10");
   const vatRate = parseInt(cfg.find((s) => s.key === "vat_rate")?.value ?? "25");
 
-  // Check if user is an active member (for discount)
+  // Member check
   let isMember = false;
   if (session?.user?.id) {
     const sub = await prisma.subscription.findUnique({ where: { userId: session.user.id } });
     isMember = sub?.status === "ACTIVE";
   }
 
-  // Resolve pending grants for this user
+  // Pending grants
   const pendingGrants = session?.user?.id
     ? await prisma.trainerGrant.findMany({
         where: { userId: session.user.id, status: "PENDING" },
@@ -65,20 +64,15 @@ export async function POST(req: NextRequest) {
       })
     : [];
 
-  // Build grant pool: productId → queue of grantIds (one consumed per unit)
   const grantPool = new Map<string, string[]>();
   for (const g of pendingGrants) {
     if (!grantPool.has(g.productId)) grantPool.set(g.productId, []);
     grantPool.get(g.productId)!.push(g.id);
   }
 
-  // Determine which item units are covered by grants
-  // appliedGrantIds = grants we'll consume; grantDiscountTotal = value in øre
   const appliedGrantIds: string[] = [];
   let grantDiscountTotal = 0;
-
-  // Per-item: how many units are granted
-  const grantedQtyMap = new Map<string, number>(); // skuId → granted quantity
+  const grantedQtyMap = new Map<string, number>();
 
   for (const item of items) {
     const productId = skuProductMap.get(item.skuId);
@@ -98,7 +92,7 @@ export async function POST(req: NextRequest) {
     if (grantedUnits > 0) grantedQtyMap.set(item.skuId, grantedUnits);
   }
 
-  // Compute totals (all incl. VAT)
+  // Compute totals
   const originalSubtotal = items.reduce(
     (s, i) => s + Math.round((i.price + (i.customizationFee ?? 0)) * (1 + vatRate / 100)) * i.quantity,
     0,
@@ -109,9 +103,35 @@ export async function POST(req: NextRequest) {
   const totalDiscountOre = grantDiscountTotal + memberDiscount;
   const finalTotal = effectiveSubtotal + shipping - memberDiscount;
 
-  // ── Zero-total path: skip Stripe, create order directly ──────────────────
+  // Build order items (used in both zero-total and Stripe paths)
+  const orderItemsData = items.map((item) => {
+    if (item.isPakketilbud) {
+      return {
+        skuId: null as string | null,
+        quantity: item.quantity,
+        priceAtPurchase: item.price + (item.customizationFee ?? 0),
+        customName: null as string | null,
+        customNumber: null as string | null,
+        colorName: null as string | null,
+        optionSelections: { isPakketilbud: true, pakketilbudName: item.productName, items: item.pakketilbudItems ?? [] },
+      };
+    }
+    return {
+      skuId: item.skuId,
+      quantity: item.quantity,
+      priceAtPurchase: item.price + (item.customizationFee ?? 0),
+      customName: item.customName ?? null,
+      customNumber: item.customNumber ?? null,
+      colorName: item.colorName ?? null,
+      optionSelections: item.printElements?.length
+        ? { printElements: item.printElements }
+        : (item.optionSelections ?? []),
+    };
+  });
+
+  // ── Zero-total path: skip Stripe, create PAID order directly ─────────────
   if (finalTotal <= 0 && appliedGrantIds.length > 0) {
-    const order = await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx) => {
       // Decrement stock
       for (const item of items) {
         if (item.isPakketilbud) {
@@ -123,7 +143,6 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Create order
       const created = await tx.order.create({
         data: {
           userId: session?.user?.id ?? null,
@@ -133,37 +152,12 @@ export async function POST(req: NextRequest) {
           total: 0,
           shippingFee: 0,
           discountApplied: grantDiscountTotal,
-          items: {
-            create: items.map((item) => {
-              if (item.isPakketilbud) {
-                return {
-                  skuId: null,
-                  quantity: item.quantity,
-                  priceAtPurchase: 0,
-                  customName: null,
-                  customNumber: null,
-                  colorName: null,
-                  optionSelections: { isPakketilbud: true, pakketilbudName: item.productName, items: item.pakketilbudItems ?? [] },
-                };
-              }
-              return {
-                skuId: item.skuId,
-                quantity: item.quantity,
-                priceAtPurchase: 0,
-                customName: item.customName ?? null,
-                customNumber: item.customNumber ?? null,
-                colorName: item.colorName ?? null,
-                optionSelections: item.printElements?.length
-                  ? { printElements: item.printElements }
-                  : (item.optionSelections ?? []),
-              };
-            }),
-          },
+          items: { create: orderItemsData },
         },
-        select: { id: true, orderNumber: true },
+        select: { id: true },
       });
 
-      // Mark grants as used — with race condition guard
+      // Mark grants as used
       const result = await tx.trainerGrant.updateMany({
         where: { id: { in: appliedGrantIds }, status: "PENDING" },
         data: { status: "USED", orderId: created.id },
@@ -171,8 +165,6 @@ export async function POST(req: NextRequest) {
       if (result.count !== appliedGrantIds.length) {
         throw new Error("En eller flere tildelinger er allerede brugt — prøv igen.");
       }
-
-      return created;
     });
 
     return NextResponse.json({ redirect: "/ordre-bekraeftelse" });
@@ -180,9 +172,22 @@ export async function POST(req: NextRequest) {
 
   // ── Stripe path ───────────────────────────────────────────────────────────
 
-  // Build line items at original prices — grants applied via coupon (Stripe rejects unit_amount: 0)
-  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
+  // Create PENDING order with all items before redirecting to Stripe
+  const pendingOrder = await prisma.order.create({
+    data: {
+      userId: session?.user?.id ?? null,
+      status: "PENDING",
+      deliveryMethod: effectiveDelivery,
+      total: finalTotal,
+      shippingFee: shipping,
+      discountApplied: totalDiscountOre,
+      items: { create: orderItemsData },
+    },
+    select: { id: true },
+  });
 
+  // Build Stripe line items
+  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
   for (const item of items) {
     const unitPriceExclVat = item.price + (item.customizationFee ?? 0);
     const unitPriceInclVat = Math.round(unitPriceExclVat * (1 + vatRate / 100));
@@ -221,12 +226,10 @@ export async function POST(req: NextRequest) {
   }
 
   // Discount / promo code logic
-  // Stripe does not allow allow_promotion_codes and discounts simultaneously.
   let discounts: Stripe.Checkout.SessionCreateParams["discounts"] = undefined;
   let allowPromoCodes = false;
 
   if (appliedGrantIds.length > 0) {
-    // Grants present: apply combined grant + member coupon; no promo field
     if (totalDiscountOre > 0) {
       const couponName =
         grantDiscountTotal > 0 && memberDiscount > 0
@@ -243,7 +246,6 @@ export async function POST(req: NextRequest) {
       discounts = [{ coupon: coupon.id }];
     }
   } else if (isMember && !promoMode) {
-    // Member, default mode: apply member discount as coupon
     if (memberDiscount > 0) {
       const coupon = await stripe.coupons.create({
         amount_off: memberDiscount,
@@ -254,75 +256,43 @@ export async function POST(req: NextRequest) {
       discounts = [{ coupon: coupon.id }];
     }
   } else {
-    // Non-member, or member who opted into promo mode: show promo code field
     allowPromoCodes = true;
   }
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
-  const checkoutSession = await stripe.checkout.sessions.create({
-    mode: "payment",
-    line_items: lineItems,
-    discounts,
-    ...(allowPromoCodes ? { allow_promotion_codes: true } : {}),
-    customer_email: session?.user?.email ?? undefined,
-    metadata: {
-      userId: session?.user?.id ?? "",
-      cartJson: JSON.stringify(
-        items.map((i) => {
-          if (i.isPakketilbud) {
-            return {
-              skuId: i.skuId,
-              isPakketilbud: true,
-              productName: i.productName ?? "",
-              size: "",
-              quantity: i.quantity,
-              price: i.price,
-              customizationFee: i.customizationFee ?? 0,
-              colorName: "",
-              optionSelections: [],
-              pakketilbudItems: (i.pakketilbudItems ?? []).map((c) => ({
-                itemId: c.itemId,
-                productId: c.productId,
-                productName: c.productName.slice(0, 40),
-                label: c.label ?? "",
-                skuId: c.skuId,
-                size: c.size,
-                colorName: c.colorName ?? "",
-                customName: c.customName ?? "",
-                customNumber: c.customNumber ?? "",
-              })),
-            };
-          }
-          return {
-            skuId: i.skuId,
-            productName: i.productName ?? "",
-            size: i.size ?? "",
-            quantity: i.quantity,
-            price: i.price,
-            customName: i.customName ?? "",
-            customNumber: i.customNumber ?? "",
-            customizationFee: i.customizationFee ?? 0,
-            colorName: i.colorName ?? "",
-            optionSelections: i.printElements?.length
-              ? { printElements: i.printElements }
-              : (i.optionSelections ?? []),
-          };
-        }),
-      ),
-      shippingFee: String(shipping),
-      isMember: String(isMember),
-      deliveryMethod: effectiveDelivery,
-      grantIds: JSON.stringify(appliedGrantIds),
-      totalDiscountApplied: String(totalDiscountOre),
-      vatRate: String(vatRate),
-    },
-    success_url: `${baseUrl}/ordre-bekraeftelse?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${baseUrl}/kurv`,
-    phone_number_collection: { enabled: true },
-    billing_address_collection: "required",
-    ...(isPickup ? {} : { shipping_address_collection: { allowed_countries: ["DK"] } }),
-    locale: "da",
+  // Create Stripe session — only orderId in metadata (avoids 500-char limit on cartJson)
+  let checkoutSession: Stripe.Checkout.Session;
+  try {
+    checkoutSession = await stripe.checkout.sessions.create({
+      mode: "payment",
+      line_items: lineItems,
+      discounts,
+      ...(allowPromoCodes ? { allow_promotion_codes: true } : {}),
+      customer_email: session?.user?.email ?? undefined,
+      metadata: {
+        orderId: pendingOrder.id,
+        userId: session?.user?.id ?? "",
+        grantIds: JSON.stringify(appliedGrantIds),
+        vatRate: String(vatRate),
+      },
+      success_url: `${baseUrl}/ordre-bekraeftelse?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/kurv`,
+      phone_number_collection: { enabled: true },
+      billing_address_collection: "required",
+      ...(isPickup ? {} : { shipping_address_collection: { allowed_countries: ["DK"] } }),
+      locale: "da",
+    });
+  } catch (err) {
+    // Clean up the pending order so it doesn't accumulate
+    await prisma.order.delete({ where: { id: pendingOrder.id } }).catch(() => {});
+    throw err;
+  }
+
+  // Store the Stripe session ID on the order for idempotency
+  await prisma.order.update({
+    where: { id: pendingOrder.id },
+    data: { stripeSessionId: checkoutSession.id },
   });
 
   return NextResponse.json({ url: checkoutSession.url });

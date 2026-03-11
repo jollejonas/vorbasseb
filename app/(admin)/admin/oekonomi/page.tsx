@@ -22,7 +22,7 @@ export default async function OekonomiPage({ searchParams }: Props) {
       ? new Date(new Date().getFullYear(), 0, 1)
       : null;
 
-  const [products, orders] = await Promise.all([
+  const [products, orders, pakketilbudList] = await Promise.all([
     prisma.product.findMany({
       include: { skus: true },
       orderBy: { name: "asc" },
@@ -33,6 +33,14 @@ export default async function OekonomiPage({ searchParams }: Props) {
         ...(since ? { createdAt: { gte: since } } : {}),
       },
       select: { total: true },
+    }),
+    prisma.pakketilbud.findMany({
+      include: {
+        items: {
+          include: { product: { include: { skus: { select: { costPrice: true } } } } },
+        },
+      },
+      orderBy: { name: "asc" },
     }),
   ]);
 
@@ -63,6 +71,29 @@ export default async function OekonomiPage({ searchParams }: Props) {
     };
   });
 
+  const pakketilbudRows = pakketilbudList.map((p) => {
+    const itemCosts = p.items.map((item) => {
+      const skusWithCost = item.product.skus.filter((s) => s.costPrice !== null);
+      return skusWithCost.length > 0
+        ? Math.round(skusWithCost.reduce((sum, s) => sum + s.costPrice!, 0) / skusWithCost.length)
+        : null;
+    });
+    const allHaveCost = itemCosts.every((c) => c !== null);
+    const totalCostOre = allHaveCost ? itemCosts.reduce((sum, c) => sum + c!, 0) : null;
+    const marginOre = totalCostOre !== null ? p.price - totalCostOre : null;
+    const marginPct = marginOre !== null && p.price > 0 ? (marginOre / p.price) * 100 : null;
+    return {
+      id: p.id,
+      name: p.name,
+      priceOre: p.price,
+      totalCostOre,
+      marginOre,
+      marginPct,
+      itemCount: p.items.length,
+      itemsWithCost: itemCosts.filter((c) => c !== null).length,
+    };
+  });
+
   const totalRevenueOre = orders.reduce((sum, o) => sum + o.total, 0);
   const antalOrdrer = orders.length;
   const gnsOrdrevaerdiOre =
@@ -85,6 +116,7 @@ export default async function OekonomiPage({ searchParams }: Props) {
       </div>
       <OekonomiClient
         productRows={productRows}
+        pakketilbudRows={pakketilbudRows}
         kpis={{ totalRevenueOre, antalOrdrer, gnsOrdrevaerdiOre, gnsAvancePct }}
         period={period}
       />

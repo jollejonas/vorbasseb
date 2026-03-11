@@ -17,6 +17,17 @@ type ProductRow = {
   skus: { size: string; costPrice: number | null }[];
 };
 
+type PakketilbudRow = {
+  id: string;
+  name: string;
+  priceOre: number;
+  totalCostOre: number | null;
+  marginOre: number | null;
+  marginPct: number | null;
+  itemCount: number;
+  itemsWithCost: number;
+};
+
 type Kpis = {
   totalRevenueOre: number;
   antalOrdrer: number;
@@ -26,6 +37,7 @@ type Kpis = {
 
 type Props = {
   productRows: ProductRow[];
+  pakketilbudRows: PakketilbudRow[];
   kpis: Kpis;
   period: string;
 };
@@ -87,7 +99,7 @@ function downloadCsv(rows: ProductRow[]) {
   URL.revokeObjectURL(url);
 }
 
-export function OekonomiClient({ productRows, kpis, period }: Props) {
+export function OekonomiClient({ productRows, pakketilbudRows, kpis, period }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [onlyWithCost, setOnlyWithCost] = useState(false);
@@ -278,6 +290,70 @@ export function OekonomiClient({ productRows, kpis, period }: Props) {
       <p className="text-xs text-gray-400">
         * Avance beregnet som salgspris − gennemsnitlig kostpris (ekskl. moms). Omsætning er fra ordrer med status "Leveret".
       </p>
+
+      {/* Pakketilbud table */}
+      {pakketilbudRows.length > 0 && (
+        <>
+          <h2 className="text-lg font-semibold text-gray-800 mt-2">Pakketilbud</h2>
+          <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Pakke</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-600">Salgspris</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-600">Total kostpris</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-600">Avance kr</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-600">Avance %</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-500">Produkter</th>
+                  <th className="px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {pakketilbudRows.map((row) => {
+                  const hasMargin = row.marginPct !== null;
+                  const good = hasMargin && row.marginPct! >= 30;
+                  const bad = hasMargin && row.marginPct! < 10;
+                  const partial = row.itemsWithCost > 0 && row.itemsWithCost < row.itemCount;
+                  return (
+                    <tr key={row.id} className="hover:bg-gray-50 transition">
+                      <td className="px-4 py-3 font-medium text-gray-900">{row.name}</td>
+                      <td className="px-4 py-3 text-right tabular-nums text-gray-700">
+                        {fmt(row.priceOre)}
+                        <span className="text-gray-400 text-xs ml-1">ekskl. moms</span>
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums text-gray-600">
+                        {fmt(row.totalCostOre)}
+                        {partial && <span className="text-orange-400 text-xs ml-1">*delvis</span>}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        <span className={hasMargin ? (good ? "text-green-600" : bad ? "text-red-500" : "text-gray-700") : "text-gray-300"}>
+                          {fmt(row.marginOre)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        <span className={`font-semibold ${hasMargin ? (good ? "text-green-600" : bad ? "text-red-500" : "text-gray-700") : "text-gray-300"}`}>
+                          {pct(row.marginPct)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right text-gray-400 text-xs">
+                        {row.itemsWithCost}/{row.itemCount}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <a href={`/admin/pakketilbud/${row.id}`} className="text-xs text-gray-400 hover:text-secondary transition">
+                          Rediger
+                        </a>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-gray-400">
+            * Kostpris = sum af gennemsnitlig kostpris for hvert produkt i pakken. Kun beregnet hvis alle produkter har kostpris sat.
+          </p>
+        </>
+      )}
     </div>
   );
 }
