@@ -33,6 +33,7 @@ export default async function PakketilbudPage({ params }: Props) {
                   },
                   orderBy: { position: "asc" },
                 },
+                _count: { select: { skus: { where: { stock: { gt: 0 } } } } },
                 skus: {
                   where: { colorVariantId: null },
                   include: { optionValues: { select: { optionValueId: true } } },
@@ -53,14 +54,10 @@ export default async function PakketilbudPage({ params }: Props) {
 
   if (!pakketilbud) notFound();
 
-  // A pakketilbud is sold out if any item has zero total stock across all SKUs
+  // A pakketilbud is sold out if any item has zero in-stock SKUs (all stock ≤ 0)
   const soldOutItems = pakketilbud.items
     .map((item) => {
-      const allSkus = [
-        ...item.product.skus,
-        ...item.product.colorVariants.flatMap((cv) => cv.skus),
-      ];
-      const outOfStock = allSkus.length > 0 && allSkus.every((s) => s.stock === 0);
+      const outOfStock = item.product._count.skus === 0;
       return outOfStock ? (item.label ?? item.product.name) : null;
     })
     .filter(Boolean) as string[];

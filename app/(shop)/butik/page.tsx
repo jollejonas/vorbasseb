@@ -105,8 +105,7 @@ export default async function ButikPage({ searchParams }: Props) {
             product: {
               select: {
                 name: true,
-                skus: { select: { stock: true } },
-                colorVariants: { include: { skus: { select: { stock: true } } } },
+                _count: { select: { skus: { where: { stock: { gt: 0 } } } } },
               },
             },
           },
@@ -258,13 +257,7 @@ export default async function ButikPage({ searchParams }: Props) {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {pakketilbud.map((p) => {
-              const isSoldOut = p.items.some((it) => {
-                const allSkus = [
-                  ...it.product.skus,
-                  ...it.product.colorVariants.flatMap((cv) => cv.skus),
-                ];
-                return allSkus.length > 0 && allSkus.every((s) => s.stock === 0);
-              });
+              const isSoldOut = p.items.some((it) => it.product._count.skus === 0);
               return <PakketilbudCard key={p.id} pakketilbud={p} vatPct={vatPct} isSoldOut={isSoldOut} />;
             })}
           </div>
