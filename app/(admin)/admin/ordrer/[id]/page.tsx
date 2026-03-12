@@ -6,6 +6,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/utils";
 import { AdminOrderActions } from "@/components/admin/AdminOrderActions";
+import { PrintPreviewModal } from "@/components/admin/PrintPreviewModal";
 
 export const metadata: Metadata = { title: "Ordredetaljer – Admin" };
 
@@ -33,7 +34,17 @@ export default async function AdminOrderDetailPage({ params }: Params) {
     where: { id },
     include: {
       items: {
-        include: { sku: { include: { product: true } } },
+        include: {
+            sku: {
+              include: {
+                product: {
+                  include: {
+                    designerZones: { include: { fixedLogo: true }, orderBy: { positionOrd: "asc" } },
+                  },
+                },
+              },
+            },
+          },
       },
       shippingAddress: true,
       user: { select: { name: true, email: true, customerNumber: true } },
@@ -50,14 +61,25 @@ export default async function AdminOrderDetailPage({ params }: Params) {
     }
     return [];
   });
-  const pakkeSkuMap = pakkeSkuIds.length > 0
-    ? new Map(
-        (await prisma.sKU.findMany({
-          where: { id: { in: pakkeSkuIds } },
-          select: { id: true, itemNumber: true },
-        })).map((s) => [s.id, s.itemNumber ?? "–"])
-      )
-    : new Map<string, string>();
+  const pakkeSkus = pakkeSkuIds.length > 0
+    ? await prisma.sKU.findMany({
+        where: { id: { in: pakkeSkuIds } },
+        select: {
+          id: true,
+          itemNumber: true,
+          product: {
+            select: {
+              images: true,
+              designerFrontImageIdx: true,
+              designerBackImageIdx: true,
+              designerPrintColor: true,
+              designerZones: { include: { fixedLogo: true }, orderBy: { positionOrd: "asc" } },
+            },
+          },
+        },
+      })
+    : [];
+  const pakkeSkuMap = new Map(pakkeSkus.map((s) => [s.id, s]));
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10">
@@ -174,11 +196,27 @@ export default async function AdminOrderDetailPage({ params }: Params) {
                         <tr key={ci} className="text-sm">
                           <td className="px-5 py-1.5 pl-8 text-gray-700">↳ {c.label || c.productName}</td>
                           <td className="px-5 py-1.5 font-mono text-xs text-gray-500">
-                            {pakkeSkuMap.get(c.skuId) ?? "–"}
+                            {pakkeSkuMap.get(c.skuId)?.itemNumber ?? "–"}
                           </td>
                           <td className="px-5 py-1.5 text-gray-500">{c.size || "–"}</td>
                           <td className="px-5 py-1.5 text-gray-500">{c.colorName || "–"}</td>
-                          <td className="px-5 py-1.5 text-gray-500">{printText || "–"}</td>
+                          <td className="px-5 py-1.5 text-gray-500">
+                            {(() => {
+                              const skuData = pakkeSkuMap.get(c.skuId);
+                              if (printText && c.printElements?.length && skuData?.product?.designerZones?.length) {
+                                return (
+                                  <PrintPreviewModal
+                                    label={c.label ?? c.productName}
+                                    printSummary={printText}
+                                    product={skuData.product}
+                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                    printElements={c.printElements as any}
+                                  />
+                                );
+                              }
+                              return printText || "–";
+                            })()}
+                          </td>
                           <td /><td />
                         </tr>
                       );
@@ -209,7 +247,26 @@ export default async function AdminOrderDetailPage({ params }: Params) {
                 <td className="px-5 py-3 font-mono text-xs text-gray-500">{item.sku?.itemNumber ?? "–"}</td>
                 <td className="px-5 py-3">{item.sku?.size ?? "–"}</td>
                 <td className="px-5 py-3 text-gray-500">{item.colorName ?? "–"}</td>
-                <td className="px-5 py-3 text-gray-500">{printParts.length > 0 ? printParts.join(" · ") : "–"}</td>
+                <td className="px-5 py-3 text-gray-500">
+                  {(() => {
+                    if (!printParts.length) return "–";
+                    const printEls = raw && !Array.isArray(raw) && (raw as { printElements?: unknown[] }).printElements
+                      ? (raw as { printElements: import("@/components/shop/CartProvider").PrintElement[] }).printElements
+                      : null;
+                    const product = item.sku?.product;
+                    if (printEls?.length && product?.designerZones?.length) {
+                      return (
+                        <PrintPreviewModal
+                          label={product.name}
+                          printSummary={printParts.join(" · ")}
+                          product={product}
+                          printElements={printEls}
+                        />
+                      );
+                    }
+                    return printParts.join(" · ");
+                  })()}
+                </td>
                 <td className="px-5 py-3 text-right">{item.quantity}</td>
                 <td className="px-5 py-3 text-right font-medium">{formatPrice(item.priceAtPurchase * item.quantity)}</td>
               </tr>
