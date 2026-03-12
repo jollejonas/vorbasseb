@@ -30,11 +30,9 @@ export default async function KontoPage() {
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: {
-      id: true,
-      name: true,
-      email: true,
-      newsletterConsent: true,
-      subscription: true,
+      id: true, name: true, email: true, newsletterConsent: true, subscription: true,
+      firstName: true, lastName: true, phone: true, birthDate: true,
+      addressLine1: true, addressLine2: true, postalCode: true, city: true, country: true,
     },
   });
 
@@ -50,7 +48,19 @@ export default async function KontoPage() {
       {/* Profile card */}
       <div className="border border-gray-100 rounded-2xl p-6 mb-6">
         <h2 className="text-base font-semibold mb-5">Profil</h2>
-        <AccountClient name={user.name} email={user.email ?? ""} newsletterConsent={user.newsletterConsent} />
+        <AccountClient
+          email={user.email ?? ""}
+          newsletterConsent={user.newsletterConsent}
+          firstName={user.firstName}
+          lastName={user.lastName}
+          phone={user.phone}
+          birthDate={user.birthDate?.toISOString().split("T")[0] ?? null}
+          addressLine1={user.addressLine1}
+          addressLine2={user.addressLine2}
+          postalCode={user.postalCode}
+          city={user.city}
+          country={user.country ?? "DK"}
+        />
       </div>
 
       {/* Fanclub card */}
