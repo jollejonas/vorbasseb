@@ -16,13 +16,15 @@ const FONT_SIZE_LABELS = { small: "Lille", medium: "Medium", large: "Stor" } as 
 
 // ─── Canvas (left column) ─────────────────────────────────────────────────────
 
+type ZoneWithFixedLogo = DesignerZone & { fixedLogo: DesignerLogo | null };
+
 type CanvasProps = {
   product: ProductDesignerFields;
-  zones: DesignerZone[];
+  zones: ZoneWithFixedLogo[];
   printElements: PrintElement[];
   previewSide: "front" | "back";
   clickedZoneId: number | null;
-  onZoneClick: (zone: DesignerZone) => void;
+  onZoneClick: (zone: ZoneWithFixedLogo) => void;
   toastMsg: string | null;
 };
 
@@ -41,11 +43,12 @@ export function JerseyDesignerCanvas({
   const previewImage =
     previewSide === "front" ? product.images[frontImageIdx] : product.images[backImageIdx];
 
-  const visibleZones = zones.filter((z) => z.side === previewSide);
+  const visibleZones = zones.filter((z) => z.side === previewSide && !z.fixedLogo);
+  const visibleFixedZones = zones.filter((z) => z.side === previewSide && z.fixedLogo);
   const visibleElements = printElements.filter((p) => p.side === previewSide);
 
   const zoneMap = useMemo(() => {
-    const m = new Map<number, DesignerZone>();
+    const m = new Map<number, ZoneWithFixedLogo>();
     zones.forEach((z) => m.set(z.id, z));
     return m;
   }, [zones]);
@@ -124,6 +127,22 @@ export function JerseyDesignerCanvas({
             </div>
           );
         })}
+        {/* Fixed logo overlays — always rendered, not clickable */}
+        {visibleFixedZones.map((z) => (
+          <div
+            key={`fixed-${z.id}`}
+            className="absolute pointer-events-none flex items-center justify-center"
+            style={{
+              left: `${z.previewX}%`,
+              top: `${z.previewY}%`,
+              width: `${z.previewW}%`,
+              height: `${z.previewH}%`,
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={z.fixedLogo!.imageUrl} alt={z.label} className="max-w-full max-h-full object-contain drop-shadow" />
+          </div>
+        ))}
       </div>
 
       {visibleZones.length > 0 && !clickedZoneId && (
@@ -139,13 +158,13 @@ export function JerseyDesignerCanvas({
 // ─── Controls (right column) ──────────────────────────────────────────────────
 
 type ControlsProps = {
-  zones: DesignerZone[];
+  zones: ZoneWithFixedLogo[];
   logos: DesignerLogo[];
   vatPct?: number;
   printElements: PrintElement[];
   onRemovePrint: (idx: number) => void;
   // Clicked zone state
-  clickedZone: DesignerZone | null;
+  clickedZone: ZoneWithFixedLogo | null;
   onClosePanel: () => void;
   addType: "text" | "logo";
   onAddTypeChange: (t: "text" | "logo") => void;
@@ -187,7 +206,7 @@ export function JerseyDesignerControls({
   onCloseDesigner,
 }: ControlsProps) {
   const zoneMap = useMemo(() => {
-    const m = new Map<number, DesignerZone>();
+    const m = new Map<number, ZoneWithFixedLogo>();
     zones.forEach((z) => m.set(z.id, z));
     return m;
   }, [zones]);

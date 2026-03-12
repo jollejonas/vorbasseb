@@ -28,11 +28,12 @@ type OptionGroupFull = ProductOptionGroup & { values: OptionValueFull[] };
 type SkuWithOptions = SKU & { optionValues: { optionValueId: string }[] };
 type ColorVariantWithSkus = ColorVariant & { skus: SKU[] };
 
+type ZoneWithFixedLogo = DesignerZone & { fixedLogo: DesignerLogo | null };
 type ProductFull = Product & {
   optionGroups: OptionGroupFull[];
   skus: SkuWithOptions[];
   colorVariants: ColorVariantWithSkus[];
-  designerZones: DesignerZone[];
+  designerZones: ZoneWithFixedLogo[];
 };
 
 type PakketilbudItemData = {
@@ -194,7 +195,7 @@ function ItemStep({
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const zoneMap = useMemo(() => {
-    const m = new Map<number, DesignerZone>();
+    const m = new Map<number, ZoneWithFixedLogo>();
     product.designerZones.forEach((z) => m.set(z.id, z));
     return m;
   }, [product.designerZones]);
@@ -821,8 +822,23 @@ export function PakketilbudWizard({
         size = sku?.size ?? "";
       }
 
+      // Auto-inject fixed zone logos
+      const fixedElements: PrintElement[] = product.designerZones
+        .filter((z) => z.fixedLogo)
+        .map((z) => ({
+          side: z.side as "front" | "back",
+          zoneId: z.id,
+          zoneLabel: z.label,
+          position: z.position,
+          type: "logo" as const,
+          value: String(z.fixedLogo!.id),
+          logoUrl: z.fixedLogo!.imageUrl,
+          fontSize: "medium" as const,
+        }));
+      const allPrintElements = [...fixedElements, ...state.printElements];
+
       // Add designer zone fees
-      const designerFee = state.printElements.reduce((t, el) => {
+      const designerFee = allPrintElements.reduce((t, el) => {
         const zone = product.designerZones.find((z) => z.id === el.zoneId);
         return t + (zone?.price ?? 0);
       }, 0);
@@ -839,7 +855,7 @@ export function PakketilbudWizard({
         customName,
         customNumber,
         customizationFee,
-        printElements: state.printElements.length > 0 ? state.printElements : undefined,
+        printElements: allPrintElements.length > 0 ? allPrintElements : undefined,
       };
     });
 
