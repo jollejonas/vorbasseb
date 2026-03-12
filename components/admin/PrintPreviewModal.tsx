@@ -80,6 +80,7 @@ export function PrintPreviewModal({ label, printSummary, product, printElements 
               clickedZoneId={null}
               onZoneClick={() => {}}
               toastMsg={null}
+              readOnly
             />
           </div>
         </div>

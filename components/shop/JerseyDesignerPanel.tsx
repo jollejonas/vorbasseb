@@ -26,6 +26,7 @@ type CanvasProps = {
   clickedZoneId: number | null;
   onZoneClick: (zone: ZoneWithFixedLogo) => void;
   toastMsg: string | null;
+  readOnly?: boolean;
 };
 
 export function JerseyDesignerCanvas({
@@ -36,6 +37,7 @@ export function JerseyDesignerCanvas({
   clickedZoneId,
   onZoneClick,
   toastMsg,
+  readOnly = false,
 }: CanvasProps) {
   const printColor = product.designerPrintColor ?? "#FFFFFF";
   const frontImageIdx = product.designerFrontImageIdx ?? 0;
@@ -66,7 +68,7 @@ export function JerseyDesignerCanvas({
         )}
 
         {/* Clickable zone rectangles */}
-        {visibleZones.map((zone) => {
+        {!readOnly && visibleZones.map((zone) => {
           const isActive = zone.id === clickedZoneId;
           return (
             <button
@@ -145,7 +147,7 @@ export function JerseyDesignerCanvas({
         ))}
       </div>
 
-      {visibleZones.length > 0 && !clickedZoneId && (
+      {!readOnly && visibleZones.length > 0 && !clickedZoneId && (
         <p className="text-xs text-center text-gray-400">Klik på en zone for at tilføje tryk</p>
       )}
       {toastMsg && (
