@@ -101,9 +101,10 @@ export default async function OrderDetailPage({ params }: Params) {
 
             // Pakketilbud
             if (opts && typeof opts === "object" && !Array.isArray(opts) && (opts as { isPakketilbud?: boolean }).isPakketilbud) {
+              type PrintEl = { zoneLabel: string; side: string; type: string; value: string };
               const meta = opts as {
                 pakketilbudName: string;
-                items: { label?: string; productName?: string; size?: string; colorName?: string; customName?: string; customNumber?: string }[];
+                items: { label?: string; productName?: string; size?: string; colorName?: string; customName?: string; customNumber?: string; printElements?: PrintEl[] }[];
               };
               return (
                 <li key={item.id} className="px-5 py-4">
@@ -122,6 +123,9 @@ export default async function OrderDetailPage({ params }: Params) {
                             {comp.colorName && <span className="text-gray-400">· {comp.colorName}</span>}
                             {comp.customName && <span className="text-gray-400">· {comp.customName}</span>}
                             {comp.customNumber && <span className="text-gray-400">#{comp.customNumber}</span>}
+                            {comp.printElements && comp.printElements.length > 0 && (
+                              <span className="text-gray-400">· {comp.printElements.map((p) => p.type === "text" ? `${p.zoneLabel}: ${p.value}` : `${p.zoneLabel}: Logo`).join(", ")}</span>
+                            )}
                           </li>
                         ))}
                       </ul>

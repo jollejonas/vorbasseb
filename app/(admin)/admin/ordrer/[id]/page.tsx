@@ -121,82 +121,79 @@ export default async function AdminOrderDetailPage({ params }: Params) {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {order.items.map((item) => {
-              type PakketilbudItemMeta = { itemId: string; productId: string; productName: string; label?: string; skuId: string; size: string; colorName?: string; customName?: string; customNumber?: string };
+              type PrintEl = { zoneLabel: string; side: string; type: string; value: string; fontSize: string };
+              type PakketilbudItemMeta = { itemId: string; productId: string; productName: string; label?: string; skuId: string; size: string; colorName?: string; customName?: string; customNumber?: string; printElements?: PrintEl[] };
               type PakketilbudOrderMeta = { isPakketilbud: true; pakketilbudName: string; items: PakketilbudItemMeta[] };
               const rawOpt = item.optionSelections as PakketilbudOrderMeta | { printElements: { side: string; zoneLabel: string; type: string; value: string; fontSize: string }[] } | { groupLabel: string; value: string }[] | null;
               const pakkeMeta = rawOpt && !Array.isArray(rawOpt) && (rawOpt as PakketilbudOrderMeta).isPakketilbud === true ? (rawOpt as PakketilbudOrderMeta) : null;
+              // ── Pakketilbud row ──────────────────────────────────────────────
+              if (pakkeMeta) {
+                return (
+                  <tr key={item.id} className="align-top">
+                    <td className="px-5 py-3 font-medium">
+                      {pakkeMeta.pakketilbudName}
+                      <span className="ml-2 text-xs text-gray-400 font-normal">Pakketilbud</span>
+                    </td>
+                    <td colSpan={4} className="px-5 py-3">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="text-gray-400">
+                            <th className="text-left pr-4 pb-1 font-medium">Produkt</th>
+                            <th className="text-left pr-4 pb-1 font-medium">Størrelse</th>
+                            <th className="text-left pr-4 pb-1 font-medium">Farve</th>
+                            <th className="text-left pb-1 font-medium">Tryk</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {pakkeMeta.items.map((c, ci) => {
+                            const printText = [
+                              ...(c.customName ? [c.customName] : []),
+                              ...(c.customNumber ? [`#${c.customNumber}`] : []),
+                              ...(c.printElements?.map((p) => p.type === "text" ? `${p.zoneLabel}: ${p.value}` : `${p.zoneLabel}: Logo`) ?? []),
+                            ].join(" · ");
+                            return (
+                              <tr key={ci}>
+                                <td className="pr-4 py-0.5 font-medium text-gray-700">{c.label || c.productName}</td>
+                                <td className="pr-4 py-0.5 text-gray-500">{c.size || "–"}</td>
+                                <td className="pr-4 py-0.5 text-gray-500">{c.colorName || "–"}</td>
+                                <td className="py-0.5 text-gray-500">{printText || "–"}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </td>
+                    <td className="px-5 py-3 text-right">{item.quantity}</td>
+                    <td className="px-5 py-3 text-right font-medium">{formatPrice(item.priceAtPurchase * item.quantity)}</td>
+                  </tr>
+                );
+              }
+
+              // ── Regular item row ─────────────────────────────────────────────
+              const raw = rawOpt;
+              const printParts: string[] = [];
+              if (item.customName || item.customNumber) {
+                printParts.push([item.customName, item.customNumber ? `#${item.customNumber}` : null].filter(Boolean).join(" "));
+              }
+              if (raw && !Array.isArray(raw) && (raw as { printElements?: unknown[] }).printElements) {
+                ((raw as { printElements: PrintEl[] }).printElements).forEach((p) => {
+                  printParts.push(p.type === "text" ? `${p.zoneLabel}: ${p.value}` : `${p.zoneLabel}: Logo`);
+                });
+              }
+              const selections = Array.isArray(raw) ? raw : [];
+              if (selections.length) {
+                printParts.push(...selections.map((s) => `${s.groupLabel}: ${s.value}`));
+              }
+
               return (
               <tr key={item.id}>
-                <td className="px-5 py-3">{pakkeMeta ? pakkeMeta.pakketilbudName : (item.sku?.product.name ?? "–")}</td>
-                <td className="px-5 py-3 font-mono text-xs text-gray-500">
-                  {item.sku?.itemNumber ?? "–"}
-                </td>
-                <td className="px-5 py-3">{pakkeMeta ? "Pakke" : (item.sku?.size ?? "–")}</td>
-                <td className="px-5 py-3 text-gray-500">{pakkeMeta ? "–" : (item.colorName ?? "–")}</td>
-                <td className="px-5 py-3 text-gray-500">
-                  {(() => {
-                    const raw = rawOpt;
-
-                    // Pakketilbud order: show item list
-                    if (pakkeMeta) {
-                      return (
-                        <ul className="space-y-0.5">
-                          {pakkeMeta.items.map((c, ci) => (
-                            <li key={ci} className="text-xs">
-                              <span className="font-medium text-gray-700">{c.label || c.productName}</span>
-                              <span className="text-gray-500"> · {c.size}{c.colorName ? ` · ${c.colorName}` : ""}</span>
-                              {c.customName && <span className="text-gray-500"> · Tryk: {c.customName}</span>}
-                              {c.customNumber && <span className="text-gray-500"> #{c.customNumber}</span>}
-                            </li>
-                          ))}
-                        </ul>
-                      );
-                    }
-
-                    // Designer order: show print spec table
-                    if (raw && !Array.isArray(raw) && (raw as { printElements?: unknown[] }).printElements && (raw as { printElements: unknown[] }).printElements.length) {
-                      return (
-                        <table className="text-xs border-collapse w-full">
-                          <thead>
-                            <tr className="text-gray-400">
-                              <th className="text-left pr-2 font-medium">Side</th>
-                              <th className="text-left pr-2 font-medium">Zone</th>
-                              <th className="text-left pr-2 font-medium">Type</th>
-                              <th className="text-left pr-2 font-medium">Indhold</th>
-                              <th className="text-left font-medium">Str.</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {((raw as { printElements: { side: string; zoneLabel: string; type: string; value: string; fontSize: string }[] }).printElements).map((p, pi) => (
-                              <tr key={pi} className="border-t border-gray-100">
-                                <td className="pr-2 py-0.5">{p.side === "front" ? "Forside" : "Bagside"}</td>
-                                <td className="pr-2 py-0.5">{p.zoneLabel}</td>
-                                <td className="pr-2 py-0.5">{p.type === "text" ? "Tekst" : "Logo"}</td>
-                                <td className="pr-2 py-0.5 font-mono">{p.value}</td>
-                                <td className="py-0.5">{p.fontSize === "small" ? "Lille" : p.fontSize === "large" ? "Stor" : "Medium"}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      );
-                    }
-
-                    // Normal order
-                    const parts: string[] = [];
-                    if (item.customName || item.customNumber) {
-                      parts.push([item.customName, item.customNumber ? `#${item.customNumber}` : null].filter(Boolean).join(" "));
-                    }
-                    const selections = Array.isArray(raw) ? raw : [];
-                    if (selections.length) {
-                      parts.push(...selections.map((s) => `${s.groupLabel}: ${s.value}`));
-                    }
-                    return parts.length > 0 ? parts.join(" · ") : "–";
-                  })()}
-                </td>
+                <td className="px-5 py-3">{item.sku?.product.name ?? "–"}</td>
+                <td className="px-5 py-3 font-mono text-xs text-gray-500">{item.sku?.itemNumber ?? "–"}</td>
+                <td className="px-5 py-3">{item.sku?.size ?? "–"}</td>
+                <td className="px-5 py-3 text-gray-500">{item.colorName ?? "–"}</td>
+                <td className="px-5 py-3 text-gray-500">{printParts.length > 0 ? printParts.join(" · ") : "–"}</td>
                 <td className="px-5 py-3 text-right">{item.quantity}</td>
-                <td className="px-5 py-3 text-right font-medium">
-                  {formatPrice(item.priceAtPurchase * item.quantity)}
-                </td>
+                <td className="px-5 py-3 text-right font-medium">{formatPrice(item.priceAtPurchase * item.quantity)}</td>
               </tr>
               );
             })}
