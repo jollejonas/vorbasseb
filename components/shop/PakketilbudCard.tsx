@@ -31,7 +31,7 @@ export function PakketilbudCard({ pakketilbud, vatPct, isSoldOut = false }: Prop
           <img
             src={pakketilbud.images[0]}
             alt={pakketilbud.name}
-            className={`w-full h-full object-cover transition duration-300 ${
+            className={`w-full h-full object-contain transition duration-300 ${
               isSoldOut ? "grayscale" : "group-hover:scale-105"
             }`}
           />
