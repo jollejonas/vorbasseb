@@ -41,14 +41,6 @@ function WizardView({
 
   return (
     <div>
-      <button
-        type="button"
-        onClick={onBack}
-        className="text-sm text-gray-500 hover:text-secondary mb-6 inline-flex items-center gap-1"
-      >
-        ← Tilbage til pakken
-      </button>
-
       {isSoldOut && (
         <div className="mb-6 rounded-xl border border-orange-200 bg-orange-50 px-5 py-4 text-sm text-orange-800">
           <strong>Midlertidigt udsolgt:</strong>{" "}
@@ -56,7 +48,7 @@ function WizardView({
         </div>
       )}
 
-      <PakketilbudWizard pakketilbud={pakketilbud} vatPct={vatPct} isSoldOut={isSoldOut} logos={logos} />
+      <PakketilbudWizard pakketilbud={pakketilbud} vatPct={vatPct} isSoldOut={isSoldOut} logos={logos} onBack={onBack} />
     </div>
   );
 }
@@ -124,7 +116,7 @@ export function PakketilbudPageClient({ pakketilbud, vatPct, isSoldOut, soldOutI
         </div>
 
         {pakketilbud.description && (
-          <p className="text-gray-600 leading-relaxed">{pakketilbud.description}</p>
+          <p className="text-gray-600 leading-snug">{pakketilbud.description}</p>
         )}
 
         <div>

@@ -291,7 +291,7 @@ function ItemStep({
         {product.description && (
           <div className={`grid transition-all duration-300 ${designerOpen ? "grid-rows-[0fr]" : "grid-rows-[1fr]"}`}>
             <div className="overflow-hidden">
-              <p className="text-gray-600 text-sm leading-relaxed pb-1">{product.description}</p>
+              <p className="text-gray-600 text-sm leading-snug pb-1">{product.description}</p>
             </div>
           </div>
         )}
@@ -370,7 +370,7 @@ function ItemStep({
                         })
                       }
                       disabled={!available}
-                      className={`w-12 h-8 rounded-lg border text-sm font-medium transition ${
+                      className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition ${
                         selected
                           ? "bg-secondary text-white border-secondary"
                           : !available
@@ -473,7 +473,7 @@ function ItemStep({
                       type="button"
                       onClick={() => available && onChange({ selectedLegacySkuId: sku.id })}
                       disabled={!available}
-                      className={`w-12 h-8 rounded-lg border text-sm font-medium transition ${
+                      className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition ${
                         selected
                           ? "bg-secondary text-white border-secondary"
                           : !available
@@ -725,11 +725,13 @@ export function PakketilbudWizard({
   vatPct,
   isSoldOut = false,
   logos = [],
+  onBack,
 }: {
   pakketilbud: PakketilbudData;
   vatPct: number;
   isSoldOut?: boolean;
   logos?: DesignerLogo[];
+  onBack?: () => void;
 }) {
   const { addItem } = useCart();
   const [currentStep, setCurrentStep] = useState(0);
@@ -941,6 +943,15 @@ export function PakketilbudWizard({
             </button>
           </li>
         </ul>
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="mt-4 text-xs text-gray-400 hover:text-secondary flex items-center gap-1"
+          >
+            ← Tilbage til pakken
+          </button>
+        )}
       </aside>
 
       {/* Step content */}

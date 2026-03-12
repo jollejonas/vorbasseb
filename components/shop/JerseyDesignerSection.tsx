@@ -219,7 +219,7 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
             )}
 
             {/* Jersey image with clickable zone rects + print overlays */}
-            <div className="relative w-full max-w-xs mx-auto rounded-xl overflow-hidden bg-gray-50 border border-gray-100">
+            <div className="relative w-full rounded-xl overflow-hidden bg-gray-50 border border-gray-100">
               {previewImage ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={previewImage} alt={`${product.name} ${previewSide}`} className="w-full object-contain" />
@@ -453,7 +453,7 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
           </p>
           <div className={`grid transition-all duration-300 ${isDesignerOpen ? "grid-rows-[0fr]" : "grid-rows-[1fr]"}`}>
             <div className="overflow-hidden">
-              <p className="text-gray-600 leading-relaxed pb-1">{product.description}</p>
+              <p className="text-gray-600 leading-snug pb-1">{product.description}</p>
             </div>
           </div>
         </div>
