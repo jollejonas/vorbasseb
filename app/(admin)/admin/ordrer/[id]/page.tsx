@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/utils";
 import { AdminOrderActions } from "@/components/admin/AdminOrderActions";
 import { PrintPreviewModal } from "@/components/admin/PrintPreviewModal";
+import { PrintButton } from "@/components/admin/PrintButton";
 
 export const metadata: Metadata = { title: "Ordredetaljer – Admin" };
 
@@ -84,13 +85,14 @@ export default async function AdminOrderDetailPage({ params }: Params) {
   return (
     <div className="max-w-4xl mx-auto px-4 py-10">
       <div className="flex items-center gap-4 mb-8">
-        <Link href="/admin/ordrer" className="text-sm text-gray-500 hover:text-secondary">
+        <Link href="/admin/ordrer" className="text-sm text-gray-500 hover:text-secondary print:hidden">
           ← Ordrer
         </Link>
         <h1 className="text-2xl font-bold">Ordre #{order.orderNumber}</h1>
         <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
           {STATUS_LABELS[order.status] ?? order.status}
         </span>
+        <PrintButton />
       </div>
 
       <div className="grid md:grid-cols-2 gap-6 mb-8">
@@ -295,7 +297,7 @@ export default async function AdminOrderDetailPage({ params }: Params) {
       </section>
 
       {/* Actions */}
-      <section className="border rounded-xl p-5">
+      <section className="border rounded-xl p-5 print:hidden">
         <h2 className="font-semibold text-gray-700 mb-4">Status &amp; handling</h2>
         <AdminOrderActions
           orderId={order.id}
