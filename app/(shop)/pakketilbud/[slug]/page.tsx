@@ -42,7 +42,7 @@ export default async function PakketilbudPage({ params }: Props) {
                   include: { skus: { orderBy: { size: "asc" } } },
                   orderBy: { position: "asc" },
                 },
-                designerZones: { orderBy: { positionOrd: "asc" } },
+                designerZones: { include: { fixedLogo: true }, orderBy: { positionOrd: "asc" } },
               },
             },
           },

@@ -14,21 +14,24 @@ export default async function RedigerProduktPage({ params }: Props) {
   if (session?.user?.role !== "ADMIN") redirect("/");
 
   const { id } = await params;
-  const product = await prisma.product.findUnique({
-    where: { id },
-    include: {
-      skus: { include: { optionValues: { select: { optionValueId: true } } }, orderBy: { size: "asc" } },
-      category: true,
-      colorVariants: { include: { skus: { orderBy: { size: "asc" } } }, orderBy: { position: "asc" } },
-      optionGroups: {
-        include: {
-          values: { include: { globalColor: true }, orderBy: { position: "asc" } },
+  const [product, designerLogos] = await Promise.all([
+    prisma.product.findUnique({
+      where: { id },
+      include: {
+        skus: { include: { optionValues: { select: { optionValueId: true } } }, orderBy: { size: "asc" } },
+        category: true,
+        colorVariants: { include: { skus: { orderBy: { size: "asc" } } }, orderBy: { position: "asc" } },
+        optionGroups: {
+          include: {
+            values: { include: { globalColor: true }, orderBy: { position: "asc" } },
+          },
+          orderBy: { position: "asc" },
         },
-        orderBy: { position: "asc" },
+        designerZones: { include: { fixedLogo: true }, orderBy: { positionOrd: "asc" } },
       },
-      designerZones: { orderBy: { positionOrd: "asc" } },
-    },
-  });
+    }),
+    prisma.designerLogo.findMany({ orderBy: { id: "asc" } }),
+  ]);
 
   if (!product) notFound();
 
@@ -43,7 +46,7 @@ export default async function RedigerProduktPage({ params }: Props) {
         </a>
         <h1 className="text-3xl font-bold">Rediger produkt</h1>
       </div>
-      <ProductForm product={product} />
+      <ProductForm product={product} designerLogos={designerLogos} />
     </div>
   );
 }

@@ -7,10 +7,11 @@ import type { Product, SKU, DesignerZone, DesignerLogo, ProductOptionGroup, Prod
 
 type SkuFull = SKU & { optionValues: { optionValueId: string }[] };
 type OptionGroupFull = ProductOptionGroup & { values: (ProductOptionValue & { globalColor: GlobalColor | null; skuValues: SKUOptionValue[] })[] };
+type ZoneWithFixedLogo = DesignerZone & { fixedLogo: DesignerLogo | null };
 
 type Props = {
   product: Product;
-  zones: DesignerZone[];
+  zones: ZoneWithFixedLogo[];
   logos: DesignerLogo[];
   skus: SkuFull[];
   vatPct?: number;
@@ -58,7 +59,9 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
       ? selectedColorValue!.images[0]
       : product.images[0];
 
-  const visibleZones = zones.filter((z) => z.side === previewSide);
+  const interactiveZones = zones.filter((z) => !z.fixedLogo);
+  const fixedZones = zones.filter((z) => z.fixedLogo);
+  const visibleZones = interactiveZones.filter((z) => z.side === previewSide);
   const visibleElements = printElements.filter((p) => p.side === previewSide);
 
   const zoneMap = useMemo(() => {
@@ -146,7 +149,19 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
       return v ? [{ groupLabel: g.label, value: v.label }] : [];
     });
 
-    const designerFee = printElements.reduce((sum, el) => {
+    const fixedElements: PrintElement[] = fixedZones.map((z) => ({
+      side: z.side as "front" | "back",
+      zoneId: z.id,
+      zoneLabel: z.label,
+      position: z.position,
+      type: "logo" as const,
+      value: String(z.fixedLogo!.id),
+      logoUrl: z.fixedLogo!.imageUrl,
+      fontSize: "medium" as const,
+    }));
+
+    const allPrintElements = [...fixedElements, ...printElements];
+    const designerFee = allPrintElements.reduce((sum, el) => {
       const zone = zoneMap.get(el.zoneId);
       return sum + (zone?.price ?? 0);
     }, 0);
@@ -160,7 +175,7 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
       quantity: 1,
       image: product.images[0],
       clubRoleRequired: product.clubRoleRequired ?? null,
-      printElements,
+      printElements: allPrintElements,
       optionSelections: optionSelections.length > 0 ? optionSelections : undefined,
       customizationFee: designerFee > 0 ? designerFee : undefined,
     });
@@ -261,6 +276,23 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
                   </div>
                 );
               })}
+
+              {/* Fixed logo overlays — always rendered, not clickable by customer */}
+              {fixedZones.filter((z) => z.side === previewSide).map((z) => (
+                <div
+                  key={`fixed-${z.id}`}
+                  className="absolute pointer-events-none flex items-center justify-center"
+                  style={{
+                    left: `${z.previewX}%`,
+                    top: `${z.previewY}%`,
+                    width: `${z.previewW}%`,
+                    height: `${z.previewH}%`,
+                  }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={z.fixedLogo!.imageUrl} alt={z.label} className="max-w-full max-h-full object-contain drop-shadow" />
+                </div>
+              ))}
             </div>
 
             {visibleZones.length > 0 && !clickedZoneId && (
@@ -281,10 +313,8 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
                         {clickedZone.side === "front" ? "Forside" : "Bagside"}
                       </span>
                     </p>
-                    {(clickedZone as typeof clickedZone & { tipText?: string }).tipText && (
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {(clickedZone as typeof clickedZone & { tipText?: string }).tipText}
-                      </p>
+                    {clickedZone.tipText && (
+                      <p className="text-xs text-gray-500 mt-0.5">{clickedZone.tipText}</p>
                     )}
                   </div>
                   <button

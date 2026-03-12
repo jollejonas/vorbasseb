@@ -41,7 +41,7 @@ export default async function ProductPage({ params }: Props) {
           },
           orderBy: { position: "asc" },
         },
-        designerZones: { orderBy: { positionOrd: "asc" } },
+        designerZones: { include: { fixedLogo: true }, orderBy: { positionOrd: "asc" } },
       },
     }),
     getVatRate(),

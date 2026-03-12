@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { slugify } from "@/lib/utils";
-import type { Product, SKU, Category, ClubRole, ColorVariant, ProductOptionGroup, ProductOptionValue, GlobalColor, OptionGroupTemplate, OptionGroupTemplateValue, DesignerZone } from "@prisma/client";
+import type { Product, SKU, Category, ClubRole, ColorVariant, ProductOptionGroup, ProductOptionValue, GlobalColor, OptionGroupTemplate, OptionGroupTemplateValue, DesignerZone, DesignerLogo } from "@prisma/client";
 import { X } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -13,12 +13,13 @@ type OptionValueWithColor = ProductOptionValue & { globalColor: GlobalColor | nu
 type OptionGroupWithValues = ProductOptionGroup & { values: OptionValueWithColor[] };
 type ColorVariantWithSkus = ColorVariant & { skus: SKU[] };
 type SkuWithOptions = SKU & { optionValues: { optionValueId: string }[] };
+type DesignerZoneWithLogo = DesignerZone & { fixedLogo: DesignerLogo | null };
 type ProductWithRelations = Product & {
   skus: SkuWithOptions[];
   category: Category | null;
   colorVariants: ColorVariantWithSkus[];
   optionGroups: OptionGroupWithValues[];
-  designerZones: DesignerZone[];
+  designerZones: DesignerZoneWithLogo[];
 };
 
 type OptionType = "COLOR" | "SIZE" | "TEXT" | "SELECT" | "CUSTOM";
@@ -168,7 +169,7 @@ function buildInitialProductState(product: ProductWithRelations | undefined): {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ProductForm({ product }: { product?: ProductWithRelations }) {
+export function ProductForm({ product, designerLogos = [] }: { product?: ProductWithRelations; designerLogos?: DesignerLogo[] }) {
   const router = useRouter();
   const isEdit = !!product;
 
@@ -214,6 +215,7 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
     previewH: number;
     priceKr: string;
     tipText: string;
+    fixedLogoId: number | null;
   };
 
   const [designerZones, setDesignerZones] = useState<ZoneRow[]>(
@@ -229,6 +231,7 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
       previewH: z.previewH,
       priceKr: (z as typeof z & { price?: number }).price ? ((z as typeof z & { price?: number }).price! / 100).toFixed(2) : "",
       tipText: (z as typeof z & { tipText?: string }).tipText ?? "",
+      fixedLogoId: z.fixedLogoId ?? null,
     }))
   );
   const [designerSaving, setDesignerSaving] = useState(false);
@@ -1171,6 +1174,7 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
                       previewH: pendingArea.h / 3,
                       priceKr: "",
                       tipText: "",
+                      fixedLogoId: null,
                     });
                   });
                   const nextIdx = designerZones.length + newZones.length - 1;
@@ -1194,6 +1198,7 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
                     previewH: pendingArea.h,
                     priceKr: "",
                     tipText: "",
+                    fixedLogoId: null,
                   };
                   setDesignerZones((prev) => [...prev, newZone]);
                   setPendingArea(null);
@@ -1437,6 +1442,23 @@ export function ProductForm({ product }: { product?: ProductWithRelations }) {
                                 onChange={(e) => update({ tipText: e.target.value })}
                                 className="w-full border rounded-lg px-2 py-1.5 text-sm" />
                             </div>
+                            {designerLogos.length > 0 && (
+                              <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Fast logo (skjules for kunden)</label>
+                                <select
+                                  value={zone.fixedLogoId ?? ""}
+                                  onChange={(e) => update({ fixedLogoId: e.target.value ? Number(e.target.value) : null })}
+                                  className="w-full border rounded-lg px-2 py-1.5 text-sm">
+                                  <option value="">Ingen (zone er klikbar)</option>
+                                  {designerLogos.map((l) => (
+                                    <option key={l.id} value={l.id}>{l.name}</option>
+                                  ))}
+                                </select>
+                                {zone.fixedLogoId && (
+                                  <p className="text-xs text-amber-600 mt-1">Fast logo — zone skjult for kunden</p>
+                                )}
+                              </div>
+                            )}
                           </div>
                         );
                       })()}

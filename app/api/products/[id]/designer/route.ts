@@ -41,6 +41,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       previewH: number;
       price: number;
       tipText?: string;
+      fixedLogoId?: number | null;
       positionOrd: number;
     }[];
   };
@@ -71,6 +72,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
           previewH: z.previewH,
           price: z.price ?? 0,
           tipText: z.tipText || null,
+          fixedLogoId: z.fixedLogoId ?? null,
           positionOrd: i,
         },
       })
@@ -79,7 +81,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   const updated = await prisma.product.findUnique({
     where: { id },
-    include: { designerZones: { orderBy: { positionOrd: "asc" } } },
+    include: { designerZones: { include: { fixedLogo: true }, orderBy: { positionOrd: "asc" } } },
   });
   return NextResponse.json(updated);
 }
