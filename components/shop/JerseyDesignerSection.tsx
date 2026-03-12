@@ -438,16 +438,16 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
       </div>
 
       {/* RIGHT — title, options, designer toggle, prints, cart */}
-      <div className="space-y-5">
+      <div className="space-y-3">
         {/* Product info */}
         <div>
           {product.membersOnly && (
-            <span className="inline-block bg-secondary text-white text-xs font-semibold px-3 py-1 rounded-full mb-3">
+            <span className="inline-block bg-secondary text-white text-xs font-semibold px-3 py-1 rounded-full mb-2">
               Kun for fanklubsmedlemmer
             </span>
           )}
-          <h1 className="text-2xl font-bold mb-1">{product.name}</h1>
-          <p className="text-xl font-bold text-secondary mb-2">
+          <h1 className="text-xl font-bold mb-0">{product.name}</h1>
+          <p className="text-lg font-bold text-secondary mb-1">
             {formatPrice(withVat(product.price, vatPct))}
             <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
           </p>
@@ -461,7 +461,7 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
         {/* COLOR swatches */}
         {colorGroup && (
           <div>
-            <p className="text-sm font-medium text-gray-700 mb-2">
+            <p className="text-sm font-medium text-gray-700 mb-1">
               {colorGroup.label}
               {selectedColorValue && (
                 <span className="ml-2 font-bold text-secondary">– {selectedColorValue.label}</span>
@@ -474,7 +474,7 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
                   type="button"
                   onClick={() => setSelectedOptions((p) => ({ ...p, [colorGroup.id]: v.id }))}
                   title={v.label}
-                  className={`w-9 h-9 rounded-full border-2 transition ${
+                  className={`w-8 h-8 rounded-full border-2 transition ${
                     selectedOptions[colorGroup.id] === v.id
                       ? "border-secondary scale-110 shadow-md"
                       : "border-gray-200 hover:border-gray-400"
@@ -491,7 +491,7 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
         {/* SIZE buttons */}
         {sizeGroup && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{sizeGroup.label}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{sizeGroup.label}</label>
             <div className="flex flex-wrap gap-2">
               {sizeGroup.values.map((v) => {
                 const sizeSkus = skus.filter((s) => s.optionValues.some((sv) => sv.optionValueId === v.id));
@@ -502,7 +502,7 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
                     type="button"
                     disabled={!inStock}
                     onClick={() => setSelectedOptions((p) => ({ ...p, [sizeGroup.id]: v.id }))}
-                    className={`px-4 py-2 text-sm rounded-lg border transition ${
+                    className={`px-3 py-1.5 text-sm rounded-lg border transition ${
                       selectedOptions[sizeGroup.id] === v.id
                         ? "bg-secondary text-white border-secondary"
                         : inStock
@@ -521,7 +521,7 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
         {/* OTHER option groups (TEXT, SELECT, CUSTOM) */}
         {otherGroups.map((g) => (
           <div key={g.id}>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               {g.label}
               {g.required && <span className="text-red-400 ml-1">*</span>}
             </label>
@@ -532,7 +532,7 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
                     key={v.id}
                     type="button"
                     onClick={() => setSelectedOptions((p) => ({ ...p, [g.id]: v.id }))}
-                    className={`px-4 py-2 text-sm rounded-lg border transition ${
+                    className={`px-3 py-1.5 text-sm rounded-lg border transition ${
                       selectedOptions[g.id] === v.id
                         ? "bg-secondary text-white border-secondary"
                         : "border-gray-200 hover:border-secondary hover:text-secondary"

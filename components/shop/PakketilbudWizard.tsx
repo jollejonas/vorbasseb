@@ -282,11 +282,11 @@ function ItemStep({
 
   // ── Shared options JSX (always visible in right column) ───────────────────
   const optionsJsx = (
-    <div className="space-y-5">
+    <div className="space-y-3">
       <div>
-        <h3 className="text-xl font-bold mb-1">{item.label ?? product.name}</h3>
+        <h3 className="text-lg font-bold mb-0">{item.label ?? product.name}</h3>
         {item.label && item.label !== product.name && (
-          <p className="text-sm text-gray-500 mb-2">{product.name}</p>
+          <p className="text-sm text-gray-500 mb-1">{product.name}</p>
         )}
         {product.description && (
           <div className={`grid transition-all duration-300 ${designerOpen ? "grid-rows-[0fr]" : "grid-rows-[1fr]"}`}>
@@ -307,7 +307,7 @@ function ItemStep({
           {/* COLOR group */}
           {colorGroup && (
             <div>
-              <p className="text-sm font-medium text-gray-700 mb-2">
+              <p className="text-sm font-medium text-gray-700 mb-1">
                 {colorGroup.label}
                 {selectedColorValue && (
                   <span className="ml-2 text-secondary font-bold">– {selectedColorValue.label}</span>
@@ -326,7 +326,7 @@ function ItemStep({
                         })
                       }
                       title={v.label}
-                      className={`w-9 h-9 rounded-full border-2 transition ${
+                      className={`w-8 h-8 rounded-full border-2 transition ${
                         selected
                           ? "border-secondary scale-110 shadow-md"
                           : "border-gray-200 hover:border-gray-400"
@@ -342,7 +342,7 @@ function ItemStep({
           {/* SIZE group */}
           {sizeGroup && (
             <div>
-              <p className="text-sm font-medium text-gray-700 mb-2">
+              <p className="text-sm font-medium text-gray-700 mb-1">
                 {sizeGroup.label}
                 {stepState.selectedOptions[sizeGroup.id] && (
                   <span className="ml-2 text-secondary font-bold">
@@ -370,7 +370,7 @@ function ItemStep({
                         })
                       }
                       disabled={!available}
-                      className={`w-14 h-10 rounded-lg border text-sm font-medium transition ${
+                      className={`w-12 h-8 rounded-lg border text-sm font-medium transition ${
                         selected
                           ? "bg-secondary text-white border-secondary"
                           : !available
@@ -389,7 +389,7 @@ function ItemStep({
           {/* Other groups */}
           {otherGroups.map((g) => (
             <div key={g.id} className="border rounded-xl p-4 bg-gray-50">
-              <p className="text-sm font-medium text-gray-700 mb-2">
+              <p className="text-sm font-medium text-gray-700 mb-1">
                 {g.label}
                 {g.fee && g.fee > 0 && (
                   <span className="ml-2 text-gray-500 font-normal text-xs">
@@ -434,7 +434,7 @@ function ItemStep({
           {/* Legacy color variant picker */}
           {product.colorVariants.length > 0 && (
             <div>
-              <p className="text-sm font-medium text-gray-700 mb-2">Farve</p>
+              <p className="text-sm font-medium text-gray-700 mb-1">Farve</p>
               <div className="flex flex-wrap gap-2">
                 {product.colorVariants.map((cv) => {
                   const selected = stepState.selectedColorVariantId === cv.id;
@@ -446,7 +446,7 @@ function ItemStep({
                         onChange({ selectedColorVariantId: cv.id, selectedLegacySkuId: null })
                       }
                       title={cv.name}
-                      className={`w-9 h-9 rounded-full border-2 transition ${
+                      className={`w-8 h-8 rounded-full border-2 transition ${
                         selected
                           ? "border-secondary scale-110 shadow-md"
                           : "border-gray-200 hover:border-gray-400"
@@ -462,7 +462,7 @@ function ItemStep({
           {/* Legacy size picker */}
           {legacySkus.length > 0 && (
             <div>
-              <p className="text-sm font-medium text-gray-700 mb-2">Størrelse</p>
+              <p className="text-sm font-medium text-gray-700 mb-1">Størrelse</p>
               <div className="flex flex-wrap gap-2">
                 {legacySkus.map((sku) => {
                   const available = sku.stock > 0;
@@ -473,7 +473,7 @@ function ItemStep({
                       type="button"
                       onClick={() => available && onChange({ selectedLegacySkuId: sku.id })}
                       disabled={!available}
-                      className={`w-14 h-10 rounded-lg border text-sm font-medium transition ${
+                      className={`w-12 h-8 rounded-lg border text-sm font-medium transition ${
                         selected
                           ? "bg-secondary text-white border-secondary"
                           : !available
@@ -510,7 +510,7 @@ function ItemStep({
         />
 
         {/* Right: options + designer controls */}
-        <div className="space-y-5">
+        <div className="space-y-3">
           {optionsJsx}
           <JerseyDesignerControls
             zones={product.designerZones}
@@ -978,7 +978,7 @@ export function PakketilbudWizard({
 
         {/* Step header */}
         {!isSummary && (
-          <p className="text-xs text-gray-400 font-semibold uppercase tracking-widest mb-3">
+          <p className="text-xs text-gray-400 font-semibold uppercase tracking-widest mb-2">
             Trin {currentStep + 1} af {totalSteps}
           </p>
         )}
