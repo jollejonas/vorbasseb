@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Check, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { useCart, type PrintElement } from "./CartProvider";
@@ -169,12 +169,14 @@ function ItemStep({
   onChange,
   vatPct,
   logos,
+  stepIndex,
 }: {
   item: PakketilbudItemData;
   stepState: StepState;
   onChange: (patch: Partial<StepState>) => void;
   vatPct: number;
   logos: DesignerLogo[];
+  stepIndex: number;
 }) {
   const { product } = item;
   const hasOptionGroups = product.optionGroups.length > 0;
@@ -182,6 +184,7 @@ function ItemStep({
 
   // ── Designer local ephemeral state ────────────────────────────────────────
   const [designerOpen, setDesignerOpen] = useState(false);
+  useEffect(() => { setDesignerOpen(false); }, [stepIndex]);
   const [previewSide, setPreviewSide] = useState<"front" | "back">("front");
   const [clickedZoneId, setClickedZoneId] = useState<number | null>(null);
   const [addType, setAddType] = useState<"text" | "logo">("text");
@@ -284,7 +287,7 @@ function ItemStep({
         {item.label && item.label !== product.name && (
           <p className="text-sm text-gray-500 mb-2">{product.name}</p>
         )}
-        {product.description && (
+        {!designerOpen && product.description && (
           <p className="text-gray-600 text-sm leading-relaxed">{product.description}</p>
         )}
         {optionGroupFee > 0 && (
@@ -975,6 +978,7 @@ export function PakketilbudWizard({
             onChange={(patch) => updateStep(currentStep, patch)}
             vatPct={vatPct}
             logos={logos}
+            stepIndex={currentStep}
           />
         )}
 
