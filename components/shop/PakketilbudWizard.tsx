@@ -5,6 +5,7 @@ import { Check, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { useCart, type PrintElement } from "./CartProvider";
 import { JerseyDesignerCanvas, JerseyDesignerControls } from "./JerseyDesignerPanel";
+import { PrintConfirmDialog } from "./PrintConfirmDialog";
 import { formatPrice, withVat } from "@/lib/utils";
 import type {
   Product,
@@ -171,6 +172,8 @@ function ItemStep({
   vatPct,
   logos,
   stepIndex,
+  onAddTextChange,
+  onDesignerOpenChange,
 }: {
   item: PakketilbudItemData;
   stepState: StepState;
@@ -178,6 +181,8 @@ function ItemStep({
   vatPct: number;
   logos: DesignerLogo[];
   stepIndex: number;
+  onAddTextChange?: (text: string) => void;
+  onDesignerOpenChange?: (open: boolean) => void;
 }) {
   const { product } = item;
   const hasOptionGroups = product.optionGroups.length > 0;
@@ -185,7 +190,7 @@ function ItemStep({
 
   // ── Designer local ephemeral state ────────────────────────────────────────
   const [designerOpen, setDesignerOpen] = useState(false);
-  useEffect(() => { setDesignerOpen(false); }, [stepIndex]);
+  useEffect(() => { setDesignerOpen(false); onDesignerOpenChange?.(false); }, [stepIndex]); // eslint-disable-line react-hooks/exhaustive-deps
   const [previewSide, setPreviewSide] = useState<"front" | "back">("front");
   const [clickedZoneId, setClickedZoneId] = useState<number | null>(null);
   const [addType, setAddType] = useState<"text" | "logo">("text");
@@ -193,6 +198,23 @@ function ItemStep({
   const [addLogoId, setAddLogoId] = useState<number | null>(null);
   const [addFontSize, setAddFontSize] = useState<"small" | "medium" | "large">("medium");
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+
+  function handleAddTextChange(val: string) {
+    setAddText(val);
+    onAddTextChange?.(val);
+  }
+  function handleDesignerOpenChange(val: boolean) {
+    setDesignerOpen(val);
+    onDesignerOpenChange?.(val);
+  }
+  function withTextConfirm(action: () => void) {
+    if (designerOpen && addText.trim().length > 0) {
+      setPendingAction(() => action);
+    } else {
+      action();
+    }
+  }
 
   const zoneMap = useMemo(() => {
     const m = new Map<number, ZoneWithFixedLogo>();
@@ -321,9 +343,11 @@ function ItemStep({
                       key={v.id}
                       type="button"
                       onClick={() =>
-                        onChange({
-                          selectedOptions: { ...stepState.selectedOptions, [colorGroup.id]: v.id },
-                        })
+                        withTextConfirm(() =>
+                          onChange({
+                            selectedOptions: { ...stepState.selectedOptions, [colorGroup.id]: v.id },
+                          })
+                        )
                       }
                       title={v.label}
                       className={`w-8 h-8 rounded-full border-2 transition ${
@@ -365,9 +389,11 @@ function ItemStep({
                       type="button"
                       onClick={() =>
                         available &&
-                        onChange({
-                          selectedOptions: { ...stepState.selectedOptions, [sizeGroup.id]: v.id },
-                        })
+                        withTextConfirm(() =>
+                          onChange({
+                            selectedOptions: { ...stepState.selectedOptions, [sizeGroup.id]: v.id },
+                          })
+                        )
                       }
                       disabled={!available}
                       className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition ${
@@ -494,9 +520,18 @@ function ItemStep({
     </div>
   );
 
+  const confirmDialog = (
+    <PrintConfirmDialog
+      open={pendingAction !== null}
+      onConfirm={() => { pendingAction?.(); setPendingAction(null); }}
+      onCancel={() => setPendingAction(null)}
+    />
+  );
+
   // ── Designer open: canvas replaces gallery in left column ─────────────────
   if (hasDesigner && designerOpen) {
     return (
+      <>
       <div className="grid md:grid-cols-2 gap-6">
         {/* Left: jersey canvas */}
         <JerseyDesignerCanvas
@@ -525,7 +560,7 @@ function ItemStep({
             addType={addType}
             onAddTypeChange={setAddType}
             addText={addText}
-            onAddTextChange={setAddText}
+            onAddTextChange={handleAddTextChange}
             addLogoId={addLogoId}
             onAddLogoIdChange={setAddLogoId}
             addFontSize={addFontSize}
@@ -534,15 +569,18 @@ function ItemStep({
             hasBack={product.designerBackImageIdx !== null}
             previewSide={previewSide}
             onPreviewSideChange={setPreviewSide}
-            onCloseDesigner={() => { setDesignerOpen(false); setClickedZoneId(null); }}
+            onCloseDesigner={() => { handleDesignerOpenChange(false); setClickedZoneId(null); }}
           />
         </div>
       </div>
+      {confirmDialog}
+      </>
     );
   }
 
   // ── Default: gallery left, options + toggle right ─────────────────────────
   return (
+    <>
     <div className="grid md:grid-cols-2 gap-6">
       {/* Left: product gallery */}
       <div>
@@ -582,7 +620,7 @@ function ItemStep({
           <div className="mt-5">
             <button
               type="button"
-              onClick={() => setDesignerOpen(true)}
+              onClick={() => handleDesignerOpenChange(true)}
               className="w-full border border-secondary text-secondary font-semibold py-2.5 px-6 rounded-xl hover:bg-secondary/5 transition text-sm"
             >
               Tilføj tryk til produktet ▼
@@ -591,6 +629,8 @@ function ItemStep({
         )}
       </div>
     </div>
+    {confirmDialog}
+    </>
   );
 }
 
@@ -738,6 +778,17 @@ export function PakketilbudWizard({
   const [stepStates, setStepStates] = useState<StepState[]>(() =>
     pakketilbud.items.map((item) => initialStep(item.product)),
   );
+  const [stepAddText, setStepAddText] = useState("");
+  const [stepDesignerOpen, setStepDesignerOpen] = useState(false);
+  const [pendingNavAction, setPendingNavAction] = useState<(() => void) | null>(null);
+
+  function withNavTextConfirm(action: () => void) {
+    if (stepDesignerOpen && stepAddText.trim().length > 0) {
+      setPendingNavAction(() => action);
+    } else {
+      action();
+    }
+  }
 
   const totalSteps = pakketilbud.items.length; // last "step" = summary (index = totalSteps)
   const isSummary = currentStep === totalSteps;
@@ -1010,6 +1061,8 @@ export function PakketilbudWizard({
             vatPct={vatPct}
             logos={logos}
             stepIndex={currentStep}
+            onAddTextChange={setStepAddText}
+            onDesignerOpenChange={setStepDesignerOpen}
           />
         )}
 
@@ -1018,7 +1071,7 @@ export function PakketilbudWizard({
           {currentStep > 0 && (
             <button
               type="button"
-              onClick={() => setCurrentStep((s) => s - 1)}
+              onClick={() => withNavTextConfirm(() => setCurrentStep((s) => s - 1))}
               className="px-5 py-2.5 border rounded-xl text-sm hover:bg-gray-50 transition"
             >
               ← Forrige
@@ -1037,7 +1090,7 @@ export function PakketilbudWizard({
           ) : (
             <button
               type="button"
-              onClick={() => setCurrentStep((s) => s + 1)}
+              onClick={() => withNavTextConfirm(() => setCurrentStep((s) => s + 1))}
               disabled={!currentComplete}
               className="ml-auto bg-secondary text-white font-bold px-6 py-2.5 rounded-xl hover:bg-secondary-dark transition disabled:opacity-60 text-sm"
             >
@@ -1046,6 +1099,11 @@ export function PakketilbudWizard({
           )}
         </div>
       </div>
+      <PrintConfirmDialog
+        open={pendingNavAction !== null}
+        onConfirm={() => { pendingNavAction?.(); setPendingNavAction(null); }}
+        onCancel={() => setPendingNavAction(null)}
+      />
     </div>
   );
 }

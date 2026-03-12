@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { useCart, type PrintElement } from "./CartProvider";
 import { formatPrice, withVat } from "@/lib/utils";
+import { PrintConfirmDialog } from "./PrintConfirmDialog";
 import type { Product, SKU, DesignerZone, DesignerLogo, ProductOptionGroup, ProductOptionValue, SKUOptionValue, GlobalColor } from "@prisma/client";
 
 type SkuFull = SKU & { optionValues: { optionValueId: string }[] };
@@ -43,6 +44,15 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
   });
   const [textInputs, setTextInputs] = useState<Record<string, string>>({});
   const [added, setAdded] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+
+  function withTextConfirm(action: () => void) {
+    if (isDesignerOpen && addText.trim().length > 0) {
+      setPendingAction(() => action);
+    } else {
+      action();
+    }
+  }
 
   const colorGroup = optionGroups.find((g) => g.type === "COLOR");
   const sizeGroup = optionGroups.find((g) => g.type === "SIZE");
@@ -195,6 +205,7 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
     otherGroups.some((g) => g.required && !selectedOptions[g.id] && !textInputs[g.id]?.trim());
 
   return (
+    <>
     <div className="grid md:grid-cols-[55%_45%] gap-8 items-start">
       {/* LEFT — product image (closed) or jersey canvas (open) */}
       <div className="space-y-4">
@@ -472,7 +483,7 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
                 <button
                   key={v.id}
                   type="button"
-                  onClick={() => setSelectedOptions((p) => ({ ...p, [colorGroup.id]: v.id }))}
+                  onClick={() => withTextConfirm(() => setSelectedOptions((p) => ({ ...p, [colorGroup.id]: v.id })))}
                   title={v.label}
                   className={`w-8 h-8 rounded-full border-2 transition ${
                     selectedOptions[colorGroup.id] === v.id
@@ -501,7 +512,7 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
                     key={v.id}
                     type="button"
                     disabled={!inStock}
-                    onClick={() => setSelectedOptions((p) => ({ ...p, [sizeGroup.id]: v.id }))}
+                    onClick={() => withTextConfirm(() => setSelectedOptions((p) => ({ ...p, [sizeGroup.id]: v.id })))}
                     className={`px-3 py-1.5 text-sm rounded-lg border transition ${
                       selectedOptions[sizeGroup.id] === v.id
                         ? "bg-secondary text-white border-secondary"
@@ -595,7 +606,7 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
 
         {/* Add to cart */}
         <button
-          onClick={handleAddToCart}
+          onClick={() => withTextConfirm(handleAddToCart)}
           disabled={isDisabled}
           className="w-full bg-primary hover:bg-primary-dark text-secondary font-bold py-3 px-6 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
@@ -607,5 +618,11 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
         </button>
       </div>
     </div>
+    <PrintConfirmDialog
+      open={pendingAction !== null}
+      onConfirm={() => { pendingAction?.(); setPendingAction(null); }}
+      onCancel={() => setPendingAction(null)}
+    />
+    </>
   );
 }
