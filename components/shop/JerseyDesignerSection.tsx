@@ -35,8 +35,12 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
   const [addFontSize, setAddFontSize] = useState<"small" | "medium" | "large">("medium");
   const [toast, setToast] = useState<string | null>(null);
 
-  // Option selections (covers COLOR, SIZE, SELECT, CUSTOM)
-  const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
+  // Option selections (covers COLOR, SIZE, SELECT, CUSTOM) — auto-select first color
+  const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>(() => {
+    const colorGrp = optionGroups.find((g) => g.type === "COLOR");
+    if (colorGrp?.values[0]) return { [colorGrp.id]: colorGrp.values[0].id };
+    return {};
+  });
   const [textInputs, setTextInputs] = useState<Record<string, string>>({});
   const [added, setAdded] = useState(false);
 
@@ -447,7 +451,11 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
             {formatPrice(withVat(product.price, vatPct))}
             <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
           </p>
-          <p className="text-gray-600 leading-relaxed">{product.description}</p>
+          <div className={`grid transition-all duration-300 ${isDesignerOpen ? "grid-rows-[0fr]" : "grid-rows-[1fr]"}`}>
+            <div className="overflow-hidden">
+              <p className="text-gray-600 leading-relaxed pb-1">{product.description}</p>
+            </div>
+          </div>
         </div>
 
         {/* COLOR swatches */}

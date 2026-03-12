@@ -287,8 +287,12 @@ function ItemStep({
         {item.label && item.label !== product.name && (
           <p className="text-sm text-gray-500 mb-2">{product.name}</p>
         )}
-        {!designerOpen && product.description && (
-          <p className="text-gray-600 text-sm leading-relaxed">{product.description}</p>
+        {product.description && (
+          <div className={`grid transition-all duration-300 ${designerOpen ? "grid-rows-[0fr]" : "grid-rows-[1fr]"}`}>
+            <div className="overflow-hidden">
+              <p className="text-gray-600 text-sm leading-relaxed pb-1">{product.description}</p>
+            </div>
+          </div>
         )}
         {optionGroupFee > 0 && (
           <p className="text-sm text-gray-500 mt-1">
