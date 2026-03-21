@@ -21,6 +21,8 @@ import {
   Image,
   TrendingUp,
   ChevronDown,
+  Ruler,
+  Star,
 } from "lucide-react";
 
 type NavItem = {
@@ -55,8 +57,10 @@ function buildGroups(attentionCount: number): NavGroup[] {
         label: "Produkt opsætning",
         items: [
           { href: "/admin/farver", label: "Farvebibliotek", icon: Palette },
+          { href: "/admin/storrelse", label: "Størrelser", icon: Ruler },
           { href: "/admin/tilvalg", label: "Tilvalg", icon: ListPlus },
           { href: "/admin/designer-logoer", label: "Designer-logoer", icon: Image },
+          { href: "/admin/sponsorer", label: "Sponsorer", icon: Star },
         ],
       },
     },
@@ -92,7 +96,7 @@ function buildGroups(attentionCount: number): NavGroup[] {
   ];
 }
 
-const SETUP_PATHS = ["/admin/farver", "/admin/tilvalg", "/admin/designer-logoer"];
+const SETUP_PATHS = ["/admin/farver", "/admin/storrelse", "/admin/tilvalg", "/admin/designer-logoer", "/admin/sponsorer"];
 
 function SidebarContent({
   groups,

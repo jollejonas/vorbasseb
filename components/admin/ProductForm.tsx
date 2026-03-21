@@ -67,9 +67,6 @@ type LegacyColorVariantRow = {
   id?: string; name: string; hex: string; images: string[]; skus: LegacySkuRow[];
 };
 
-const ADULT_SIZES = ["XS", "S", "M", "L", "XL", "XXL"];
-const KIDS_SIZES = ["116", "128", "140", "152", "164"];
-const ALL_SIZES = [...ADULT_SIZES, ...KIDS_SIZES, "One Size"];
 
 let _keySeq = 0;
 function nextKey() { return `k${++_keySeq}`; }
@@ -278,6 +275,7 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
   // Tracks when admin has clicked "Konverter" on a legacy product
   const [migratedToOptions, setMigratedToOptions] = useState(false);
   const [globalColors, setGlobalColors] = useState<GlobalColor[]>([]);
+  const [sizePresets, setSizePresets] = useState<string[]>([]);
 
   // ── Template library panel ──────────────────────────────────────────────────
   const [libraryTemplates, setLibraryTemplates] = useState<TemplateFull[]>([]);
@@ -337,6 +335,13 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
         .catch(() => {});
     }
   }, [useOptionGroups]);
+
+  useEffect(() => {
+    fetch("/api/admin/size-presets")
+      .then((r) => r.json())
+      .then((data: { label: string }[]) => setSizePresets(data.map((s) => s.label)))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const script = document.createElement("script");
@@ -859,6 +864,7 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
                 key={g._key}
                 group={g}
                 globalColors={globalColors}
+                sizePresets={sizePresets}
                 modelNumber={modelNumber}
                 colorGroup={colorGroup}
                 sizeGroup={sizeGroup}
@@ -1047,6 +1053,7 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
           <LegacyVariantSection
             legacySkus={legacySkus}
             legacyColorVariants={legacyColorVariants}
+            sizePresets={sizePresets}
             onAddSize={addLegacySize}
             onRemoveSize={removeLegacySize}
             onUpdateSku={updateLegacySku}
@@ -1498,11 +1505,12 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
 // ─── OptionGroupEditor ─────────────────────────────────────────────────────────
 
 function OptionGroupEditor({
-  group, globalColors,
+  group, globalColors, sizePresets,
   onUpdate, onRemove, onAddValue, onRemoveValue, onUpdateValue, onUpload,
 }: {
   group: OptionGroupRow;
   globalColors: GlobalColor[];
+  sizePresets: string[];
   modelNumber?: string;
   colorGroup?: OptionGroupRow;
   sizeGroup?: OptionGroupRow;
@@ -1633,7 +1641,7 @@ function OptionGroupEditor({
         <div>
           <div className="flex flex-wrap gap-2 mb-2">
             <span className="text-xs text-gray-500 self-center">Tilføj:</span>
-            {ALL_SIZES.filter((sz) => !usedSizes.includes(sz)).map((sz) => (
+            {sizePresets.filter((sz) => !usedSizes.includes(sz)).map((sz) => (
               <button key={sz} type="button"
                 onClick={() => onAddValue({ label: sz, position: group.values.length })}
                 className="px-2.5 py-1 text-xs border rounded-lg hover:border-secondary hover:text-secondary transition">
@@ -1872,7 +1880,7 @@ function FlatSizeTable({
 // ─── LegacyVariantSection ──────────────────────────────────────────────────────
 
 function LegacyVariantSection({
-  legacySkus, legacyColorVariants,
+  legacySkus, legacyColorVariants, sizePresets,
   onAddSize, onRemoveSize, onUpdateSku,
   onAddColorVariant, onRemoveColorVariant, onUpdateColorVariant,
   onAddColorSize, onUpdateColorSku, onRemoveColorSize,
@@ -1880,6 +1888,7 @@ function LegacyVariantSection({
 }: {
   legacySkus: LegacySkuRow[];
   legacyColorVariants: LegacyColorVariantRow[];
+  sizePresets: string[];
   onAddSize: (sz: string) => void;
   onRemoveSize: (sz: string) => void;
   onUpdateSku: (sz: string, patch: Partial<LegacySkuRow>) => void;
@@ -1950,7 +1959,7 @@ function LegacyVariantSection({
               <div>
                 <div className="flex flex-wrap gap-2 mb-2">
                   <span className="text-xs text-gray-500 self-center">Tilføj størrelse:</span>
-                  {ALL_SIZES.filter((sz) => !usedCvSizes.includes(sz)).map((sz) => (
+                  {sizePresets.filter((sz) => !usedCvSizes.includes(sz)).map((sz) => (
                     <button key={sz} type="button" onClick={() => onAddColorSize(cvIdx, sz)}
                       className="px-2 py-0.5 text-xs border rounded-lg hover:border-secondary hover:text-secondary transition">
                       {sz}
@@ -2001,7 +2010,7 @@ function LegacyVariantSection({
           <p className="text-sm font-medium text-gray-700 mb-2">Størrelser &amp; lager</p>
           <div className="flex flex-wrap gap-2 mb-3">
             <span className="text-xs text-gray-500 self-center">Tilføj størrelse:</span>
-            {ALL_SIZES.filter((sz) => !usedSizes.includes(sz)).map((sz) => (
+            {sizePresets.filter((sz) => !usedSizes.includes(sz)).map((sz) => (
               <button key={sz} type="button" onClick={() => onAddSize(sz)}
                 className="px-2.5 py-1 text-xs border rounded-lg hover:border-secondary hover:text-secondary transition">
                 {sz}

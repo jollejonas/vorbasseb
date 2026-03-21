@@ -573,3 +573,25 @@ model DbuStanding {
 
   @@unique([configId, sort])
 }
+
+// ─── Configurable sizes ─────────────────────────────────────────────────────
+
+model SizePreset {
+  id       String @id @default(cuid())
+  label    String @unique
+  position Int    @default(0)
+
+  @@index([position])
+}
+
+// ─── Sponsors ───────────────────────────────────────────────────────────────
+
+model Sponsor {
+  id         String  @id @default(cuid())
+  name       String
+  logoUrl    String
+  websiteUrl String?
+  position   Int     @default(0)
+
+  @@index([position])
+}

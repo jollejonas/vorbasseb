@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Facebook } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { NewsletterForm } from "./NewsletterForm";
+import { SponsorCarousel } from "./SponsorCarousel";
 
 function InstagramIcon({ size = 18 }: { size?: number }) {
   return (
@@ -15,12 +16,16 @@ function InstagramIcon({ size = 18 }: { size?: number }) {
 }
 
 export async function Footer() {
-  const rows = await prisma.siteSetting
-    .findMany({ where: { key: { in: ["footer_phone", "footer_email"] } } })
-    .catch(() => []);
+  const [rows, sponsors] = await Promise.all([
+    prisma.siteSetting
+      .findMany({ where: { key: { in: ["footer_phone", "footer_email", "sponsors_heading"] } } })
+      .catch(() => []),
+    prisma.sponsor.findMany({ orderBy: { position: "asc" } }).catch(() => []),
+  ]);
 
   const phone = rows.find((r) => r.key === "footer_phone")?.value ?? "+45 XX XX XX XX";
   const email = rows.find((r) => r.key === "footer_email")?.value ?? "shop@vorbassebk.dk";
+  const sponsorsHeading = rows.find((r) => r.key === "sponsors_heading")?.value ?? "Støt vores sponsorer";
 
   return (
     <footer className="bg-secondary text-white mt-16">
@@ -84,6 +89,14 @@ export async function Footer() {
           </div>
         </div>
       </div>
+
+      {/* Sponsor carousel */}
+      {sponsors.length > 0 && (
+        <div className="border-t border-white/10 py-6 px-4">
+          <p className="text-center text-sm text-white/70 mb-4">{sponsorsHeading}</p>
+          <SponsorCarousel sponsors={sponsors} />
+        </div>
+      )}
 
       {/* Payment logos */}
       <div className="border-t border-white/10">

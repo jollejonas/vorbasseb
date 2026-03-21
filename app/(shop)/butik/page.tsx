@@ -13,16 +13,10 @@ export const revalidate = 300; // 5-minute ISR cache per unique URL
 
 export const metadata: Metadata = { title: "Butik" };
 
-// Canonical clothing size order (smallest → largest, then children by age)
-const SIZE_ORDER = [
-  "XXS", "XS", "S", "M", "L", "XL", "XXL", "2XL", "3XL",
-  "116", "128", "140", "152", "164", "176",
-];
-
-function sortSizes(sizes: string[]): string[] {
+function sortSizes(sizes: string[], order: string[]): string[] {
   return [...sizes].sort((a, b) => {
-    const ai = SIZE_ORDER.indexOf(a.toUpperCase());
-    const bi = SIZE_ORDER.indexOf(b.toUpperCase());
+    const ai = order.indexOf(a);
+    const bi = order.indexOf(b);
     if (ai === -1 && bi === -1) return a.localeCompare(b);
     if (ai === -1) return 1;
     if (bi === -1) return -1;
@@ -45,9 +39,11 @@ export default async function ButikPage({ searchParams }: Props) {
 
   const filterParams = { kategori, q, sort, tilgaengelig, size };
 
-  const categories = await prisma.category.findMany({
-    orderBy: { position: "asc" },
-  });
+  const [categories, sizePresetsDb] = await Promise.all([
+    prisma.category.findMany({ orderBy: { position: "asc" } }),
+    prisma.sizePreset.findMany({ orderBy: { position: "asc" } }),
+  ]);
+  const sizeOrder = sizePresetsDb.map((s) => s.label);
 
   // Fetch distinct in-stock sizes (scoped to current category if set)
   const sizeWhere: Prisma.SKUWhereInput = {
@@ -63,7 +59,7 @@ export default async function ButikPage({ searchParams }: Props) {
     select: { size: true },
     distinct: ["size"],
   });
-  const sizeOptions = sortSizes(rawSizes.map((s) => s.size));
+  const sizeOptions = sortSizes(rawSizes.map((s) => s.size), sizeOrder);
 
   const where: Prisma.ProductWhereInput = {
     published: true,
