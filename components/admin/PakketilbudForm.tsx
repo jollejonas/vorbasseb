@@ -57,6 +57,21 @@ export function PakketilbudForm({ pakketilbud }: { pakketilbud?: PakketilbudData
   const [slugManual, setSlugManual] = useState(isEdit);
   const [description, setDescription] = useState(pakketilbud?.description ?? "");
   const [priceKr, setPriceKr] = useState(pakketilbud ? (pakketilbud.price / 100).toFixed(2) : "");
+  const [salePriceKr, setSalePriceKr] = useState(
+    (pakketilbud as typeof pakketilbud & { salePrice?: number | null })?.salePrice
+      ? ((pakketilbud as typeof pakketilbud & { salePrice: number }).salePrice / 100).toFixed(2)
+      : ""
+  );
+  const [salePriceStart, setSalePriceStart] = useState(
+    (pakketilbud as typeof pakketilbud & { salePriceStart?: string | Date | null })?.salePriceStart
+      ? new Date((pakketilbud as typeof pakketilbud & { salePriceStart: string | Date }).salePriceStart).toISOString().slice(0, 10)
+      : ""
+  );
+  const [salePriceEnd, setSalePriceEnd] = useState(
+    (pakketilbud as typeof pakketilbud & { salePriceEnd?: string | Date | null })?.salePriceEnd
+      ? new Date((pakketilbud as typeof pakketilbud & { salePriceEnd: string | Date }).salePriceEnd).toISOString().slice(0, 10)
+      : ""
+  );
   const [images, setImages] = useState<string[]>(pakketilbud?.images ?? []);
   const [published, setPublished] = useState(pakketilbud?.published ?? true);
   const [featured, setFeatured] = useState(pakketilbud?.featured ?? false);
@@ -200,11 +215,15 @@ export function PakketilbudForm({ pakketilbud }: { pakketilbud?: PakketilbudData
 
     setSaving(true);
     try {
+      const salePriceOre = salePriceKr ? Math.round(parseFloat(salePriceKr.replace(",", ".")) * 100) : null;
       const payload = {
         name,
         slug,
         description,
         price,
+        salePrice: salePriceOre,
+        salePriceStart: salePriceStart || null,
+        salePriceEnd: salePriceEnd || null,
         images,
         published,
         featured,
@@ -292,6 +311,33 @@ export function PakketilbudForm({ pakketilbud }: { pakketilbud?: PakketilbudData
             className="w-48 border rounded-lg px-3 py-2 text-sm"
             required
           />
+        </div>
+
+        {/* ── Tilbudspris ────────────────────────────────────────────────── */}
+        <div className="border rounded-lg p-4 space-y-3 bg-amber-50">
+          <p className="text-sm font-medium text-gray-700">Tidsbestemt tilbud (valgfrit)</p>
+          <div className="grid sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Tilbudspris (kr, ekskl. moms)</label>
+              <input type="number" min="0" step="0.01" value={salePriceKr} onChange={(e) => setSalePriceKr(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
+                placeholder="499.00"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Tilbud fra</label>
+              <input type="date" value={salePriceStart} onChange={(e) => setSalePriceStart(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Tilbud til</label>
+              <input type="date" value={salePriceEnd} onChange={(e) => setSalePriceEnd(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
+              />
+            </div>
+          </div>
+          <p className="text-xs text-gray-500">Tilbudsprisen overskriver fanklubsrabat og rabatkoder i perioden.</p>
         </div>
 
         <div>

@@ -181,6 +181,21 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
   const [categoryId, setCategoryId] = useState<string>(product?.categoryId ?? "");
   const [categories, setCategories] = useState<Category[]>([]);
   const [priceKr, setPriceKr] = useState(product ? (product.price / 100).toFixed(2) : "");
+  const [salePriceKr, setSalePriceKr] = useState(
+    (product as typeof product & { salePrice?: number | null })?.salePrice
+      ? ((product as typeof product & { salePrice: number }).salePrice / 100).toFixed(2)
+      : ""
+  );
+  const [salePriceStart, setSalePriceStart] = useState(
+    (product as typeof product & { salePriceStart?: string | Date | null })?.salePriceStart
+      ? new Date((product as typeof product & { salePriceStart: string | Date }).salePriceStart).toISOString().slice(0, 10)
+      : ""
+  );
+  const [salePriceEnd, setSalePriceEnd] = useState(
+    (product as typeof product & { salePriceEnd?: string | Date | null })?.salePriceEnd
+      ? new Date((product as typeof product & { salePriceEnd: string | Date }).salePriceEnd).toISOString().slice(0, 10)
+      : ""
+  );
   const [modelNumber, setModelNumber] = useState(product?.modelNumber ?? "");
   const [membersOnly, setMembersOnly] = useState(product?.membersOnly ?? false);
   const [membersEarlyAccess, setMembersEarlyAccess] = useState(product?.membersEarlyAccess ?? false);
@@ -645,8 +660,12 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
           costPrice: cell.costPriceKr ? Math.round(parseFloat(cell.costPriceKr) * 100) : null,
         }));
 
+        const salePricePayload = salePriceKr ? Math.round(parseFloat(salePriceKr) * 100) : null;
         payload = {
           name, slug, categoryId: categoryId || null, price: Math.round(priceVal * 100),
+          salePrice: salePricePayload,
+          salePriceStart: salePriceStart || null,
+          salePriceEnd: salePriceEnd || null,
           modelNumber: modelNumber || null, description, images,
           membersOnly, membersEarlyAccess, clubRoleRequired: clubRoleRequired || null,
           published, featured, designerEnabled,
@@ -656,8 +675,12 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
         };
       } else {
         // Legacy path
+        const salePricePayload = salePriceKr ? Math.round(parseFloat(salePriceKr) * 100) : null;
         payload = {
           name, slug, categoryId: categoryId || null, price: Math.round(priceVal * 100),
+          salePrice: salePricePayload,
+          salePriceStart: salePriceStart || null,
+          salePriceEnd: salePriceEnd || null,
           modelNumber: modelNumber || null, description, images,
           membersOnly, membersEarlyAccess, clubRoleRequired: clubRoleRequired || null,
           published, featured, designerEnabled,
@@ -757,6 +780,33 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
               placeholder="299.00"
             />
           </div>
+        </div>
+
+        {/* ── Tilbudspris ──────────────────────────────────────────────────── */}
+        <div className="border rounded-lg p-4 space-y-3 bg-amber-50">
+          <p className="text-sm font-medium text-gray-700">Tidsbestemt tilbud (valgfrit)</p>
+          <div className="grid sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Tilbudspris (kr, ekskl. moms)</label>
+              <input type="number" min="0" step="0.01" value={salePriceKr} onChange={(e) => setSalePriceKr(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
+                placeholder="199.00"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Tilbud fra</label>
+              <input type="date" value={salePriceStart} onChange={(e) => setSalePriceStart(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Tilbud til</label>
+              <input type="date" value={salePriceEnd} onChange={(e) => setSalePriceEnd(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
+              />
+            </div>
+          </div>
+          <p className="text-xs text-gray-500">Tilbudsprisen overskriver fanklubsrabat og rabatkoder i perioden.</p>
         </div>
 
         <div>
