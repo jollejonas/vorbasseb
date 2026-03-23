@@ -133,6 +133,9 @@ model Product {
   categoryId       String?
   category         Category?   @relation(fields: [categoryId], references: [id])
   price            Int // øre (DKK × 100)
+  salePrice        Int?        // øre — tilbudspris (ekskl. moms, som price)
+  salePriceStart   DateTime?   // tilbud gælder fra (inklusiv)
+  salePriceEnd     DateTime?   // tilbud gælder til (inklusiv)
   modelNumber      String?     // e.g. "2001" — used in varenummer auto-generation
   membersOnly             Boolean     @default(false)
   membersEarlyAccess      Boolean     @default(false)
@@ -161,7 +164,10 @@ model Pakketilbud {
   name        String
   slug        String            @unique
   description String            @default("")
-  price       Int               // base price in øre
+  price          Int               // base price in øre
+  salePrice      Int?              // øre — tilbudspris
+  salePriceStart DateTime?         // tilbud gælder fra (inklusiv)
+  salePriceEnd   DateTime?         // tilbud gælder til (inklusiv)
   images      String[]
   published   Boolean           @default(true)
   featured    Boolean           @default(false)
