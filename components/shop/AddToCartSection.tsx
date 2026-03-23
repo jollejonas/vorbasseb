@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { useCart } from "./CartProvider";
+import { getEffectivePrice } from "@/lib/pricing";
 import type { Product, SKU } from "@prisma/client";
 
 const SIZES_ORDER = [
@@ -22,6 +23,7 @@ export function AddToCartSection({
 }) {
   const { addItem } = useCart();
   const [selectedSku, setSelectedSku] = useState<SKU | null>(null);
+  const { effectivePrice, isOnSale } = getEffectivePrice(product.price, product.salePrice, product.salePriceStart, product.salePriceEnd);
 
   const sortedSkus = [...skus].sort(
     (a, b) => SIZES_ORDER.indexOf(a.size) - SIZES_ORDER.indexOf(b.size),
@@ -42,11 +44,12 @@ export function AddToCartSection({
       productId: product.id,
       productName: product.name,
       size: selectedSku.size,
-      price: product.price,
+      price: effectivePrice,
       quantity: 1,
       image: product.images[0],
       clubRoleRequired: product.clubRoleRequired ?? null,
       colorName: colorName || undefined,
+      isOnSale,
     });
 
     const colorLabel = colorName ? ` · ${colorName}` : "";

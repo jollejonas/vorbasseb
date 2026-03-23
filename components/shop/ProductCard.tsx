@@ -2,12 +2,14 @@ import Link from "next/link";
 import Image from "next/image";
 import { Lock } from "lucide-react";
 import { formatPrice, withVat } from "@/lib/utils";
+import { getEffectivePrice } from "@/lib/pricing";
 import type { Product } from "@prisma/client";
 
 type ProductWithSkus = Product & { skus: { stock: number }[] };
 
 export function ProductCard({ product, index = 0, vatPct = 25 }: { product: ProductWithSkus; index?: number; vatPct?: number }) {
   const inStock = product.skus.some((s) => s.stock > 0);
+  const { effectivePrice, isOnSale } = getEffectivePrice(product.price, product.salePrice, product.salePriceStart, product.salePriceEnd);
 
   return (
     <div className="group flex flex-col bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-shadow">
@@ -24,6 +26,12 @@ export function ProductCard({ product, index = 0, vatPct = 25 }: { product: Prod
         ) : (
           <div className="w-full h-full flex items-center justify-center text-gray-200 text-4xl font-black">
             VBK
+          </div>
+        )}
+
+        {isOnSale && (
+          <div className="absolute top-2 right-2 bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+            Tilbud
           </div>
         )}
 
@@ -45,10 +53,18 @@ export function ProductCard({ product, index = 0, vatPct = 25 }: { product: Prod
       <div className="p-4 flex flex-col gap-3">
         <div>
           <h3 className="font-bold text-secondary text-sm leading-tight">{product.name}</h3>
-          <p className="text-secondary/80 font-semibold mt-1 text-sm">
-            {formatPrice(withVat(product.price, vatPct))}
-            <span className="text-xs font-normal text-gray-400 ml-1">inkl. moms</span>
-          </p>
+          {isOnSale ? (
+            <p className="mt-1 text-sm">
+              <span className="line-through text-gray-400 mr-1">{formatPrice(withVat(product.price, vatPct))}</span>
+              <span className="font-bold text-red-600">{formatPrice(withVat(effectivePrice, vatPct))}</span>
+              <span className="text-xs font-normal text-gray-400 ml-1">inkl. moms</span>
+            </p>
+          ) : (
+            <p className="text-secondary/80 font-semibold mt-1 text-sm">
+              {formatPrice(withVat(product.price, vatPct))}
+              <span className="text-xs font-normal text-gray-400 ml-1">inkl. moms</span>
+            </p>
+          )}
         </div>
         <Link
           href={`/butik/${product.slug}`}

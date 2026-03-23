@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useCart } from "./CartProvider";
 import { formatPrice, withVat } from "@/lib/utils";
+import { getEffectivePrice } from "@/lib/pricing";
 import type { Product, SKU } from "@prisma/client";
 
 export function SimpleAddToCart({
@@ -10,12 +11,13 @@ export function SimpleAddToCart({
   skus,
   vatPct,
 }: {
-  product: Pick<Product, "id" | "name" | "price" | "description" | "membersOnly" | "clubRoleRequired" | "images">;
+  product: Pick<Product, "id" | "name" | "price" | "description" | "membersOnly" | "clubRoleRequired" | "images" | "salePrice" | "salePriceStart" | "salePriceEnd">;
   skus: SKU[];
   vatPct: number;
 }) {
   const { addItem } = useCart();
   const [added, setAdded] = useState(false);
+  const { effectivePrice, isOnSale } = getEffectivePrice(product.price, product.salePrice, product.salePriceStart, product.salePriceEnd);
 
   const availableSku = skus.find((s) => s.stock > 0) ?? skus[0] ?? null;
   const inStock = availableSku !== null && availableSku.stock > 0;
@@ -27,10 +29,11 @@ export function SimpleAddToCart({
       productId: product.id,
       productName: product.name,
       size: availableSku.size || "One Size",
-      price: product.price,
+      price: effectivePrice,
       quantity: 1,
       image: product.images[0],
       clubRoleRequired: product.clubRoleRequired ?? null,
+      isOnSale,
     });
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
@@ -63,10 +66,18 @@ export function SimpleAddToCart({
             </span>
           )}
           <h1 className="text-2xl font-bold mb-1">{product.name}</h1>
-          <p className="text-xl font-bold text-secondary mb-2">
-            {formatPrice(withVat(product.price, vatPct))}
-            <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
-          </p>
+          {isOnSale ? (
+            <p className="text-xl mb-2">
+              <span className="line-through text-gray-400 mr-2">{formatPrice(withVat(product.price, vatPct))}</span>
+              <span className="font-bold text-red-600">{formatPrice(withVat(effectivePrice, vatPct))}</span>
+              <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
+            </p>
+          ) : (
+            <p className="text-xl font-bold text-secondary mb-2">
+              {formatPrice(withVat(product.price, vatPct))}
+              <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
+            </p>
+          )}
           <p className="text-gray-600 leading-relaxed">{product.description ?? ""}</p>
         </div>
 

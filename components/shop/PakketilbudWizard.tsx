@@ -7,6 +7,7 @@ import { useCart, type PrintElement } from "./CartProvider";
 import { JerseyDesignerCanvas, JerseyDesignerControls } from "./JerseyDesignerPanel";
 import { PrintConfirmDialog } from "./PrintConfirmDialog";
 import { formatPrice, withVat } from "@/lib/utils";
+import { getEffectivePrice } from "@/lib/pricing";
 import type {
   Product,
   SKU,
@@ -51,6 +52,9 @@ type PakketilbudData = {
   slug: string;
   description: string;
   price: number;
+  salePrice?: number | null;
+  salePriceStart?: Date | string | null;
+  salePriceEnd?: Date | string | null;
   images: string[];
   items: PakketilbudItemData[];
 };
@@ -665,7 +669,8 @@ function SummaryStep({
     return total + optionGroupFee + designerFee;
   }, 0);
 
-  const totalPrice = pakketilbud.price + totalCustomizationFee;
+  const { effectivePrice: summaryEffectivePrice, isOnSale: summaryIsOnSale } = getEffectivePrice(pakketilbud.price, pakketilbud.salePrice, pakketilbud.salePriceStart, pakketilbud.salePriceEnd);
+  const totalPrice = summaryEffectivePrice + totalCustomizationFee;
 
   return (
     <div className="space-y-4">
@@ -748,7 +753,11 @@ function SummaryStep({
       </div>
 
       <div className="text-right text-sm text-gray-500">
-        Pakkepris: <span className="font-bold text-gray-900">{formatPrice(withVat(totalPrice, vatPct))}</span>
+        Pakkepris:{" "}
+        {summaryIsOnSale && (
+          <span className="line-through text-gray-400 mr-1">{formatPrice(withVat(pakketilbud.price + totalCustomizationFee, vatPct))}</span>
+        )}
+        <span className={`font-bold ${summaryIsOnSale ? "text-red-600" : "text-gray-900"}`}>{formatPrice(withVat(totalPrice, vatPct))}</span>
         <span className="ml-1 text-xs">inkl. moms</span>
         {totalCustomizationFee > 0 && (
           <span className="ml-2 text-xs">(inkl. tryk)</span>
@@ -774,6 +783,7 @@ export function PakketilbudWizard({
   onBack?: () => void;
 }) {
   const { addItem } = useCart();
+  const { effectivePrice: pakkeEffectivePrice, isOnSale: pakkeIsOnSale } = getEffectivePrice(pakketilbud.price, pakketilbud.salePrice, pakketilbud.salePriceStart, pakketilbud.salePriceEnd);
   const [currentStep, setCurrentStep] = useState(0);
   const [stepStates, setStepStates] = useState<StepState[]>(() =>
     pakketilbud.items.map((item) => initialStep(item.product)),
@@ -917,12 +927,14 @@ export function PakketilbudWizard({
       productId: pakketilbud.id,
       productName: pakketilbud.name,
       size: "",
-      price: pakketilbud.price,
+      price: pakkeEffectivePrice,
       image: pakketilbud.images[0],
       isPakketilbud: true,
+      pakketilbudId: pakketilbud.id,
       customizationFee: totalCustomizationFee > 0 ? totalCustomizationFee : undefined,
       pakketilbudItems,
       quantity: 1,
+      isOnSale: pakkeIsOnSale,
     });
 
     toast.success(`${pakketilbud.name} lagt i kurven`);

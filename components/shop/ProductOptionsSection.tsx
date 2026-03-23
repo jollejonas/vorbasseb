@@ -5,6 +5,7 @@ import { ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { useCart } from "./CartProvider";
 import { formatPrice, withVat } from "@/lib/utils";
+import { getEffectivePrice } from "@/lib/pricing";
 import type { Product, SKU, ProductOptionGroup, ProductOptionValue, GlobalColor, SKUOptionValue } from "@prisma/client";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -33,6 +34,7 @@ type Props = {
 
 export function ProductOptionsSection({ product, skus, optionGroups, vatPct = 25 }: Props) {
   const { addItem } = useCart();
+  const { effectivePrice, isOnSale } = getEffectivePrice(product.price, product.salePrice, product.salePriceStart, product.salePriceEnd);
 
   // For COLOR + SIZE groups: track selected value IDs (pre-select first in-stock color)
   const colorGroupInit = optionGroups.find((g) => g.type === "COLOR");
@@ -158,13 +160,14 @@ export function ProductOptionsSection({ product, skus, optionGroups, vatPct = 25
       productId: product.id,
       productName: product.name,
       size: sizeValue?.label ?? skuToUse.size,
-      price: product.price,
+      price: effectivePrice,
       quantity: 1,
       image: activeImages[0],
       colorName: colorName || undefined,
       optionSelections: optionSelections.length > 0 ? optionSelections : undefined,
       customizationFee: extraFee > 0 ? extraFee : undefined,
       clubRoleRequired: product.clubRoleRequired ?? null,
+      isOnSale,
     });
 
     const colorLabel = colorName ? ` · ${colorName}` : "";
@@ -214,10 +217,18 @@ export function ProductOptionsSection({ product, skus, optionGroups, vatPct = 25
             </span>
           )}
           <h1 className="text-2xl font-bold mb-1">{product.name}</h1>
-          <p className="text-xl font-bold text-secondary mb-2">
-            {formatPrice(withVat(product.price, vatPct))}
-            <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
-          </p>
+          {isOnSale ? (
+            <p className="text-xl mb-2">
+              <span className="line-through text-gray-400 mr-2">{formatPrice(withVat(product.price, vatPct))}</span>
+              <span className="font-bold text-red-600">{formatPrice(withVat(effectivePrice, vatPct))}</span>
+              <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
+            </p>
+          ) : (
+            <p className="text-xl font-bold text-secondary mb-2">
+              {formatPrice(withVat(product.price, vatPct))}
+              <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
+            </p>
+          )}
           <p className="text-gray-600 leading-relaxed">{product.description}</p>
         </div>
 

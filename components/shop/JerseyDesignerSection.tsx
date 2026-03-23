@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { useCart, type PrintElement } from "./CartProvider";
 import { formatPrice, withVat } from "@/lib/utils";
+import { getEffectivePrice } from "@/lib/pricing";
 import { PrintConfirmDialog } from "./PrintConfirmDialog";
 import type { Product, SKU, DesignerZone, DesignerLogo, ProductOptionGroup, ProductOptionValue, SKUOptionValue, GlobalColor } from "@prisma/client";
 
@@ -23,6 +24,7 @@ const FONT_SIZE_LABELS = { small: "Lille", medium: "Medium", large: "Stor" } as 
 
 export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25, optionGroups }: Props) {
   const { addItem } = useCart();
+  const { effectivePrice, isOnSale } = getEffectivePrice(product.price, product.salePrice, product.salePriceStart, product.salePriceEnd);
 
   const [isDesignerOpen, setIsDesignerOpen] = useState(false);
   const [previewSide, setPreviewSide] = useState<"front" | "back">("front");
@@ -185,13 +187,14 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
       productId: product.id,
       productName: product.name,
       size: selectedSizeLabel,
-      price: product.price,
+      price: effectivePrice,
       quantity: 1,
       image: product.images[0],
       clubRoleRequired: product.clubRoleRequired ?? null,
       printElements: allPrintElements,
       optionSelections: optionSelections.length > 0 ? optionSelections : undefined,
       customizationFee: designerFee > 0 ? designerFee : undefined,
+      isOnSale,
     });
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
@@ -458,10 +461,18 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
             </span>
           )}
           <h1 className="text-xl font-bold mb-0">{product.name}</h1>
-          <p className="text-lg font-bold text-secondary mb-1">
-            {formatPrice(withVat(product.price, vatPct))}
-            <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
-          </p>
+          {isOnSale ? (
+            <p className="text-lg mb-1">
+              <span className="line-through text-gray-400 mr-2">{formatPrice(withVat(product.price, vatPct))}</span>
+              <span className="font-bold text-red-600">{formatPrice(withVat(effectivePrice, vatPct))}</span>
+              <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
+            </p>
+          ) : (
+            <p className="text-lg font-bold text-secondary mb-1">
+              {formatPrice(withVat(product.price, vatPct))}
+              <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
+            </p>
+          )}
           <div className={`grid transition-all duration-300 ${isDesignerOpen ? "grid-rows-[0fr]" : "grid-rows-[1fr]"}`}>
             <div className="overflow-hidden">
               <p className="text-gray-600 leading-snug pb-1">{product.description}</p>

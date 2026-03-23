@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { formatPrice, withVat } from "@/lib/utils";
+import { getEffectivePrice } from "@/lib/pricing";
 import { PakketilbudWizard } from "./PakketilbudWizard";
 
 type Item = {
@@ -55,6 +56,7 @@ function WizardView({
 
 export function PakketilbudPageClient({ pakketilbud, vatPct, isSoldOut, soldOutItems, logos }: Props) {
   const [started, setStarted] = useState(false);
+  const { effectivePrice: pakkePrice, isOnSale: pakkeIsOnSale } = getEffectivePrice(pakketilbud.price, pakketilbud.salePrice, pakketilbud.salePriceStart, pakketilbud.salePriceEnd);
 
   if (started) {
     return (
@@ -109,10 +111,18 @@ export function PakketilbudPageClient({ pakketilbud, vatPct, isSoldOut, soldOutI
             Pakketilbud
           </span>
           <h1 className="text-3xl font-black mb-2">{pakketilbud.name}</h1>
-          <p className="text-2xl font-bold text-secondary">
-            {formatPrice(withVat(pakketilbud.price, vatPct))}
-            <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
-          </p>
+          {pakkeIsOnSale ? (
+            <p className="text-2xl mb-1">
+              <span className="line-through text-gray-400 mr-2">{formatPrice(withVat(pakketilbud.price, vatPct))}</span>
+              <span className="font-bold text-red-600">{formatPrice(withVat(pakkePrice, vatPct))}</span>
+              <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
+            </p>
+          ) : (
+            <p className="text-2xl font-bold text-secondary">
+              {formatPrice(withVat(pakketilbud.price, vatPct))}
+              <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
+            </p>
+          )}
         </div>
 
         {pakketilbud.description && (

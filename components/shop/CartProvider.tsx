@@ -53,7 +53,9 @@ export type CartItem = {
   optionSelections?: OptionSelection[]; // snapshot of TEXT/SELECT/CUSTOM selections
   printElements?: PrintElement[]; // jersey designer print specs
   isPakketilbud?: boolean;
+  pakketilbudId?: string; // ID of the Pakketilbud (for sale price checking)
   pakketilbudItems?: PakketilbudItemSelection[];
+  isOnSale?: boolean; // true when an active sale price was used at add-to-cart time
 };
 
 type CartState = { items: CartItem[] };

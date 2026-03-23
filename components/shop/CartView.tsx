@@ -50,6 +50,9 @@ export function CartView() {
     .reduce((s, i) => s + (i.price + (i.customizationFee ?? 0)) * i.quantity, 0);
   const effectiveSubtotal = subtotal - grantDiscountDisplay;
 
+  // Sale detection
+  const anyItemOnSale = items.some((i) => i.isOnSale);
+
   // Trainer detection
   const hasTrainerItems = items.some((i) => i.clubRoleRequired === "TRAINER");
   const hasGrantItems = grants.length > 0;
@@ -58,7 +61,7 @@ export function CartView() {
   const effectiveDelivery: DeliveryMethod = hasTrainerItems ? "PICKUP" : deliveryMethod;
   const shipping = effectiveDelivery === "PICKUP" ? 0 : calcShipping(effectiveSubtotal);
 
-  const memberDiscount = membership?.isMember
+  const memberDiscount = (membership?.isMember && !anyItemOnSale)
     ? Math.round(effectiveSubtotal * (membership.discountPct / 100))
     : 0;
   const finalTotal = effectiveSubtotal + shipping - memberDiscount;
@@ -224,13 +227,19 @@ export function CartView() {
             <span>−{formatPrice(grantDiscountDisplay)}</span>
           </div>
         )}
-        {membership?.isMember && memberDiscount > 0 && !promoMode && (
+        {anyItemOnSale && (
+          <div className="flex justify-between text-sm text-red-600 font-medium">
+            <span>Tilbudspris aktiv</span>
+            <span>Rabatter gælder ikke</span>
+          </div>
+        )}
+        {!anyItemOnSale && membership?.isMember && memberDiscount > 0 && !promoMode && (
           <div className="flex justify-between text-sm text-green-600 font-medium">
             <span>Fanklubsrabat ({membership.discountPct}%)</span>
             <span>−{formatPrice(memberDiscount)}</span>
           </div>
         )}
-        {promoMode && (
+        {!anyItemOnSale && promoMode && (
           <div className="flex justify-between text-sm text-blue-600 font-medium">
             <span>Rabatkode</span>
             <span>Indtastes i kassen</span>
@@ -250,13 +259,21 @@ export function CartView() {
           <span>Total (inkl. moms)</span>
           <span>{formatPrice(withVat(effectiveSubtotal - (promoMode ? 0 : memberDiscount), vatPct) + shipping)}</span>
         </div>
-        {membership?.isMember && memberDiscount > 0 && !promoMode && (
+        {!anyItemOnSale && membership?.isMember && memberDiscount > 0 && !promoMode && (
           <p className="text-xs text-gray-400">* Den endelige rabat beregnes af Stripe ved betaling</p>
         )}
       </div>
 
+      {/* Sale price notice */}
+      {anyItemOnSale && (
+        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+          <span className="font-bold shrink-0">Tilbud!</span>
+          <span>Én eller flere varer er på tilbud — fanklubsrabat og rabatkoder gælder ikke i denne ordre.</span>
+        </div>
+      )}
+
       {/* Member discount notice / CTA */}
-      {membership?.isMember ? (
+      {membership?.isMember && !anyItemOnSale ? (
         <div className="flex flex-wrap items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-700 font-medium">
           <Star size={16} className="shrink-0 text-green-500" />
           <span className="flex-1">
@@ -273,7 +290,7 @@ export function CartView() {
             </button>
           )}
         </div>
-      ) : membership !== null ? (
+      ) : membership !== null && !membership.isMember ? (
         <div className="bg-[#0a0f1e] rounded-xl px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
           <div className="flex-1">
             <p className="text-white text-sm font-semibold flex items-center gap-1.5">

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatPrice, withVat } from "@/lib/utils";
+import { getEffectivePrice } from "@/lib/pricing";
 
 type Props = {
   pakketilbud: {
@@ -7,6 +8,9 @@ type Props = {
     name: string;
     slug: string;
     price: number;
+    salePrice?: number | null;
+    salePriceStart?: Date | string | null;
+    salePriceEnd?: Date | string | null;
     images: string[];
     items: { id: string; label: string | null; product: { name: string } }[];
   };
@@ -15,6 +19,7 @@ type Props = {
 };
 
 export function PakketilbudCard({ pakketilbud, vatPct, isSoldOut = false }: Props) {
+  const { effectivePrice, isOnSale } = getEffectivePrice(pakketilbud.price, pakketilbud.salePrice, pakketilbud.salePriceStart, pakketilbud.salePriceEnd);
   return (
     <Link
       href={`/pakketilbud/${pakketilbud.slug}`}
@@ -44,6 +49,10 @@ export function PakketilbudCard({ pakketilbud, vatPct, isSoldOut = false }: Prop
           <span className="absolute top-2 left-2 bg-gray-700 text-white text-xs font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
             Udsolgt
           </span>
+        ) : isOnSale ? (
+          <span className="absolute top-2 left-2 bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
+            Tilbud
+          </span>
         ) : (
           <span className="absolute top-2 left-2 bg-secondary text-white text-xs font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
             Pakke
@@ -58,9 +67,16 @@ export function PakketilbudCard({ pakketilbud, vatPct, isSoldOut = false }: Prop
           {pakketilbud.items.map((it) => it.label ?? it.product.name).join(" + ")}
         </p>
         <div className="flex items-center justify-between">
-          <span className={`font-bold ${isSoldOut ? "text-gray-400" : "text-secondary"}`}>
-            {formatPrice(withVat(pakketilbud.price, vatPct))}
-          </span>
+          {isOnSale ? (
+            <span>
+              <span className="line-through text-gray-400 text-sm mr-1">{formatPrice(withVat(pakketilbud.price, vatPct))}</span>
+              <span className="font-bold text-red-600">{formatPrice(withVat(effectivePrice, vatPct))}</span>
+            </span>
+          ) : (
+            <span className={`font-bold ${isSoldOut ? "text-gray-400" : "text-secondary"}`}>
+              {formatPrice(withVat(pakketilbud.price, vatPct))}
+            </span>
+          )}
           {isSoldOut ? (
             <span className="text-xs text-gray-400">Midlertidigt udsolgt</span>
           ) : (

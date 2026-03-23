@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ProductImageGallery } from "./ProductImageGallery";
 import { AddToCartSection } from "./AddToCartSection";
 import { formatPrice, withVat } from "@/lib/utils";
+import { getEffectivePrice } from "@/lib/pricing";
 import type { Product, SKU, ColorVariant } from "@prisma/client";
 
 type ColorVariantWithSkus = ColorVariant & { skus: SKU[] };
@@ -17,6 +18,7 @@ type Props = {
 
 export function ProductColorSection({ product, skus, colorVariants, vatPct }: Props) {
   const [selectedColorIdx, setSelectedColorIdx] = useState(0);
+  const { effectivePrice, isOnSale } = getEffectivePrice(product.price, product.salePrice, product.salePriceStart, product.salePriceEnd);
 
   const hasColors = colorVariants.length > 0;
   const selectedColor = hasColors ? colorVariants[selectedColorIdx] : null;
@@ -46,10 +48,18 @@ export function ProductColorSection({ product, skus, colorVariants, vatPct }: Pr
             </span>
           )}
           <h1 className="text-2xl font-bold mb-1">{product.name}</h1>
-          <p className="text-xl font-bold text-secondary mb-2">
-            {formatPrice(withVat(product.price, vatPct))}
-            <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
-          </p>
+          {isOnSale ? (
+            <p className="text-xl mb-2">
+              <span className="line-through text-gray-400 mr-2">{formatPrice(withVat(product.price, vatPct))}</span>
+              <span className="font-bold text-red-600">{formatPrice(withVat(effectivePrice, vatPct))}</span>
+              <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
+            </p>
+          ) : (
+            <p className="text-xl font-bold text-secondary mb-2">
+              {formatPrice(withVat(product.price, vatPct))}
+              <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
+            </p>
+          )}
           <p className="text-gray-600 leading-relaxed mb-4">{product.description}</p>
         </div>
         {hasColors && (
