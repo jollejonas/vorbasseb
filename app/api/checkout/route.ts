@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import type { CartItem } from "@/components/shop/CartProvider";
+import { getEffectivePrice } from "@/lib/pricing";
 
 export async function POST(req: NextRequest) {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -18,10 +19,21 @@ export async function POST(req: NextRequest) {
     i.isPakketilbud ? (i.pakketilbudItems ?? []).map((c) => c.skuId) : [i.skuId],
   );
 
-  // Enforce clubRoleRequired
+  // Enforce clubRoleRequired + fetch sale price data
   const skusWithProducts = await prisma.sKU.findMany({
     where: { id: { in: allSkuIds } },
-    select: { id: true, productId: true, product: { select: { clubRoleRequired: true } } },
+    select: {
+      id: true,
+      productId: true,
+      product: {
+        select: {
+          clubRoleRequired: true,
+          salePrice: true,
+          salePriceStart: true,
+          salePriceEnd: true,
+        },
+      },
+    },
   });
   for (const sku of skusWithProducts) {
     if (sku.product.clubRoleRequired) {
@@ -39,6 +51,33 @@ export async function POST(req: NextRequest) {
   const isPickup = effectiveDelivery === "PICKUP";
 
   const skuProductMap = new Map(skusWithProducts.map((s) => [s.id, s.productId]));
+
+  // Determine which SKUs belong to an actively on-sale product
+  const now = new Date();
+  const skuOnSaleMap = new Map<string, boolean>();
+  for (const sku of skusWithProducts) {
+    const { isOnSale } = getEffectivePrice(0, sku.product.salePrice, sku.product.salePriceStart, sku.product.salePriceEnd, now);
+    skuOnSaleMap.set(sku.id, isOnSale);
+  }
+  // Also check pakketilbud items for sale status
+  const pakketilbudIds = items.filter((i) => i.isPakketilbud && i.pakketilbudId).map((i) => i.pakketilbudId!);
+  const pakketilbudSaleMap = new Map<string, boolean>();
+  if (pakketilbudIds.length > 0) {
+    const pakkeSaleData = await prisma.pakketilbud.findMany({
+      where: { id: { in: pakketilbudIds } },
+      select: { id: true, salePrice: true, salePriceStart: true, salePriceEnd: true },
+    });
+    for (const p of pakkeSaleData) {
+      const { isOnSale } = getEffectivePrice(0, p.salePrice, p.salePriceStart, p.salePriceEnd, now);
+      pakketilbudSaleMap.set(p.id, isOnSale);
+    }
+  }
+
+  // An item is on sale if its product (or pakketilbud) has an active sale price
+  const anyItemOnSale = items.some((item) => {
+    if (item.isPakketilbud && item.pakketilbudId) return pakketilbudSaleMap.get(item.pakketilbudId) ?? false;
+    return skuOnSaleMap.get(item.skuId) ?? false;
+  });
 
   // Read settings
   const cfg = await prisma.siteSetting
@@ -99,7 +138,7 @@ export async function POST(req: NextRequest) {
   );
   const effectiveSubtotal = originalSubtotal - grantDiscountTotal;
   const shipping = isPickup ? 0 : effectiveSubtotal >= freeOre ? 0 : flatOre;
-  const memberDiscount = isMember ? Math.round(effectiveSubtotal * discountPct / 100) : 0;
+  const memberDiscount = (isMember && !anyItemOnSale) ? Math.round(effectiveSubtotal * discountPct / 100) : 0;
   const totalDiscountOre = grantDiscountTotal + memberDiscount;
   const finalTotal = effectiveSubtotal + shipping - memberDiscount;
 
@@ -255,7 +294,7 @@ export async function POST(req: NextRequest) {
       });
       discounts = [{ coupon: coupon.id }];
     }
-  } else {
+  } else if (!anyItemOnSale) {
     allowPromoCodes = true;
   }
 
