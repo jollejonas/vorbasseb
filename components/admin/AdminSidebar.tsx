@@ -60,7 +60,6 @@ function buildGroups(attentionCount: number): NavGroup[] {
           { href: "/admin/storrelse", label: "Størrelser", icon: Ruler },
           { href: "/admin/tilvalg", label: "Tilvalg", icon: ListPlus },
           { href: "/admin/designer-logoer", label: "Designer-logoer", icon: Image },
-          { href: "/admin/sponsorer", label: "Sponsorer", icon: Star },
         ],
       },
     },
@@ -70,6 +69,7 @@ function buildGroups(attentionCount: number): NavGroup[] {
         { href: "/admin/nyheder", label: "Nyheder", icon: Newspaper },
         { href: "/admin/nyhedsbrev", label: "Nyhedsbrev", icon: Mail },
         { href: "/admin/kampe", label: "Kampe", icon: Trophy },
+        { href: "/admin/sponsorer", label: "Sponsorer", icon: Star },
       ],
     },
     {
@@ -96,7 +96,7 @@ function buildGroups(attentionCount: number): NavGroup[] {
   ];
 }
 
-const SETUP_PATHS = ["/admin/farver", "/admin/storrelse", "/admin/tilvalg", "/admin/designer-logoer", "/admin/sponsorer"];
+const SETUP_PATHS = ["/admin/farver", "/admin/storrelse", "/admin/tilvalg", "/admin/designer-logoer"];
 
 function SidebarContent({
   groups,
