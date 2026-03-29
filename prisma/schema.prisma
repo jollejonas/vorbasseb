@@ -234,8 +234,13 @@ model ProductOptionValue {
   globalColorId String?
   globalColor   GlobalColor?        @relation(fields: [globalColorId], references: [id], onDelete: SetNull)
   images        String[]            // Cloudinary URLs — COLOR type only
+  imageLabels   String[]            // optional labels for images[], index-aligned (e.g. "Forside", "Bagside")
   price         Int?                // øre, ekskl. moms — SELECT type only
   costPrice     Int?                // øre, ekskl. moms — SELECT type only
+  // Designer canvas overrides — COLOR type only (optional)
+  designerFrontImageIdx Int?        // index into images[] to use as front canvas template
+  designerBackImageIdx  Int?        // index into images[] to use as back canvas template
+  designerPrintColor    String?     // hex e.g. "#FFFFFF" — overrides product.designerPrintColor
   skuValues     SKUOptionValue[]
 
   @@index([groupId, position])
