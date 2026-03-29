@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { X } from "lucide-react";
 
-type Category = { name: string; slug: string };
+type Category = {
+  name: string;
+  slug: string;
+  children: { name: string; slug: string }[];
+};
 
 export type FilterSearchParams = {
   kategori?: string;
@@ -58,13 +62,27 @@ export function FilterContent({
             Alle produkter
           </Link>
           {categories.map((c) => (
-            <Link
-              key={c.slug}
-              href={buildHref(searchParams, { kategori: c.slug })}
-              className={`${pillBase} ${kategori === c.slug ? pillActive : pillInactive}`}
-            >
-              {c.name}
-            </Link>
+            <div key={c.slug}>
+              <Link
+                href={buildHref(searchParams, { kategori: c.slug })}
+                className={`${pillBase} ${kategori === c.slug ? pillActive : pillInactive}`}
+              >
+                {c.name}
+              </Link>
+              {c.children.length > 0 && (
+                <div className="mt-0.5 space-y-0.5 ml-3">
+                  {c.children.map((sub) => (
+                    <Link
+                      key={sub.slug}
+                      href={buildHref(searchParams, { kategori: sub.slug })}
+                      className={`${pillBase} text-xs pl-4 ${kategori === sub.slug ? pillActive : pillInactive}`}
+                    >
+                      ↳ {sub.name}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
         </div>
       </div>

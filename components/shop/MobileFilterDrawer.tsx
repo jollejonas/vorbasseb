@@ -5,7 +5,7 @@ import { SlidersHorizontal, X } from "lucide-react";
 import { FilterContent, type FilterSearchParams } from "./FilterContent";
 
 type Props = {
-  categories: { name: string; slug: string }[];
+  categories: { name: string; slug: string; children: { name: string; slug: string }[] }[];
   sizeOptions: string[];
   searchParams: FilterSearchParams;
 };

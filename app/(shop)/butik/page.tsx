@@ -40,10 +40,29 @@ export default async function ButikPage({ searchParams }: Props) {
   const filterParams = { kategori, q, sort, tilgaengelig, size };
 
   const [categories, sizePresetsDb] = await Promise.all([
-    prisma.category.findMany({ orderBy: { position: "asc" } }),
+    prisma.category.findMany({
+      where: { parentId: null },
+      orderBy: { position: "asc" },
+      include: { children: true },
+    }),
     prisma.sizePreset.findMany({ orderBy: { position: "asc" } }),
   ]);
   const sizeOrder = sizePresetsDb.map((s) => s.label);
+
+  // Resolve categoryIds — if filtering by a parent category, include all its children
+  let categoryIds: string[] | null = null;
+  if (kategori) {
+    const allCats = [...categories, ...categories.flatMap((c) => c.children)];
+    const matched = allCats.find((c) => c.slug === kategori);
+    if (matched) {
+      const parent = categories.find((c) => c.id === matched.id);
+      if (parent && parent.children.length > 0) {
+        categoryIds = [parent.id, ...parent.children.map((c) => c.id)];
+      } else {
+        categoryIds = [matched.id];
+      }
+    }
+  }
 
   // Fetch distinct in-stock sizes (scoped to current category if set)
   const sizeWhere: Prisma.SKUWhereInput = {
@@ -51,7 +70,7 @@ export default async function ButikPage({ searchParams }: Props) {
     product: {
       published: true,
       clubRoleRequired: null,
-      ...(kategori ? { category: { slug: kategori } } : {}),
+      ...(categoryIds ? { categoryId: { in: categoryIds } } : {}),
     },
   };
   const rawSizes = await prisma.sKU.findMany({
@@ -64,7 +83,7 @@ export default async function ButikPage({ searchParams }: Props) {
   const where: Prisma.ProductWhereInput = {
     published: true,
     clubRoleRequired: null, // role-restricted products only appear on their dedicated page
-    ...(kategori ? { category: { slug: kategori } } : {}),
+    ...(categoryIds ? { categoryId: { in: categoryIds } } : {}),
     ...(size ? { skus: { some: { size, stock: { gt: 0 } } } } : {}),
     ...(tilgaengelig === "1" && !size
       ? { skus: { some: { stock: { gt: 0 } } } }
@@ -115,7 +134,8 @@ export default async function ButikPage({ searchParams }: Props) {
   // Active filter pills
   const activeFilters: { label: string; removeKey: string }[] = [];
   if (kategori) {
-    const cat = categories.find((c) => c.slug === kategori);
+    const allCats = [...categories, ...categories.flatMap((c) => c.children)];
+    const cat = allCats.find((c) => c.slug === kategori);
     activeFilters.push({ label: cat?.name ?? kategori, removeKey: "kategori" });
   }
   if (size) activeFilters.push({ label: `Størrelse: ${size}`, removeKey: "size" });
