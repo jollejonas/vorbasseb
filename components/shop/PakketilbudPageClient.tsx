@@ -126,7 +126,7 @@ export function PakketilbudPageClient({ pakketilbud, vatPct, isSoldOut, soldOutI
         </div>
 
         {pakketilbud.description && (
-          <p className="text-gray-600 leading-snug">{pakketilbud.description}</p>
+          <div className="product-content" dangerouslySetInnerHTML={{ __html: pakketilbud.description }} />
         )}
 
         <div>

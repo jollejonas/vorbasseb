@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { slugify } from "@/lib/utils";
 import type { Product, SKU, Category, ClubRole, ColorVariant, ProductOptionGroup, ProductOptionValue, GlobalColor, OptionGroupTemplate, OptionGroupTemplateValue, DesignerZone, DesignerLogo } from "@prisma/client";
 import { X } from "lucide-react";
+import { TipTapEditor } from "@/components/admin/TipTapEditor";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,8 +33,13 @@ type OptionValueRow = {
   globalColorId?: string | null;
   globalColorHex?: string;
   images: string[];
+  imageLabels: string[]; // index-aligned with images[]
   priceKr?: string;
   costPriceKr?: string;
+  // Designer overrides (COLOR type only)
+  designerFrontImageIdx?: number | null;
+  designerBackImageIdx?: number | null;
+  designerPrintColor?: string;
 };
 
 type OptionGroupRow = {
@@ -109,8 +115,12 @@ function buildInitialProductState(product: ProductWithRelations | undefined): {
         globalColorId: v.globalColorId,
         globalColorHex: v.globalColor?.hex,
         images: v.images,
+        imageLabels: (v as typeof v & { imageLabels?: string[] }).imageLabels ?? [],
         priceKr: (v as typeof v & { price?: number | null }).price != null ? ((v as typeof v & { price?: number }).price! / 100).toFixed(2) : "",
         costPriceKr: (v as typeof v & { costPrice?: number | null }).costPrice != null ? ((v as typeof v & { costPrice?: number }).costPrice! / 100).toFixed(2) : "",
+        designerFrontImageIdx: (v as typeof v & { designerFrontImageIdx?: number | null }).designerFrontImageIdx ?? null,
+        designerBackImageIdx: (v as typeof v & { designerBackImageIdx?: number | null }).designerBackImageIdx ?? null,
+        designerPrintColor: (v as typeof v & { designerPrintColor?: string | null }).designerPrintColor ?? "",
       };
     }),
   }));
@@ -392,7 +402,11 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
               setOptionGroups((prev) =>
                 prev.map((g) => g.type !== "COLOR" ? g : {
                   ...g,
-                  values: g.values.map((v) => v._key !== key ? v : { ...v, images: [...v.images, url] }),
+                  values: g.values.map((v) => v._key !== key ? v : {
+                    ...v,
+                    images: [...v.images, url],
+                    imageLabels: [...(v.imageLabels ?? []), ""],
+                  }),
                 })
               );
             } else if (typeof t === "object" && t.type === "legacyColor") {
@@ -430,11 +444,11 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
     setOptionGroups((prev) => prev.map((g) => g._key !== key ? g : { ...g, ...patch }));
   }
 
-  function addOptionValue(groupKey: string, value: Omit<OptionValueRow, "_key" | "images">) {
+  function addOptionValue(groupKey: string, value: Omit<OptionValueRow, "_key" | "images" | "imageLabels">) {
     const valueKey = nextKey();
     setOptionGroups((prev) =>
       prev.map((g) => g._key !== groupKey ? g : {
-        ...g, values: [...g.values, { ...value, _key: valueKey, images: [] }],
+        ...g, values: [...g.values, { ...value, _key: valueKey, images: [], imageLabels: [] }],
       })
     );
     return valueKey;
@@ -526,6 +540,7 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
       globalColorId: v.globalColorId ?? null,
       globalColorHex: v.globalColor?.hex,
       images: v.images,
+      imageLabels: [],
     }));
     const newGroup: OptionGroupRow = {
       _key: groupKey,
@@ -645,8 +660,12 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
             position: vi,
             globalColorId: v.globalColorId ?? null,
             images: v.images,
+            imageLabels: v.imageLabels ?? [],
             price: v.priceKr ? Math.round(parseFloat(v.priceKr) * 100) : null,
             costPrice: v.costPriceKr ? Math.round(parseFloat(v.costPriceKr) * 100) : null,
+            designerFrontImageIdx: v.designerFrontImageIdx ?? null,
+            designerBackImageIdx: v.designerBackImageIdx ?? null,
+            designerPrintColor: v.designerPrintColor || null,
           })),
         }));
 
@@ -822,8 +841,9 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Beskrivelse</label>
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4}
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary resize-y"
+          <TipTapEditor
+            content={description}
+            onChange={setDescription}
             placeholder="Kort beskrivelse af produktet..."
           />
         </div>
@@ -935,6 +955,7 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
                 onRemoveValue={(vKey) => removeOptionValue(g._key, vKey, g.type)}
                 onUpdateValue={(vKey, patch) => updateOptionValue(g._key, vKey, patch)}
                 onUpload={(vKey) => openCloudinaryWidget({ type: "colorValue", key: vKey })}
+                designerEnabled={designerEnabled}
                 gi={gi}
               />
             ))}
@@ -1142,36 +1163,40 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
 
         {isEdit && designerEnabled && (
             <div className="space-y-5">
-              {/* Front/back image selection */}
-              <div className="grid sm:grid-cols-3 gap-4">
+              {/* Front/back image selection — hidden when product has a COLOR option group (colors manage their own) */}
+              <div className={optionGroups.some(g => g.type === "COLOR") ? "grid sm:grid-cols-1 gap-4" : "grid sm:grid-cols-3 gap-4"}>
+                {!optionGroups.some(g => g.type === "COLOR") && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Forside-billede</label>
+                      <select
+                        value={designerFrontImageIdx}
+                        onChange={(e) => setDesignerFrontImageIdx(e.target.value === "" ? "" : parseInt(e.target.value))}
+                        className="w-full border rounded-lg px-3 py-2 text-sm"
+                      >
+                        <option value="">Ingen</option>
+                        {images.map((_, i) => (
+                          <option key={i} value={i}>Billede {i + 1}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Bagside-billede</label>
+                      <select
+                        value={designerBackImageIdx}
+                        onChange={(e) => setDesignerBackImageIdx(e.target.value === "" ? "" : parseInt(e.target.value))}
+                        className="w-full border rounded-lg px-3 py-2 text-sm"
+                      >
+                        <option value="">Ingen</option>
+                        {images.map((_, i) => (
+                          <option key={i} value={i}>Billede {i + 1}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </>
+                )}
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Forside-billede</label>
-                  <select
-                    value={designerFrontImageIdx}
-                    onChange={(e) => setDesignerFrontImageIdx(e.target.value === "" ? "" : parseInt(e.target.value))}
-                    className="w-full border rounded-lg px-3 py-2 text-sm"
-                  >
-                    <option value="">Ingen</option>
-                    {images.map((_, i) => (
-                      <option key={i} value={i}>Billede {i + 1}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Bagside-billede</label>
-                  <select
-                    value={designerBackImageIdx}
-                    onChange={(e) => setDesignerBackImageIdx(e.target.value === "" ? "" : parseInt(e.target.value))}
-                    className="w-full border rounded-lg px-3 py-2 text-sm"
-                  >
-                    <option value="">Ingen</option>
-                    {images.map((_, i) => (
-                      <option key={i} value={i}>Billede {i + 1}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Tryk-farve</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Tryk-farve (standard)</label>
                   <div className="flex gap-2 items-center">
                     <input
                       type="color"
@@ -1557,6 +1582,7 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
 function OptionGroupEditor({
   group, globalColors, sizePresets,
   onUpdate, onRemove, onAddValue, onRemoveValue, onUpdateValue, onUpload,
+  designerEnabled,
 }: {
   group: OptionGroupRow;
   globalColors: GlobalColor[];
@@ -1566,10 +1592,11 @@ function OptionGroupEditor({
   sizeGroup?: OptionGroupRow;
   onUpdate: (patch: Partial<OptionGroupRow>) => void;
   onRemove: () => void;
-  onAddValue: (v: Omit<OptionValueRow, "_key" | "images">) => string;
+  onAddValue: (v: Omit<OptionValueRow, "_key" | "images" | "imageLabels">) => string;
   onRemoveValue: (key: string) => void;
   onUpdateValue: (key: string, patch: Partial<OptionValueRow>) => void;
   onUpload: (key: string) => void;
+  designerEnabled?: boolean;
   gi?: number;
 }) {
   const typeLabels: Record<OptionType, string> = {
@@ -1657,28 +1684,87 @@ function OptionGroupEditor({
           {group.values.length > 0 && (
             <div className="space-y-2">
               {group.values.map((v) => (
-                <div key={v._key} className="flex items-center gap-2 border rounded-lg px-3 py-2">
-                  <span className="w-5 h-5 rounded-full border border-gray-200 flex-shrink-0" style={{ background: v.globalColorHex ?? "#ccc" }} />
-                  <span className="text-sm font-medium flex-1">{v.label}</span>
-                  {/* Images */}
-                  <div className="flex gap-1">
-                    {v.images.map((url, imgIdx) => (
-                      <div key={imgIdx} className="relative w-10 h-10 rounded overflow-hidden border">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={url} alt="" className="w-full h-full object-cover" />
-                        <button type="button"
-                          onClick={() => onUpdateValue(v._key, { images: v.images.filter((_, j) => j !== imgIdx) })}
-                          className="absolute inset-0 bg-black/40 text-white text-xs flex items-center justify-center opacity-0 hover:opacity-100">
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                    <button type="button" onClick={() => onUpload(v._key)}
-                      className="w-10 h-10 border-2 border-dashed border-gray-300 rounded flex items-center justify-center text-gray-400 hover:border-secondary hover:text-secondary text-lg transition">
-                      +
-                    </button>
+                <div key={v._key} className="border rounded-lg px-3 py-2 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full border border-gray-200 flex-shrink-0" style={{ background: v.globalColorHex ?? "#ccc" }} />
+                    <span className="text-sm font-medium flex-1">{v.label}</span>
+                    {/* Images with labels */}
+                    <div className="flex gap-1 flex-wrap">
+                      {v.images.map((url, imgIdx) => (
+                        <div key={imgIdx} className="flex flex-col items-center w-12">
+                          <div className="relative w-12 h-12 rounded overflow-hidden border">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={url} alt="" className="w-full h-full object-cover" />
+                            <button type="button"
+                              onClick={() => onUpdateValue(v._key, {
+                                images: v.images.filter((_, j) => j !== imgIdx),
+                                imageLabels: (v.imageLabels ?? []).filter((_, j) => j !== imgIdx),
+                              })}
+                              className="absolute inset-0 bg-black/40 text-white text-xs flex items-center justify-center opacity-0 hover:opacity-100">
+                              ×
+                            </button>
+                          </div>
+                          <input
+                            type="text"
+                            value={v.imageLabels?.[imgIdx] ?? ""}
+                            onChange={(e) => {
+                              const next = [...(v.imageLabels ?? [])];
+                              next[imgIdx] = e.target.value;
+                              onUpdateValue(v._key, { imageLabels: next });
+                            }}
+                            placeholder="Label"
+                            className="w-12 text-[10px] text-center border border-t-0 rounded-b px-0.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-secondary"
+                          />
+                        </div>
+                      ))}
+                      <button type="button" onClick={() => onUpload(v._key)}
+                        className="w-12 h-12 border-2 border-dashed border-gray-300 rounded flex items-center justify-center text-gray-400 hover:border-secondary hover:text-secondary text-lg transition">
+                        +
+                      </button>
+                    </div>
+                    <button type="button" onClick={() => onRemoveValue(v._key)} className="text-xs text-red-400 hover:text-red-600">Fjern</button>
                   </div>
-                  <button type="button" onClick={() => onRemoveValue(v._key)} className="text-xs text-red-400 hover:text-red-600">Fjern</button>
+                  {/* Designer per-color settings — only shown when designer is enabled and value has images */}
+                  {designerEnabled && v.images.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2 pt-1 border-t border-dashed border-gray-200">
+                      <div>
+                        <label className="block text-[10px] font-medium text-gray-400 mb-1">Designer forside</label>
+                        <select
+                          value={v.designerFrontImageIdx ?? ""}
+                          onChange={(e) => onUpdateValue(v._key, { designerFrontImageIdx: e.target.value === "" ? null : Number(e.target.value) })}
+                          className="w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-secondary"
+                        >
+                          <option value="">— Ikke konfigureret —</option>
+                          {v.images.map((_, i) => (
+                            <option key={i} value={i}>{v.imageLabels?.[i] || `Billede ${i + 1}`}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-medium text-gray-400 mb-1">Designer bagside</label>
+                        <select
+                          value={v.designerBackImageIdx ?? ""}
+                          onChange={(e) => onUpdateValue(v._key, { designerBackImageIdx: e.target.value === "" ? null : Number(e.target.value) })}
+                          className="w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-secondary"
+                        >
+                          <option value="">— Ingen bagside —</option>
+                          {v.images.map((_, i) => (
+                            <option key={i} value={i}>{v.imageLabels?.[i] || `Billede ${i + 1}`}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-medium text-gray-400 mb-1">Tryk-farve</label>
+                        <input
+                          type="color"
+                          value={v.designerPrintColor || "#ffffff"}
+                          onChange={(e) => onUpdateValue(v._key, { designerPrintColor: e.target.value })}
+                          className="w-full h-7 border rounded cursor-pointer p-0.5"
+                          title="Farve på trykket tekst/logo"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

@@ -229,7 +229,9 @@ export function ProductOptionsSection({ product, skus, optionGroups, vatPct = 25
               <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
             </p>
           )}
-          <p className="text-gray-600 leading-relaxed">{product.description}</p>
+          {product.description && (
+            <div className="product-content" dangerouslySetInnerHTML={{ __html: product.description }} />
+          )}
         </div>
 
         {/* COLOR group */}

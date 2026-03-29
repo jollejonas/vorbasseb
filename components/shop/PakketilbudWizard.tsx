@@ -317,7 +317,7 @@ function ItemStep({
         {product.description && (
           <div className={`grid transition-all duration-300 ${designerOpen ? "grid-rows-[0fr]" : "grid-rows-[1fr]"}`}>
             <div className="overflow-hidden">
-              <p className="text-gray-600 text-sm leading-snug pb-1">{product.description}</p>
+              <div className="product-content" dangerouslySetInnerHTML={{ __html: product.description }} />
             </div>
           </div>
         )}

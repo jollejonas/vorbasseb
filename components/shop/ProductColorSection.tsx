@@ -60,7 +60,9 @@ export function ProductColorSection({ product, skus, colorVariants, vatPct }: Pr
               <span className="text-sm text-gray-400 font-normal ml-1">inkl. moms</span>
             </p>
           )}
-          <p className="text-gray-600 leading-relaxed mb-4">{product.description}</p>
+          {product.description && (
+            <div className="product-content mb-4" dangerouslySetInnerHTML={{ __html: product.description }} />
+          )}
         </div>
         {hasColors && (
           <div className="mb-5">

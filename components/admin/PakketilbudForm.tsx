@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { slugify, formatPrice } from "@/lib/utils";
 import { X, GripVertical, ChevronUp, ChevronDown } from "lucide-react";
+import { TipTapEditor } from "@/components/admin/TipTapEditor";
 
 type ProductResult = {
   id: string;
@@ -292,11 +293,10 @@ export function PakketilbudForm({ pakketilbud }: { pakketilbud?: PakketilbudData
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Beskrivelse</label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={3}
-            className="w-full border rounded-lg px-3 py-2 text-sm"
+          <TipTapEditor
+            content={description}
+            onChange={setDescription}
+            placeholder="Kort beskrivelse af pakketilbuddet..."
           />
         </div>
 

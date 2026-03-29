@@ -60,20 +60,37 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
   const sizeGroup = optionGroups.find((g) => g.type === "SIZE");
   const otherGroups = optionGroups.filter((g) => g.type !== "COLOR" && g.type !== "SIZE");
 
-  const frontImageIdx = product.designerFrontImageIdx ?? 0;
-  const backImageIdx = product.designerBackImageIdx ?? 0;
-  const previewImage = previewSide === "front"
-    ? product.images[frontImageIdx]
-    : product.images[backImageIdx];
-
-  const printColor = product.designerPrintColor ?? "#FFFFFF";
-
   // Color-aware static image (shown when designer is closed)
   const selectedColorValue = colorGroup?.values.find((v) => v.id === selectedOptions[colorGroup!.id]);
   const activeStaticImage =
     (selectedColorValue?.images ?? []).length > 0
       ? selectedColorValue!.images[0]
       : product.images[0];
+
+  // Per-color designer image resolution
+  // If a color is selected and has designer images configured → use those; otherwise fall back to product-level
+  const colorHasFrontImage = selectedColorValue != null && selectedColorValue.designerFrontImageIdx != null && selectedColorValue.images.length > 0;
+  const frontImage = colorHasFrontImage
+    ? selectedColorValue!.images[selectedColorValue!.designerFrontImageIdx!]
+    : product.images[product.designerFrontImageIdx ?? 0];
+  const backImage = selectedColorValue?.designerBackImageIdx != null && selectedColorValue.images.length > 0
+    ? selectedColorValue.images[selectedColorValue.designerBackImageIdx]
+    : product.images[product.designerBackImageIdx ?? 0];
+  const printColor =
+    (selectedColorValue?.designerPrintColor) ||
+    product.designerPrintColor ||
+    "#FFFFFF";
+
+  // Designer is available for this color only if the color value has a front image configured
+  // (or if there is no color group at all — single-color product using product-level settings)
+  const colorDesignerAvailable = !colorGroup || colorHasFrontImage;
+
+  // Has a back designer image available (for front/back toggle)
+  const hasBackImage = colorGroup
+    ? (selectedColorValue?.designerBackImageIdx != null && selectedColorValue.images.length > 0)
+    : product.designerBackImageIdx != null;
+
+  const previewImage = previewSide === "front" ? frontImage : backImage;
 
   const interactiveZones = zones.filter((z) => !z.fixedLogo);
   const fixedZones = zones.filter((z) => z.fixedLogo);
@@ -215,7 +232,7 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
         {isDesignerOpen ? (
           <>
             {/* Front/Back toggle */}
-            {product.designerBackImageIdx !== null && (
+            {hasBackImage && (
               <div className="flex gap-2">
                 <button
                   onClick={() => setPreviewSide("front")}
@@ -475,7 +492,9 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
           )}
           <div className={`grid transition-all duration-300 ${isDesignerOpen ? "grid-rows-[0fr]" : "grid-rows-[1fr]"}`}>
             <div className="overflow-hidden">
-              <p className="text-gray-600 leading-snug pb-1">{product.description}</p>
+              {product.description && (
+                <div className="product-content" dangerouslySetInnerHTML={{ __html: product.description }} />
+              )}
             </div>
           </div>
         </div>
@@ -494,7 +513,12 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
                 <button
                   key={v.id}
                   type="button"
-                  onClick={() => withTextConfirm(() => setSelectedOptions((p) => ({ ...p, [colorGroup.id]: v.id })))}
+                  onClick={() => withTextConfirm(() => {
+                    setSelectedOptions((p) => ({ ...p, [colorGroup.id]: v.id }));
+                    // Close designer if switching to a color without designer images
+                    const hasDesigner = v.designerFrontImageIdx != null && v.images.length > 0;
+                    if (!hasDesigner && isDesignerOpen) { setIsDesignerOpen(false); setClickedZoneId(null); }
+                  })}
                   title={v.label}
                   className={`w-8 h-8 rounded-full border-2 transition ${
                     selectedOptions[colorGroup.id] === v.id
@@ -576,17 +600,21 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
           </div>
         ))}
 
-        {/* Designer toggle button */}
-        <button
-          type="button"
-          onClick={() => {
-            setIsDesignerOpen(!isDesignerOpen);
-            setClickedZoneId(null);
-          }}
-          className="w-full border border-secondary text-secondary font-semibold py-2.5 px-6 rounded-xl hover:bg-secondary/5 transition text-sm"
-        >
-          {isDesignerOpen ? "Skjul tryk-designer ▲" : "Tilføj tryk til produktet ▼"}
-        </button>
+        {/* Designer toggle button — hidden if selected color has no designer images configured */}
+        {colorDesignerAvailable ? (
+          <button
+            type="button"
+            onClick={() => {
+              setIsDesignerOpen(!isDesignerOpen);
+              setClickedZoneId(null);
+            }}
+            className="w-full border border-secondary text-secondary font-semibold py-2.5 px-6 rounded-xl hover:bg-secondary/5 transition text-sm"
+          >
+            {isDesignerOpen ? "Skjul tryk-designer ▲" : "Tilføj tryk til produktet ▼"}
+          </button>
+        ) : colorGroup ? (
+          <p className="text-sm text-center text-gray-400 py-2">Tryk-designer er ikke tilgængelig for denne farve</p>
+        ) : null}
 
         {/* Prints list — only when designer is open */}
         {isDesignerOpen && (
