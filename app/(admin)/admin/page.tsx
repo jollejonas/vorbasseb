@@ -228,6 +228,12 @@ export default async function AdminPage() {
           )}
         </div>
       </div>
+
+      {/* Quick links */}
+      <div className="mt-6 flex gap-4 text-sm">
+        <Link href="/admin/kategorier" className="text-secondary underline">Kategorier</Link>
+        <Link href="/admin/farver" className="text-secondary underline">Farver</Link>
+      </div>
     </div>
   );
 }
