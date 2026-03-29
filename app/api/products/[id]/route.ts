@@ -44,8 +44,12 @@ type OptionValueInput = {
   position: number;
   globalColorId?: string | null;
   images?: string[];
+  imageLabels?: string[];
   price?: number | null;
   costPrice?: number | null;
+  designerFrontImageIdx?: number | null;
+  designerBackImageIdx?: number | null;
+  designerPrintColor?: string | null;
 };
 
 type OptionGroupInput = {
@@ -168,10 +172,16 @@ export async function PUT(req: NextRequest, { params }: Params) {
               data: {
                 label: v.label,
                 position: vi,
-                globalColorId: v.globalColorId ?? null,
+                globalColor: v.globalColorId
+                  ? { connect: { id: v.globalColorId } }
+                  : { disconnect: true },
                 images: v.images ?? [],
+                imageLabels: v.imageLabels ?? [],
                 price: v.price ?? null,
                 costPrice: v.costPrice ?? null,
+                designerFrontImageIdx: v.designerFrontImageIdx ?? null,
+                designerBackImageIdx: v.designerBackImageIdx ?? null,
+                designerPrintColor: v.designerPrintColor ?? null,
               },
             });
             valueId = v.id;
@@ -183,8 +193,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
                 position: vi,
                 globalColorId: v.globalColorId ?? null,
                 images: v.images ?? [],
+                imageLabels: v.imageLabels ?? [],
                 price: v.price ?? null,
                 costPrice: v.costPrice ?? null,
+                designerFrontImageIdx: v.designerFrontImageIdx ?? null,
+                designerBackImageIdx: v.designerBackImageIdx ?? null,
+                designerPrintColor: v.designerPrintColor ?? null,
               },
             });
             valueId = created.id;

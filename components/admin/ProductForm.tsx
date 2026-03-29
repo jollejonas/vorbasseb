@@ -25,6 +25,8 @@ type ProductWithRelations = Product & {
 
 type OptionType = "COLOR" | "SIZE" | "TEXT" | "SELECT" | "CUSTOM";
 
+type CategoryOption = { id: string; name: string; children: { id: string; name: string }[] };
+
 type OptionValueRow = {
   id?: string;
   _key: string;
@@ -189,7 +191,7 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
   const [slug, setSlug] = useState(product?.slug ?? "");
   const [slugManual, setSlugManual] = useState(isEdit);
   const [categoryId, setCategoryId] = useState<string>(product?.categoryId ?? "");
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [priceKr, setPriceKr] = useState(product ? (product.price / 100).toFixed(2) : "");
   const [salePriceKr, setSalePriceKr] = useState(
     (product as typeof product & { salePrice?: number | null })?.salePrice
@@ -344,7 +346,7 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
   useEffect(() => {
     fetch("/api/categories")
       .then((r) => r.json())
-      .then((data: Category[]) => {
+      .then((data: CategoryOption[]) => {
         setCategories(data);
         if (!categoryId && data.length > 0) setCategoryId(data[0].id);
       })
@@ -787,7 +789,18 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
               className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
             >
               <option value="">Ingen kategori</option>
-              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {categories.map((c) =>
+                c.children.length > 0 ? (
+                  <optgroup key={c.id} label={c.name}>
+                    <option value={c.id}>{c.name} (generel)</option>
+                    {c.children.map((sub) => (
+                      <option key={sub.id} value={sub.id}>↳ {sub.name}</option>
+                    ))}
+                  </optgroup>
+                ) : (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                )
+              )}
             </select>
           </div>
           <div>

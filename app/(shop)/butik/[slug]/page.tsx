@@ -27,7 +27,7 @@ export default async function ProductPage({ params }: Props) {
           orderBy: { size: "asc" },
           include: { optionValues: { select: { optionValueId: true } } },
         },
-        category: true,
+        category: { include: { parent: true } },
         colorVariants: {
           include: { skus: { orderBy: { size: "asc" } } },
           orderBy: { position: "asc" },
@@ -57,6 +57,17 @@ export default async function ProductPage({ params }: Props) {
         <a href="/butik" className="hover:text-secondary">
           Butik
         </a>
+        {product.category?.parent && (
+          <>
+            {" / "}
+            <a
+              href={`/butik?kategori=${product.category.parent.slug}`}
+              className="hover:text-secondary"
+            >
+              {product.category.parent.name}
+            </a>
+          </>
+        )}
         {product.category && (
           <>
             {" / "}
