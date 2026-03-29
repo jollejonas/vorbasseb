@@ -116,11 +116,15 @@ enum Plan {
 }
 
 model Category {
-  id       String    @id @default(cuid())
+  id       String     @id @default(cuid())
   name     String
-  slug     String    @unique
+  slug     String     @unique
   position Int
   products Product[]
+
+  parentId String?
+  parent   Category?  @relation("SubCategories", fields: [parentId], references: [id])
+  children Category[] @relation("SubCategories")
 
   @@index([position])
 }
