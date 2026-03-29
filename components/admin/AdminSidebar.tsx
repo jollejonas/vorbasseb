@@ -23,6 +23,7 @@ import {
   ChevronDown,
   Ruler,
   Star,
+  FolderTree,
 } from "lucide-react";
 
 type NavItem = {
@@ -56,6 +57,7 @@ function buildGroups(attentionCount: number): NavGroup[] {
       subGroup: {
         label: "Produkt opsætning",
         items: [
+          { href: "/admin/kategorier", label: "Kategorier", icon: FolderTree },
           { href: "/admin/farver", label: "Farvebibliotek", icon: Palette },
           { href: "/admin/storrelse", label: "Størrelser", icon: Ruler },
           { href: "/admin/tilvalg", label: "Tilvalg", icon: ListPlus },
@@ -96,7 +98,7 @@ function buildGroups(attentionCount: number): NavGroup[] {
   ];
 }
 
-const SETUP_PATHS = ["/admin/farver", "/admin/storrelse", "/admin/tilvalg", "/admin/designer-logoer"];
+const SETUP_PATHS = ["/admin/kategorier", "/admin/farver", "/admin/storrelse", "/admin/tilvalg", "/admin/designer-logoer"];
 
 function SidebarContent({
   groups,
