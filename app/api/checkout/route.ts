@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import type { CartItem } from "@/components/shop/CartProvider";
+import type { CartItem, OptionSelection, PrintElement } from "@/components/shop/CartProvider";
 import { getEffectivePrice } from "@/lib/pricing";
 
 export async function POST(req: NextRequest) {
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     i.isPakketilbud ? (i.pakketilbudItems ?? []).map((c) => c.skuId) : [i.skuId],
   );
 
-  // Enforce clubRoleRequired + fetch sale price data
+  // Enforce clubRoleRequired + fetch authoritative price + option groups
   const skusWithProducts = await prisma.sKU.findMany({
     where: { id: { in: allSkuIds } },
     select: {
@@ -27,10 +27,21 @@ export async function POST(req: NextRequest) {
       productId: true,
       product: {
         select: {
+          price: true,
           clubRoleRequired: true,
           salePrice: true,
           salePriceStart: true,
           salePriceEnd: true,
+          optionGroups: {
+            select: {
+              label: true,
+              type: true,
+              fee: true,
+              values: {
+                select: { label: true, price: true },
+              },
+            },
+          },
         },
       },
     },
@@ -59,18 +70,53 @@ export async function POST(req: NextRequest) {
     const { isOnSale } = getEffectivePrice(0, sku.product.salePrice, sku.product.salePriceStart, sku.product.salePriceEnd, now);
     skuOnSaleMap.set(sku.id, isOnSale);
   }
+
+  // Build authoritative server-side price and option group maps
+  const skuServerPriceMap = new Map<string, number>();
+  const skuOptionGroupsMap = new Map<string, typeof skusWithProducts[0]["product"]["optionGroups"]>();
+  for (const sku of skusWithProducts) {
+    const { effectivePrice } = getEffectivePrice(
+      sku.product.price,
+      sku.product.salePrice,
+      sku.product.salePriceStart,
+      sku.product.salePriceEnd,
+      now,
+    );
+    skuServerPriceMap.set(sku.id, effectivePrice);
+    skuOptionGroupsMap.set(sku.id, sku.product.optionGroups);
+  }
+
   // Also check pakketilbud items for sale status
   const pakketilbudIds = items.filter((i) => i.isPakketilbud && i.pakketilbudId).map((i) => i.pakketilbudId!);
   const pakketilbudSaleMap = new Map<string, boolean>();
+  const pakkeServerPriceMap = new Map<string, number>();
   if (pakketilbudIds.length > 0) {
     const pakkeSaleData = await prisma.pakketilbud.findMany({
       where: { id: { in: pakketilbudIds } },
-      select: { id: true, salePrice: true, salePriceStart: true, salePriceEnd: true },
+      select: { id: true, price: true, salePrice: true, salePriceStart: true, salePriceEnd: true },
     });
     for (const p of pakkeSaleData) {
-      const { isOnSale } = getEffectivePrice(0, p.salePrice, p.salePriceStart, p.salePriceEnd, now);
+      const { effectivePrice, isOnSale } = getEffectivePrice(p.price, p.salePrice, p.salePriceStart, p.salePriceEnd, now);
       pakketilbudSaleMap.set(p.id, isOnSale);
+      pakkeServerPriceMap.set(p.id, effectivePrice);
     }
+  }
+
+  // Fetch authoritative designer zone prices
+  const allZoneIds = new Set<number>();
+  for (const item of items) {
+    for (const pe of (item.printElements ?? [])) allZoneIds.add(pe.zoneId);
+    for (const pi of (item.pakketilbudItems ?? [])) {
+      for (const pe of (pi.printElements ?? [])) allZoneIds.add(pe.zoneId);
+    }
+  }
+  const zoneServerPriceMap = new Map<number, number>();
+  if (allZoneIds.size > 0) {
+    const zones = await prisma.designerZone.findMany({
+      where: { id: { in: [...allZoneIds] } },
+      select: { id: true, price: true },
+    });
+    for (const z of zones) zoneServerPriceMap.set(z.id, z.price);
   }
 
   // An item is on sale if its product (or pakketilbud) has an active sale price
@@ -78,6 +124,52 @@ export async function POST(req: NextRequest) {
     if (item.isPakketilbud && item.pakketilbudId) return pakketilbudSaleMap.get(item.pakketilbudId) ?? false;
     return skuOnSaleMap.get(item.skuId) ?? false;
   });
+
+  // ── Server-side price helpers (never trust client-supplied prices) ──────────
+
+  function computeOptionSelectionFee(
+    optionGroups: typeof skusWithProducts[0]["product"]["optionGroups"],
+    optionSelections?: OptionSelection[],
+  ): number {
+    if (!optionSelections || optionSelections.length === 0) return 0;
+    let fee = 0;
+    for (const sel of optionSelections) {
+      const group = optionGroups.find((g) => g.label === sel.groupLabel);
+      if (!group) continue;
+      if ((group.type === "TEXT" || group.type === "CUSTOM") && group.fee && sel.value) {
+        fee += group.fee;
+      } else if (group.type === "SELECT") {
+        const val = group.values.find((v) => v.label === sel.value);
+        fee += val?.price ?? 0;
+      }
+    }
+    return fee;
+  }
+
+  function computePrintFee(printElements?: PrintElement[]): number {
+    return (printElements ?? []).reduce((sum, pe) => sum + (zoneServerPriceMap.get(pe.zoneId) ?? 0), 0);
+  }
+
+  /** Returns server-verified effective product price (excl. VAT, in øre). */
+  function getServerItemPrice(item: CartItem): number {
+    if (item.isPakketilbud && item.pakketilbudId) {
+      return pakkeServerPriceMap.get(item.pakketilbudId) ?? 0;
+    }
+    return skuServerPriceMap.get(item.skuId) ?? 0;
+  }
+
+  /** Returns server-verified customization fee (excl. VAT, in øre). */
+  function getServerItemCustomizationFee(item: CartItem): number {
+    if (item.isPakketilbud) {
+      // Sum per-component customization fees from pakketilbudItems
+      return (item.pakketilbudItems ?? []).reduce((sum, pi) => {
+        const optGroups = skuOptionGroupsMap.get(pi.skuId) ?? [];
+        return sum + computeOptionSelectionFee(optGroups, pi.optionSelections) + computePrintFee(pi.printElements);
+      }, 0);
+    }
+    const optGroups = skuOptionGroupsMap.get(item.skuId) ?? [];
+    return computeOptionSelectionFee(optGroups, item.optionSelections) + computePrintFee(item.printElements);
+  }
 
   // Read settings
   const cfg = await prisma.siteSetting
@@ -119,7 +211,9 @@ export async function POST(req: NextRequest) {
     const pool = grantPool.get(productId);
     if (!pool || pool.length === 0) continue;
 
-    const unitPriceExcl = item.price + (item.customizationFee ?? 0);
+    const serverPrice = getServerItemPrice(item);
+    const serverFee = getServerItemCustomizationFee(item);
+    const unitPriceExcl = serverPrice + serverFee;
     const unitPrice = Math.round(unitPriceExcl * (1 + vatRate / 100));
     let grantedUnits = 0;
     for (let u = 0; u < item.quantity && pool.length > 0; u++) {
@@ -131,11 +225,12 @@ export async function POST(req: NextRequest) {
     if (grantedUnits > 0) grantedQtyMap.set(item.skuId, grantedUnits);
   }
 
-  // Compute totals
-  const originalSubtotal = items.reduce(
-    (s, i) => s + Math.round((i.price + (i.customizationFee ?? 0)) * (1 + vatRate / 100)) * i.quantity,
-    0,
-  );
+  // Compute totals using server-derived prices only
+  const originalSubtotal = items.reduce((s, i) => {
+    const serverPrice = getServerItemPrice(i);
+    const serverFee = getServerItemCustomizationFee(i);
+    return s + Math.round((serverPrice + serverFee) * (1 + vatRate / 100)) * i.quantity;
+  }, 0);
   const effectiveSubtotal = originalSubtotal - grantDiscountTotal;
   const shipping = isPickup ? 0 : effectiveSubtotal >= freeOre ? 0 : flatOre;
   const memberDiscount = (isMember && !anyItemOnSale) ? Math.round(effectiveSubtotal * discountPct / 100) : 0;
@@ -144,11 +239,13 @@ export async function POST(req: NextRequest) {
 
   // Build order items (used in both zero-total and Stripe paths)
   const orderItemsData = items.map((item) => {
+    const serverPrice = getServerItemPrice(item);
+    const serverFee = getServerItemCustomizationFee(item);
     if (item.isPakketilbud) {
       return {
         skuId: null as string | null,
         quantity: item.quantity,
-        priceAtPurchase: item.price + (item.customizationFee ?? 0),
+        priceAtPurchase: serverPrice + serverFee,
         customName: null as string | null,
         customNumber: null as string | null,
         colorName: null as string | null,
@@ -158,7 +255,7 @@ export async function POST(req: NextRequest) {
     return {
       skuId: item.skuId,
       quantity: item.quantity,
-      priceAtPurchase: item.price + (item.customizationFee ?? 0),
+      priceAtPurchase: serverPrice + serverFee,
       customName: item.customName ?? null,
       customNumber: item.customNumber ?? null,
       colorName: item.colorName ?? null,
@@ -225,11 +322,12 @@ export async function POST(req: NextRequest) {
     select: { id: true },
   });
 
-  // Build Stripe line items
+  // Build Stripe line items using server-derived prices
   const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
   for (const item of items) {
-    const unitPriceExclVat = item.price + (item.customizationFee ?? 0);
-    const unitPriceInclVat = Math.round(unitPriceExclVat * (1 + vatRate / 100));
+    const serverPrice = getServerItemPrice(item);
+    const serverFee = getServerItemCustomizationFee(item);
+    const unitPriceInclVat = Math.round((serverPrice + serverFee) * (1 + vatRate / 100));
     let name: string;
     if (item.isPakketilbud) {
       const summary = (item.pakketilbudItems ?? [])
