@@ -2,10 +2,10 @@ import type { NextConfig } from "next";
 
 const cspDirectives = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' js.stripe.com cdn.jsdelivr.net widget.cloudinary.com",
+  "script-src 'self' 'unsafe-inline' js.stripe.com cdn.jsdelivr.net upload-widget.cloudinary.com",
   "style-src 'self' 'unsafe-inline' cdn.jsdelivr.net",
   "img-src 'self' data: res.cloudinary.com",
-  "connect-src 'self' api.stripe.com",
+  "connect-src 'self' api.stripe.com api.cloudinary.com",
   "frame-src js.stripe.com",
   "font-src 'self' cdn.jsdelivr.net",
   "object-src 'none'",
