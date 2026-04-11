@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
       product: {
         select: {
           price: true,
+          membersOnly: true,
           clubRoleRequired: true,
           salePrice: true,
           salePriceStart: true,
@@ -185,6 +186,13 @@ export async function POST(req: NextRequest) {
   if (session?.user?.id) {
     const sub = await prisma.subscription.findUnique({ where: { userId: session.user.id } });
     isMember = sub?.status === "ACTIVE";
+  }
+
+  // Enforce membersOnly products — reject non-members server-side
+  for (const sku of skusWithProducts) {
+    if (sku.product.membersOnly && !isMember) {
+      return NextResponse.json({ error: "Dette produkt kræver et aktivt fanklubsmedlemskab" }, { status: 403 });
+    }
   }
 
   // Pending grants

@@ -1,5 +1,6 @@
 import { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getVatRate } from "@/lib/vat";
 import { ProductColorSection } from "@/components/shop/ProductColorSection";
@@ -49,6 +50,17 @@ export default async function ProductPage({ params }: Props) {
   ]);
 
   if (!product) notFound();
+
+  // Enforce membersOnly gate server-side
+  if (product.membersOnly) {
+    const session = await auth();
+    let isMember = false;
+    if (session?.user?.id) {
+      const sub = await prisma.subscription.findUnique({ where: { userId: session.user.id } });
+      isMember = sub?.status === "ACTIVE";
+    }
+    if (!isMember) redirect("/fanklub");
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
