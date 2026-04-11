@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { Users } from "lucide-react";
+import { InviteAdminButton } from "@/components/admin/InviteAdminButton";
 
 export const metadata: Metadata = { title: "Brugere – Admin" };
 
@@ -36,14 +37,17 @@ export default async function AdminBrugerePage({ searchParams }: Props) {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10">
-      <div className="flex items-center gap-4 mb-8">
-        <a href="/admin" className="text-sm text-gray-500 hover:text-secondary">
-          ← Admin
-        </a>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <Users size={28} className="text-secondary" />
-          Brugere
-        </h1>
+      <div className="flex items-center justify-between gap-4 mb-8">
+        <div className="flex items-center gap-4">
+          <a href="/admin" className="text-sm text-gray-500 hover:text-secondary">
+            ← Admin
+          </a>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Users size={28} className="text-secondary" />
+            Brugere
+          </h1>
+        </div>
+        <InviteAdminButton />
       </div>
 
       {/* Search */}

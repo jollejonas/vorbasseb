@@ -195,6 +195,27 @@ export async function sendPaymentFailed({ to }: { to: string }) {
   });
 }
 
+export async function sendAdminInvite({ to, inviteUrl }: { to: string; inviteUrl: string }) {
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: "Du er inviteret som admin – Vorbasse Boldklub",
+    html: wrapHtml(`
+      <h2>Du er inviteret som admin</h2>
+      <p>Du er blevet inviteret til at få administratoradgang til Vorbasse Boldklubs hjemmeside.</p>
+      <p>Klik på knappen nedenfor for at oprette din konto. Linket er gyldigt i 48 timer.</p>
+      <p style="margin: 32px 0;">
+        <a href="${escapeHtml(inviteUrl)}" style="background:#1a56db;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold;">
+          Opret admin-konto
+        </a>
+      </p>
+      <p style="color:#888;font-size:0.85em;">Hvis du ikke forventede denne invitation kan du se bort fra denne e-mail.</p>
+      <hr />
+      <p>Mvh. Vorbasse Boldklub</p>
+    `),
+  });
+}
+
 export async function sendLowStockAlert(productName: string, size: string, stock: number) {
   const adminTo = process.env.ADMIN_EMAIL ?? FROM;
   await resend.emails.send({
