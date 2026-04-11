@@ -8,7 +8,7 @@ import { getEffectivePrice } from "@/lib/pricing";
 export async function POST(req: NextRequest) {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
   const session = await auth();
-  const { items, deliveryMethod = "SHIPPING", promoMode = false }: { items: CartItem[]; deliveryMethod?: "SHIPPING" | "PICKUP"; promoMode?: boolean } = await req.json();
+  const { items, deliveryMethod = "SHIPPING" }: { items: CartItem[]; deliveryMethod?: "SHIPPING" | "PICKUP" } = await req.json();
 
   if (!items || items.length === 0) {
     return NextResponse.json({ error: "Tom kurv" }, { status: 400 });
@@ -390,7 +390,7 @@ export async function POST(req: NextRequest) {
       });
       discounts = [{ coupon: coupon.id }];
     }
-  } else if (isMember && !promoMode) {
+  } else if (isMember && !anyItemOnSale) {
     if (memberDiscount > 0) {
       const coupon = await stripe.coupons.create({
         amount_off: memberDiscount,
@@ -400,7 +400,7 @@ export async function POST(req: NextRequest) {
       });
       discounts = [{ coupon: coupon.id }];
     }
-  } else if (!anyItemOnSale) {
+  } else if (!isMember && !anyItemOnSale) {
     allowPromoCodes = true;
   }
 

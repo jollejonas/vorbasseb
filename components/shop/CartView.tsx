@@ -14,8 +14,6 @@ export function CartView() {
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>("SHIPPING");
   const [membership, setMembership] = useState<{ isMember: boolean; discountPct: number } | null>(null);
   const [grants, setGrants] = useState<{ id: string; productId: string }[]>([]);
-  const [promoMode, setPromoMode] = useState(false);
-
   useEffect(() => {
     fetch("/api/membership")
       .then((r) => r.json())
@@ -233,21 +231,15 @@ export function CartView() {
             <span>Rabatter gælder ikke</span>
           </div>
         )}
-        {!anyItemOnSale && membership?.isMember && memberDiscount > 0 && !promoMode && (
+        {!anyItemOnSale && membership?.isMember && memberDiscount > 0 && (
           <div className="flex justify-between text-sm text-green-600 font-medium">
             <span>Fanklubsrabat ({membership.discountPct}%)</span>
             <span>−{formatPrice(memberDiscount)}</span>
           </div>
         )}
-        {!anyItemOnSale && promoMode && (
-          <div className="flex justify-between text-sm text-blue-600 font-medium">
-            <span>Rabatkode</span>
-            <span>Indtastes i kassen</span>
-          </div>
-        )}
         <div className="flex justify-between text-sm text-gray-500">
           <span>Heraf moms ({vatPct}%)</span>
-          <span>{formatPrice(vatAmount(effectiveSubtotal - (promoMode ? 0 : memberDiscount), vatPct))}</span>
+          <span>{formatPrice(vatAmount(effectiveSubtotal - memberDiscount, vatPct))}</span>
         </div>
         <div className="flex justify-between text-sm">
           <span>Fragt</span>
@@ -257,9 +249,9 @@ export function CartView() {
         </div>
         <div className="flex justify-between font-bold text-lg border-t pt-3">
           <span>Total (inkl. moms)</span>
-          <span>{formatPrice(withVat(effectiveSubtotal - (promoMode ? 0 : memberDiscount), vatPct) + shipping)}</span>
+          <span>{formatPrice(withVat(effectiveSubtotal - memberDiscount, vatPct) + shipping)}</span>
         </div>
-        {!anyItemOnSale && membership?.isMember && memberDiscount > 0 && !promoMode && (
+        {!anyItemOnSale && membership?.isMember && memberDiscount > 0 && (
           <p className="text-xs text-gray-400">* Den endelige rabat beregnes af Stripe ved betaling</p>
         )}
       </div>
@@ -277,18 +269,8 @@ export function CartView() {
         <div className="flex flex-wrap items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-700 font-medium">
           <Star size={16} className="shrink-0 text-green-500" />
           <span className="flex-1">
-            {promoMode
-              ? `Fanklubsrabatten er midlertidigt deaktiveret — brug en rabatkode i kassen`
-              : `Du er fanklubsmedlem — ${membership.discountPct}% rabat er inkluderet i totalen ovenfor`}
+            {`Du er fanklubsmedlem — ${membership.discountPct}% rabat er inkluderet i totalen ovenfor`}
           </span>
-          {!hasGrantItems && (
-            <button
-              onClick={() => setPromoMode((p) => !p)}
-              className="text-xs text-green-600 underline hover:text-green-800 transition shrink-0"
-            >
-              {promoMode ? "← Brug fanklubsrabatten i stedet" : "Har du en bedre rabatkode? →"}
-            </button>
-          )}
         </div>
       ) : membership !== null && !membership.isMember ? (
         <div className="bg-[#0a0f1e] rounded-xl px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
@@ -316,13 +298,13 @@ export function CartView() {
         >
           Ryd kurv
         </button>
-        <CheckoutButton deliveryMethod={effectiveDelivery} promoMode={promoMode} />
+        <CheckoutButton deliveryMethod={effectiveDelivery} />
       </div>
     </div>
   );
 }
 
-function CheckoutButton({ deliveryMethod, promoMode }: { deliveryMethod: DeliveryMethod; promoMode: boolean }) {
+function CheckoutButton({ deliveryMethod }: { deliveryMethod: DeliveryMethod }) {
   const { items } = useCart();
   const [loading, setLoading] = useState(false);
 
@@ -332,7 +314,7 @@ function CheckoutButton({ deliveryMethod, promoMode }: { deliveryMethod: Deliver
     const res = await fetch("/api/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items, deliveryMethod, promoMode }),
+      body: JSON.stringify({ items, deliveryMethod }),
     });
 
     setLoading(false);
