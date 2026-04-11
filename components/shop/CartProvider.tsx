@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useSession } from "next-auth/react";
 
 export type OptionSelection = { groupLabel: string; value: string };
 
@@ -112,6 +113,44 @@ function itemKey(item: CartItem) {
   return `${item.skuId}::${item.customName ?? ""}::${item.customNumber ?? ""}::${item.colorName ?? ""}::${selections}::${prints}`;
 }
 
+function normalizeCartItems(input: unknown): CartItem[] {
+  if (!Array.isArray(input)) return [];
+
+  return input
+    .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
+    .map((item) => {
+      const rawQty = typeof item.quantity === "number" ? Math.trunc(item.quantity) : 1;
+      const quantity = Number.isFinite(rawQty) ? Math.max(1, rawQty) : 1;
+      return { ...(item as CartItem), quantity };
+    });
+}
+
+function readLocalCart(): CartItem[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    return normalizeCartItems(JSON.parse(raw));
+  } catch {
+    return [];
+  }
+}
+
+function mergeCartItems(localItems: CartItem[], serverItems: CartItem[]): CartItem[] {
+  const merged = new Map<string, CartItem>();
+
+  for (const item of [...serverItems, ...localItems]) {
+    const key = itemKey(item);
+    const existing = merged.get(key);
+    if (existing) {
+      merged.set(key, { ...item, quantity: existing.quantity + item.quantity });
+      continue;
+    }
+    merged.set(key, item);
+  }
+
+  return Array.from(merged.values());
+}
+
 type CartContextValue = {
   items: CartItem[];
   addItem: (item: CartItem) => void;
@@ -128,21 +167,71 @@ const CartContext = createContext<CartContextValue | null>(null);
 const STORAGE_KEY = "vbk_cart";
 
 export function CartProvider({ children }: { children: ReactNode }) {
+  const { data: session, status } = useSession();
   const [state, dispatch] = useReducer(reducer, { items: [] });
   const [vatPct, setVatPct] = useState(25);
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [syncReadyUserId, setSyncReadyUserId] = useState<string | null>(null);
+  const userId = session?.user?.id ?? null;
 
   // Hydrate from localStorage
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) dispatch({ type: "INIT", items: JSON.parse(raw) });
-    } catch {}
+    dispatch({ type: "INIT", items: readLocalCart() });
+    setIsHydrated(true);
   }, []);
 
   // Persist to localStorage
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.items));
-  }, [state.items]);
+    if (!isHydrated) return;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.items));
+    } catch {}
+  }, [isHydrated, state.items]);
+
+  // On login/session load, merge local cart with server cart.
+  useEffect(() => {
+    if (!isHydrated) return;
+
+    if (status !== "authenticated" || !userId) {
+      setSyncReadyUserId(null);
+      return;
+    }
+
+    let cancelled = false;
+    setSyncReadyUserId(null);
+
+    void (async () => {
+      try {
+        const res = await fetch("/api/cart", { cache: "no-store" });
+        const data = res.ok ? await res.json() : null;
+        const serverItems = normalizeCartItems(data?.items);
+        const localItems = readLocalCart();
+        const merged = mergeCartItems(localItems, serverItems);
+        if (!cancelled) dispatch({ type: "INIT", items: merged });
+      } catch {
+        // Keep local cart if server fetch fails.
+      } finally {
+        if (!cancelled) setSyncReadyUserId(userId);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isHydrated, status, userId]);
+
+  // Sync authenticated cart mutations to the server.
+  useEffect(() => {
+    if (!isHydrated) return;
+    if (status !== "authenticated" || !userId) return;
+    if (syncReadyUserId !== userId) return;
+
+    void fetch("/api/cart", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: state.items }),
+    }).catch(() => {});
+  }, [isHydrated, status, userId, syncReadyUserId, state.items]);
 
   // Fetch VAT rate once
   useEffect(() => {
@@ -152,12 +241,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
       .catch(() => {});
   }, []);
 
+  const clearCart = () => {
+    dispatch({ type: "CLEAR" });
+
+    if (status !== "authenticated" || !userId || syncReadyUserId !== userId) return;
+    void fetch("/api/cart", { method: "DELETE" }).catch(() => {});
+  };
+
   const value: CartContextValue = {
     items: state.items,
     addItem: (item) => dispatch({ type: "ADD", item }),
     removeItem: (item) => dispatch({ type: "REMOVE", key: itemKey(item) }),
     updateQty: (item, quantity) => dispatch({ type: "UPDATE_QTY", key: itemKey(item), quantity }),
-    clearCart: () => dispatch({ type: "CLEAR" }),
+    clearCart,
     totalItems: state.items.reduce((s, i) => s + i.quantity, 0),
     subtotal: state.items.reduce(
       (s, i) =>

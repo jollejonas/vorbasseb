@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { fulfillOrder } from "@/lib/fulfillOrder";
+import { sendPaymentFailed } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -109,9 +110,24 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
 
   if (!subId) return;
 
+  const updated = await prisma.subscription.findFirst({
+    where: { stripeSubscriptionId: subId },
+    select: { userId: true },
+  });
+
   await prisma.subscription.updateMany({
     where: { stripeSubscriptionId: subId },
     data: { status: "PAST_DUE" },
   });
+
+  if (updated?.userId) {
+    const user = await prisma.user.findUnique({
+      where: { id: updated.userId },
+      select: { email: true },
+    });
+    if (user?.email) {
+      await sendPaymentFailed({ to: user.email });
+    }
+  }
 }
 

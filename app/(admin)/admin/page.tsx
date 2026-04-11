@@ -56,46 +56,75 @@ const REASON_STYLE: Record<AttentionReason, string> = {
   images: "bg-gray-100 text-gray-600",
 };
 
+function getOrderPeriodStarts(now = new Date()) {
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+
+  const startOfWeek = new Date(startOfToday);
+  const dayOfWeek = startOfWeek.getDay();
+  const daysSinceMonday = (dayOfWeek + 6) % 7;
+  startOfWeek.setDate(startOfWeek.getDate() - daysSinceMonday);
+
+  const startOfMonth = new Date(startOfToday);
+  startOfMonth.setDate(1);
+
+  return { startOfToday, startOfWeek, startOfMonth };
+}
+
 export default async function AdminPage() {
   const session = await auth();
   // @ts-expect-error custom field
   if (session?.user?.role !== "ADMIN") redirect("/");
 
-  const [pendingOrderCount, orderCount, activeMembers, revenue, recentOrders, allProducts] =
-    await Promise.all([
-      prisma.order.count({ where: { status: "PAID" } }),
-      prisma.order.count({ where: { status: { in: ["PAID", "SHIPPED"] } } }),
-      prisma.subscription.count({ where: { status: "ACTIVE" } }),
-      prisma.order.aggregate({
-        where: { status: { in: ["PAID", "SHIPPED", "DELIVERED"] } },
-        _sum: { total: true },
-      }),
-      prisma.order.findMany({
-        where: { status: { in: ["PAID", "PENDING"] } },
-        orderBy: { createdAt: "desc" },
-        take: 5,
-        select: {
-          id: true,
-          orderNumber: true,
-          total: true,
-          status: true,
-          createdAt: true,
-          customerName: true,
-          guestEmail: true,
-          user: { select: { name: true, email: true } },
-        },
-      }),
-      prisma.product.findMany({
-        where: { published: true },
-        select: {
-          id: true,
-          name: true,
-          images: true,
-          skus: { select: { stock: true } },
-          colorVariants: { select: { images: true } },
-        },
-      }),
-    ]);
+  const { startOfToday, startOfWeek, startOfMonth } = getOrderPeriodStarts();
+
+  const [
+    pendingOrderCount,
+    orderCount,
+    todayOrderCount,
+    weekOrderCount,
+    monthOrderCount,
+    activeMembers,
+    revenue,
+    recentOrders,
+    allProducts,
+  ] = await Promise.all([
+    prisma.order.count({ where: { status: "PAID" } }),
+    prisma.order.count({ where: { status: { in: ["PAID", "SHIPPED"] } } }),
+    prisma.order.count({ where: { createdAt: { gte: startOfToday } } }),
+    prisma.order.count({ where: { createdAt: { gte: startOfWeek } } }),
+    prisma.order.count({ where: { createdAt: { gte: startOfMonth } } }),
+    prisma.subscription.count({ where: { status: "ACTIVE" } }),
+    prisma.order.aggregate({
+      where: { status: { in: ["PAID", "SHIPPED", "DELIVERED"] } },
+      _sum: { total: true },
+    }),
+    prisma.order.findMany({
+      where: { status: { in: ["PAID", "PENDING"] } },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        orderNumber: true,
+        total: true,
+        status: true,
+        createdAt: true,
+        customerName: true,
+        guestEmail: true,
+        user: { select: { name: true, email: true } },
+      },
+    }),
+    prisma.product.findMany({
+      where: { published: true },
+      select: {
+        id: true,
+        name: true,
+        images: true,
+        skus: { select: { stock: true } },
+        colorVariants: { select: { images: true } },
+      },
+    }),
+  ]);
 
   const attentionProducts = getAttentionProducts(allProducts);
 
@@ -104,6 +133,11 @@ export default async function AdminPage() {
     { label: "Aktive ordrer i alt", value: orderCount, icon: Package, href: "/admin/ordrer", highlight: false },
     { label: "Fanklubsmedlemmer", value: activeMembers, icon: Users, href: null, highlight: false },
     { label: "Samlet omsætning", value: formatPrice(revenue._sum.total ?? 0), icon: TrendingUp, href: null, highlight: false },
+  ];
+  const orderBreakdown = [
+    { label: "I dag", value: todayOrderCount },
+    { label: "Denne uge", value: weekOrderCount },
+    { label: "Denne måned", value: monthOrderCount },
   ];
 
   const STATUS_LABEL: Record<string, string> = {
@@ -135,6 +169,20 @@ export default async function AdminPage() {
             )}
           </div>
         ))}
+      </div>
+
+      <div className="bg-white border border-gray-100 rounded-xl shadow-sm mb-10">
+        <div className="px-5 py-4 border-b">
+          <h2 className="font-semibold text-sm">Ordrer over tid</h2>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
+          {orderBreakdown.map((period) => (
+            <div key={period.label} className="px-5 py-4">
+              <p className="text-2xl font-bold">{period.value}</p>
+              <p className="text-sm text-gray-500 mt-1">{period.label}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">

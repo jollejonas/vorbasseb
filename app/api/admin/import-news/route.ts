@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import * as cheerio from "cheerio";
+import { sanitizeHtml } from "@/lib/sanitizeHtml";
 
 const BASE_URL = "https://live-911-vorbasse-b-af-1912.umbraco-proxy.com";
 
@@ -182,7 +183,7 @@ export async function POST(req: NextRequest) {
     bodyParts.push($.html(el) ?? "");
   });
 
-  const content = bodyParts.join("\n");
+  const content = sanitizeHtml(bodyParts.join("\n"));
 
   const payload = {
     title,

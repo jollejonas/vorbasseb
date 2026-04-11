@@ -43,3 +43,8 @@ next-env.d.ts
 /app/generated/prisma
 
 .vercel
+
+# local tooling
+.claude/settings.local.json
+.superpowers/
+agents/
