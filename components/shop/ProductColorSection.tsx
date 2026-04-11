@@ -5,6 +5,7 @@ import { ProductImageGallery } from "./ProductImageGallery";
 import { AddToCartSection } from "./AddToCartSection";
 import { formatPrice, withVat } from "@/lib/utils";
 import { getEffectivePrice } from "@/lib/pricing";
+import { sanitizeHtml } from "@/lib/sanitizeHtml";
 import type { Product, SKU, ColorVariant } from "@prisma/client";
 
 type ColorVariantWithSkus = ColorVariant & { skus: SKU[] };
@@ -61,7 +62,7 @@ export function ProductColorSection({ product, skus, colorVariants, vatPct }: Pr
             </p>
           )}
           {product.description && (
-            <div className="product-content mb-4" dangerouslySetInnerHTML={{ __html: product.description }} />
+            <div className="product-content mb-4" dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description) }} />
           )}
         </div>
         {hasColors && (

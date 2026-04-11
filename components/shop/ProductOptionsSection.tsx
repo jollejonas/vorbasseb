@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useCart } from "./CartProvider";
 import { formatPrice, withVat } from "@/lib/utils";
 import { getEffectivePrice } from "@/lib/pricing";
+import { sanitizeHtml } from "@/lib/sanitizeHtml";
 import type { Product, SKU, ProductOptionGroup, ProductOptionValue, GlobalColor, SKUOptionValue } from "@prisma/client";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -230,7 +231,7 @@ export function ProductOptionsSection({ product, skus, optionGroups, vatPct = 25
             </p>
           )}
           {product.description && (
-            <div className="product-content" dangerouslySetInnerHTML={{ __html: product.description }} />
+            <div className="product-content" dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description) }} />
           )}
         </div>
 

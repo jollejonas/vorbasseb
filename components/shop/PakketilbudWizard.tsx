@@ -8,6 +8,7 @@ import { JerseyDesignerCanvas, JerseyDesignerControls } from "./JerseyDesignerPa
 import { PrintConfirmDialog } from "./PrintConfirmDialog";
 import { formatPrice, withVat } from "@/lib/utils";
 import { getEffectivePrice } from "@/lib/pricing";
+import { sanitizeHtml } from "@/lib/sanitizeHtml";
 import type {
   Product,
   SKU,
@@ -317,7 +318,7 @@ function ItemStep({
         {product.description && (
           <div className={`grid transition-all duration-300 ${designerOpen ? "grid-rows-[0fr]" : "grid-rows-[1fr]"}`}>
             <div className="overflow-hidden">
-              <div className="product-content" dangerouslySetInnerHTML={{ __html: product.description }} />
+              <div className="product-content" dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description) }} />
             </div>
           </div>
         )}

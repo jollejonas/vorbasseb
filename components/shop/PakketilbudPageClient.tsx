@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { formatPrice, withVat } from "@/lib/utils";
 import { getEffectivePrice } from "@/lib/pricing";
 import { PakketilbudWizard } from "./PakketilbudWizard";
+import { sanitizeHtml } from "@/lib/sanitizeHtml";
 
 type Item = {
   id: string;
@@ -126,7 +127,7 @@ export function PakketilbudPageClient({ pakketilbud, vatPct, isSoldOut, soldOutI
         </div>
 
         {pakketilbud.description && (
-          <div className="product-content" dangerouslySetInnerHTML={{ __html: pakketilbud.description }} />
+          <div className="product-content" dangerouslySetInnerHTML={{ __html: sanitizeHtml(pakketilbud.description) }} />
         )}
 
         <div>

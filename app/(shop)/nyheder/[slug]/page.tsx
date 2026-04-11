@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { prisma } from "@/lib/prisma";
 import { ShareButtons } from "@/components/shop/ShareButtons";
+import { sanitizeHtml } from "@/lib/sanitizeHtml";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -56,7 +57,7 @@ export default async function NyhedsartikelPage({ params }: Props) {
 
       <div
         className="news-content"
-        dangerouslySetInnerHTML={{ __html: post.content }}
+        dangerouslySetInnerHTML={{ __html: sanitizeHtml(post.content) }}
       />
 
       <ShareButtons slug={post.slug} title={post.title} />

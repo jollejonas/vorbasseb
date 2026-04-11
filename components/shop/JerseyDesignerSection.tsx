@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useCart, type PrintElement } from "./CartProvider";
 import { formatPrice, withVat } from "@/lib/utils";
 import { getEffectivePrice } from "@/lib/pricing";
+import { sanitizeHtml } from "@/lib/sanitizeHtml";
 import { PrintConfirmDialog } from "./PrintConfirmDialog";
 import type { Product, SKU, DesignerZone, DesignerLogo, ProductOptionGroup, ProductOptionValue, SKUOptionValue, GlobalColor } from "@prisma/client";
 
@@ -493,7 +494,7 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
           <div className={`grid transition-all duration-300 ${isDesignerOpen ? "grid-rows-[0fr]" : "grid-rows-[1fr]"}`}>
             <div className="overflow-hidden">
               {product.description && (
-                <div className="product-content" dangerouslySetInnerHTML={{ __html: product.description }} />
+                <div className="product-content" dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description) }} />
               )}
             </div>
           </div>

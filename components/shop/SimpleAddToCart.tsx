@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useCart } from "./CartProvider";
 import { formatPrice, withVat } from "@/lib/utils";
 import { getEffectivePrice } from "@/lib/pricing";
+import { sanitizeHtml } from "@/lib/sanitizeHtml";
 import type { Product, SKU } from "@prisma/client";
 
 export function SimpleAddToCart({
@@ -79,7 +80,7 @@ export function SimpleAddToCart({
             </p>
           )}
           {product.description && (
-            <div className="product-content" dangerouslySetInnerHTML={{ __html: product.description }} />
+            <div className="product-content" dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description) }} />
           )}
         </div>
 
