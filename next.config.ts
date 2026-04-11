@@ -4,7 +4,7 @@ const cspDirectives = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' js.stripe.com cdn.jsdelivr.net upload-widget.cloudinary.com",
   "style-src 'self' 'unsafe-inline' cdn.jsdelivr.net",
-  "img-src 'self' data: res.cloudinary.com",
+  "img-src 'self' data: res.cloudinary.com https://*.dbu.dk https://lgu.dk https://www.lgu.dk",
   "connect-src 'self' api.stripe.com api.cloudinary.com",
   "frame-src js.stripe.com",
   "font-src 'self' cdn.jsdelivr.net",
@@ -40,6 +40,9 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "picsum.photos" },
       { protocol: "https", hostname: "res.cloudinary.com" },
       { protocol: "https", hostname: "live-911-vorbasse-b-af-1912.umbraco-proxy.com" },
+      { protocol: "https", hostname: "file.dbu.dk" },
+      { protocol: "https", hostname: "lgu.dk" },
+      { protocol: "https", hostname: "www.lgu.dk" },
     ],
   },
   async headers() {

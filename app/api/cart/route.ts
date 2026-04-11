@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import type { CartItem } from "@/components/shop/CartProvider";
 import { auth } from "@/auth";
@@ -20,16 +21,31 @@ async function getSessionUserId() {
   return session?.user?.id ?? null;
 }
 
+function isMissingCartStorage(error: unknown) {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    (error.code === "P2021" || error.code === "P2022")
+  );
+}
+
 export async function GET() {
   const userId = await getSessionUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const cart = await prisma.cart.findUnique({
-    where: { userId },
-    select: { items: true },
-  });
+  try {
+    const cart = await prisma.cart.findUnique({
+      where: { userId },
+      select: { items: true },
+    });
 
-  return NextResponse.json({ items: normalizeCartItems(cart?.items) });
+    return NextResponse.json({ items: normalizeCartItems(cart?.items) });
+  } catch (error) {
+    if (isMissingCartStorage(error)) {
+      return NextResponse.json({ items: [], storage: "local" });
+    }
+
+    throw error;
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -39,11 +55,19 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const items = normalizeCartItems(body?.items);
 
-  await prisma.cart.upsert({
-    where: { userId },
-    create: { userId, items },
-    update: { items },
-  });
+  try {
+    await prisma.cart.upsert({
+      where: { userId },
+      create: { userId, items },
+      update: { items },
+    });
+  } catch (error) {
+    if (isMissingCartStorage(error)) {
+      return NextResponse.json({ ok: true, items, storage: "local" });
+    }
+
+    throw error;
+  }
 
   return NextResponse.json({ ok: true, items });
 }
@@ -52,7 +76,15 @@ export async function DELETE() {
   const userId = await getSessionUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  await prisma.cart.deleteMany({ where: { userId } });
+  try {
+    await prisma.cart.deleteMany({ where: { userId } });
+  } catch (error) {
+    if (isMissingCartStorage(error)) {
+      return NextResponse.json({ ok: true, storage: "local" });
+    }
+
+    throw error;
+  }
 
   return NextResponse.json({ ok: true });
 }
