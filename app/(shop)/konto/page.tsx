@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { AccountClient } from "@/components/shop/AccountClient";
+import { CancelMembershipButton } from "@/components/shop/CancelMembershipButton";
 
 export const metadata: Metadata = { title: "Konto" };
 
@@ -99,6 +100,10 @@ export default async function KontoPage() {
               <div className="bg-primary/10 border border-primary/20 rounded-xl px-4 py-3 text-sm text-secondary font-medium">
                 Du har 10% rabat på alle køb som fanklubsmedlem.
               </div>
+            )}
+
+            {isMember && (
+              <CancelMembershipButton />
             )}
 
             {sub.status === "CANCELED" && (
