@@ -1,28 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import * as cheerio from "cheerio";
-import { sanitizeHtml } from "@/lib/sanitizeHtml";
-
-const BASE_URL = "https://live-911-vorbasse-b-af-1912.umbraco-proxy.com";
-
-const DANISH_MONTHS: Record<string, number> = {
-  januar: 0, februar: 1, marts: 2, april: 3, maj: 4, juni: 5,
-  juli: 6, august: 7, september: 8, oktober: 9, november: 10, december: 11,
-};
-
-function parseDanishDate(text: string): Date | null {
-  // "21. februar 2026 kl. 18:00" or "5. februar 2026 kl. 17:00"
-  const m = text.match(/(\d{1,2})\.\s+(\w+)\s+(\d{4})\s+kl[.:]?\s*(\d{1,2}):(\d{2})/i);
-  if (!m) return null;
-  const monthNum = DANISH_MONTHS[m[2].toLowerCase()];
-  if (monthNum === undefined) return null;
-  return new Date(parseInt(m[3]), monthNum, parseInt(m[1]), parseInt(m[4]), parseInt(m[5]));
-}
-
-function urlToSlug(url: string): string {
-  return url.split("/").filter(Boolean).pop() ?? "";
-}
+import { fetchNewsListing, importArticle } from "@/lib/news-import";
 
 // ── GET: list external articles for a given year ──────────────────────────
 export async function GET(req: NextRequest) {
@@ -33,65 +12,8 @@ export async function GET(req: NextRequest) {
   }
 
   const year = req.nextUrl.searchParams.get("year") ?? new Date().getFullYear().toString();
-  const listingBase = `${BASE_URL}/nyheder/klub-nyheder/nyheder-${year}/`;
+  const articles = await fetchNewsListing(year);
 
-  const seen = new Set<string>();
-  const articles: { title: string; url: string; date: string; slug: string }[] = [];
-
-  // Paginate through the listing (5 articles/page, ?no=0,1,2,...)
-  for (let page = 0; page < 20; page++) {
-    const pageUrl = page === 0 ? listingBase : `${listingBase}?no=${page}`;
-    let html: string;
-    try {
-      const res = await fetch(pageUrl, { cache: "no-store" });
-      if (!res.ok) break;
-      html = await res.text();
-    } catch {
-      break;
-    }
-
-    const $ = cheerio.load(html);
-    let found = 0;
-
-    // Find all links that match the article URL pattern for this year.
-    // Each article appears twice: once as an image link (empty text) and once
-    // as a title link — so we allow revisiting a slug to pick up the title.
-    $(`a[href*="/nyheder/klub-nyheder/nyheder-${year}/"]`).each((_, el) => {
-      const href = $(el).attr("href") ?? "";
-      const slug = urlToSlug(href);
-
-      // Skip year-overview pages (e.g. slug === "nyheder-2026")
-      if (!slug || /^nyheder-\d{4}$/.test(slug)) return;
-
-      const text = $(el).text().trim().replace(/\s+/g, " ");
-
-      if (seen.has(slug)) {
-        // Update title if this occurrence has the actual text
-        if (text) {
-          const existing = articles.find((a) => a.slug === slug);
-          if (existing) existing.title = text;
-        }
-        return;
-      }
-      seen.add(slug);
-
-      // Try to get date from surrounding text.
-      // Listing page uses "DD-MM-YYYY HH:MM:SS" format inside .theme_newsFolder_textWrap
-      const card = $(el).closest('[class*="newsListItem"], article, .news-item, li').first();
-      const cardText = (card.length ? card : $(el).parent()).text();
-      const rawDate = cardText.match(/(\d{2})-(\d{2})-(\d{4})/);
-      const date = rawDate
-        ? `${rawDate[1]}.${rawDate[2]}.${rawDate[3]}`
-        : (cardText.match(/\d{1,2}\.\s+\w+\s+\d{4}/) ?? [""])[0];
-
-      articles.push({ title: text || slug, url: BASE_URL + href, date, slug });
-      found++;
-    });
-
-    if (found === 0) break; // no more pages
-  }
-
-  // Check which slugs already exist in our DB
   const existingSlugs = new Set(
     (await prisma.newsPost.findMany({ select: { slug: true } })).map((p) => p.slug),
   );
@@ -112,91 +34,12 @@ export async function POST(req: NextRequest) {
   const { articleUrl } = await req.json();
   if (!articleUrl) return NextResponse.json({ error: "Missing articleUrl" }, { status: 400 });
 
-  const slug = urlToSlug(articleUrl);
-
-  const existing = await prisma.newsPost.findUnique({ where: { slug } });
-  // If already imported AND title looks correct (has spaces, not just the slug), skip
-  if (existing && existing.title !== slug && existing.title.includes(" ")) {
-    return NextResponse.json({ ok: true, id: existing.id, skipped: true });
-  }
-
-  let html: string;
   try {
-    const res = await fetch(articleUrl, { cache: "no-store" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    html = await res.text();
+    const result = await importArticle(articleUrl);
+    return NextResponse.json({ ok: true, ...result });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  const $ = cheerio.load(html);
-
-  // Extract cover image before removing chrome — images use data-src (lazy-load)
-  const coverImageRaw =
-    $(".theme_newsItem_imageWrap img[data-src]").first().attr("data-src") ??
-    $(".theme_newsItem_imageHolder img[data-src]").first().attr("data-src") ??
-    null;
-  // Make URL absolute and strip cache-busting rnd param
-  const coverImage = coverImageRaw
-    ? (coverImageRaw.startsWith("http") ? coverImageRaw : BASE_URL + coverImageRaw)
-        .replace(/[?&]rnd=[^&]*/g, "")
-        .replace(/\?$/, "")
-    : null;
-
-  // Extract title before removing chrome — the h1 lives inside .theme_newsItem_headerWrap
-  // which would be wiped by [class*='header'] below
-  const title =
-    $(".theme_newsItem_headerWrap h1").first().text().trim() ||
-    $("h1").first().text().trim() ||
-    $("h2").first().text().trim() ||
-    slug;
-
-  // Remove navigation, header, footer, scripts, styles
-  $("nav, header, footer, script, style, noscript, [class*='nav'], [class*='menu'], [class*='footer'], [class*='header'], [class*='breadcrumb'], [class*='social'], [class*='share']").remove();
-
-  // Extract date: find a paragraph matching the Danish date pattern
-  let publishedAt: Date | null = null;
-  let dateParagraphText = "";
-  $("p, span, div").each((_, el) => {
-    const text = $(el).text().trim();
-    if (/\d{1,2}\.\s+\w+\s+\d{4}\s+kl/i.test(text) && !dateParagraphText) {
-      dateParagraphText = text;
-      publishedAt = parseDanishDate(text);
-    }
-  });
-
-  // Extract body: target the Umbraco article content area directly.
-  // Structure: .theme_newsItem > [headerWrap, imageWrap, content-div]
-  // Removing the header and image wraps leaves only the article text.
-  const articleRoot = $(".theme_newsItem").clone();
-  articleRoot.find(".theme_newsItem_headerWrap, .theme_newsItem_imageWrap").remove();
-
-  const bodyParts: string[] = [];
-  articleRoot.find("p, h2, h3, h4, h5, ul, ol, blockquote").each((_, el) => {
-    const text = $(el).text().trim();
-    if (!text) return;
-    // Skip nav-like elements (many links) and stub lines
-    if ($(el).find("a").length > 4) return;
-    const tagName = (el as { tagName?: string }).tagName?.toLowerCase() ?? "";
-    if (tagName === "p" && text.length < 4) return;
-    bodyParts.push($.html(el) ?? "");
-  });
-
-  const content = sanitizeHtml(bodyParts.join("\n"));
-
-  const payload = {
-    title,
-    slug,
-    content,
-    coverImage,
-    publishedAt: publishedAt ?? existing?.publishedAt ?? new Date(),
-    membersOnly: false,
-  };
-
-  const post = existing
-    ? await prisma.newsPost.update({ where: { slug }, data: payload })
-    : await prisma.newsPost.create({ data: payload });
-
-  return NextResponse.json({ ok: true, id: post.id });
 }
+
