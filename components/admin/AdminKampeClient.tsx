@@ -19,6 +19,7 @@ function formatDt(d: Date | string) {
   return new Intl.DateTimeFormat("da-DK", {
     weekday: "short", day: "numeric", month: "short",
     hour: "2-digit", minute: "2-digit",
+    timeZone: "Europe/Copenhagen",
   }).format(new Date(d));
 }
 

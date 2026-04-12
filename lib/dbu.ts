@@ -76,6 +76,33 @@ export function dbuGetStandings(poolId: number, teamId: number): Promise<DbuStan
   );
 }
 
+// ── DateTime helper ─────────────────────────────────────────────────────────
+// DBU API returns MatchDateTime as a local Danish time string without any
+// timezone designator (e.g. "2026-04-10T20:00:00"). If we do new Date(str)
+// on a UTC server it is stored as 20:00 UTC, which renders as 22:00 CEST in
+// the browser — the classic +2-hour bug. This function correctly interprets
+// the string as Europe/Copenhagen local time and returns the true UTC Date.
+export function parseDbuDateTime(localStr: string): Date {
+  // Step 1: treat the string as if it were UTC to get a rough reference point.
+  const approxUtc = new Date(localStr + "Z");
+
+  // Step 2: find out what Copenhagen wall-clock time corresponds to that UTC
+  //         moment (sv-SE gives a stable "YYYY-MM-DD HH:mm:ss" string).
+  const copenhagenStr = approxUtc.toLocaleString("sv-SE", {
+    timeZone: "Europe/Copenhagen",
+  });
+
+  // Step 3: parse that Copenhagen string back as if it were UTC to get the
+  //         numeric value of the Copenhagen wall-clock time.
+  const copenhagenAsUtc = new Date(copenhagenStr.replace(" ", "T") + "Z");
+
+  // Step 4: offset = Copenhagen wall-clock − approxUtc (e.g. +7200000 ms in CEST).
+  const offsetMs = copenhagenAsUtc.getTime() - approxUtc.getTime();
+
+  // Step 5: subtract the offset from the approx UTC to get the true UTC instant.
+  return new Date(approxUtc.getTime() - offsetMs);
+}
+
 // ── Label helper ────────────────────────────────────────────────────────────
 // Derives a short display label from the DBU RowName, e.g.:
 // "Herrer Serie 4 - Forår 2026" → "Herrer"

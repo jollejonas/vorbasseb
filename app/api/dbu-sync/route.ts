@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
-import { dbuGetTeams, dbuGetMatches, dbuGetStandings, deriveLabel } from "@/lib/dbu";
+import { dbuGetTeams, dbuGetMatches, dbuGetStandings, deriveLabel, parseDbuDateTime } from "@/lib/dbu";
 
 // Shared sync logic — used by admin route and cron route
 export async function runDiscover() {
@@ -44,7 +44,7 @@ export async function runDataSync() {
           create: {
             dbuId: m.Id,
             configId: config.id,
-            matchDateTime: new Date(m.MatchDateTime),
+            matchDateTime: parseDbuDateTime(m.MatchDateTime),
             roundNo: m.RoundNo,
             homeTeamName: m.HomeTeamName,
             homeScore: m.HomeTeamScore,
@@ -53,7 +53,7 @@ export async function runDataSync() {
             stadiumName: m.StadiumName,
           },
           update: {
-            matchDateTime: new Date(m.MatchDateTime),
+            matchDateTime: parseDbuDateTime(m.MatchDateTime),
             homeTeamName: m.HomeTeamName,
             homeScore: m.HomeTeamScore,
             awayTeamName: m.AwayTeamName,
