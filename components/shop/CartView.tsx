@@ -55,6 +55,16 @@ export function CartView() {
   const hasTrainerItems = items.some((i) => i.clubRoleRequired === "TRAINER");
   const hasGrantItems = grants.length > 0;
 
+  // Group order detection
+  const groupOrderItems = items.filter((i) => i.isGroupOrder);
+  const hasGroupOrderItems = groupOrderItems.length > 0;
+  const hasNonGroupOrderItems = items.some((i) => !i.isGroupOrder);
+  const latestGroupDeadline = groupOrderItems.reduce<string | null>((latest, i) => {
+    if (!i.groupOrderDeadline) return latest;
+    if (!latest) return i.groupOrderDeadline;
+    return i.groupOrderDeadline > latest ? i.groupOrderDeadline : latest;
+  }, null);
+
   // Force PICKUP if any trainer item in cart
   const effectiveDelivery: DeliveryMethod = hasTrainerItems ? "PICKUP" : deliveryMethod;
   const shipping = effectiveDelivery === "PICKUP" ? 0 : calcShipping(effectiveSubtotal);
@@ -155,6 +165,35 @@ export function CartView() {
           );
         })}
       </ul>
+
+      {/* Group order info banner */}
+      {hasGroupOrderItems && (
+        <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+          <span className="text-blue-600 text-lg mt-0.5">📦</span>
+          <div>
+            <p className="text-sm font-semibold text-blue-900">Kurven indeholder samlebestilling</p>
+            {hasNonGroupOrderItems ? (
+              <p className="text-sm text-blue-700 mt-0.5">
+                Din kurv indeholder både normale produkter og samlebestillings-produkter. De normale varer sendes med det samme, men samlebestillingerne behandles først efter deadline.
+              </p>
+            ) : (
+              <p className="text-sm text-blue-700 mt-0.5">
+                Disse produkter indgår i en samlebestilling og behandles efter deadline.
+              </p>
+            )}
+            {latestGroupDeadline && (
+              <p className="text-sm font-medium text-blue-800 mt-1">
+                Deadline:{" "}
+                {new Date(latestGroupDeadline).toLocaleString("da-DK", {
+                  timeZone: "Europe/Copenhagen",
+                  dateStyle: "long",
+                  timeStyle: "short",
+                })}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Delivery method — hidden when trainer items force PICKUP */}
       {!hasTrainerItems ? (

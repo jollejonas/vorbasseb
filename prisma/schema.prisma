@@ -157,6 +157,9 @@ model Product {
   published            Boolean     @default(true)
   featured             Boolean     @default(false)
   images           String[] // Cloudinary URLs (used when no color variants)
+  // Samlebestilling (group order)
+  isGroupOrder          Boolean   @default(false)
+  groupOrderDeadline    DateTime?
   // Jersey designer
   designerEnabled       Boolean  @default(false)
   designerFrontImageIdx Int?     // index into images[] for front preview
@@ -347,6 +350,7 @@ model Order {
   phone           String?
   refunded        Boolean        @default(false)
   cancelledAt     DateTime?
+  groupOrderHoldUntil DateTime?  // hold order until this date (group order snapshot)
   items           OrderItem[]
   usedGrants      TrainerGrant[]
   addressId       String?

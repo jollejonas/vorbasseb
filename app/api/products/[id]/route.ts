@@ -121,6 +121,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
         featured: body.featured,
         images: body.images,
         designerEnabled: body.designerEnabled ?? false,
+        isGroupOrder: body.isGroupOrder ?? false,
+        groupOrderDeadline: body.groupOrderDeadline ? new Date(body.groupOrderDeadline) : null,
       },
     });
 

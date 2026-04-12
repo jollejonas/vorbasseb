@@ -57,6 +57,8 @@ export type CartItem = {
   pakketilbudId?: string; // ID of the Pakketilbud (for sale price checking)
   pakketilbudItems?: PakketilbudItemSelection[];
   isOnSale?: boolean; // true when an active sale price was used at add-to-cart time
+  isGroupOrder?: boolean; // true if this item is part of a samlebestilling
+  groupOrderDeadline?: string | null; // ISO string — deadline for the group order
 };
 
 type CartState = { items: CartItem[] };

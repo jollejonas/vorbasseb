@@ -214,6 +214,12 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
   const [clubRoleRequired, setClubRoleRequired] = useState<ClubRole | "">(product?.clubRoleRequired ?? "");
   const [published, setPublished] = useState(product?.published ?? true);
   const [featured, setFeatured] = useState(product?.featured ?? false);
+  const [isGroupOrder, setIsGroupOrder] = useState((product as typeof product & { isGroupOrder?: boolean })?.isGroupOrder ?? false);
+  const [groupOrderDeadline, setGroupOrderDeadline] = useState(
+    (product as typeof product & { groupOrderDeadline?: Date | string | null })?.groupOrderDeadline
+      ? new Date((product as typeof product & { groupOrderDeadline: Date | string }).groupOrderDeadline).toISOString().slice(0, 16)
+      : ""
+  );
   const [description, setDescription] = useState(product?.description ?? "");
   const [images, setImages] = useState<string[]>(product?.images ?? []);
   const [saving, setSaving] = useState(false);
@@ -690,6 +696,7 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
           modelNumber: modelNumber || null, description, images,
           membersOnly, membersEarlyAccess, clubRoleRequired: clubRoleRequired || null,
           published, featured, designerEnabled,
+          isGroupOrder, groupOrderDeadline: groupOrderDeadline || null,
           optionGroups: groupsPayload,
           skuMatrix: matrixPayload,
           clearColorVariants: migratedToOptions,
@@ -705,6 +712,7 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
           modelNumber: modelNumber || null, description, images,
           membersOnly, membersEarlyAccess, clubRoleRequired: clubRoleRequired || null,
           published, featured, designerEnabled,
+          isGroupOrder, groupOrderDeadline: groupOrderDeadline || null,
           skus: legacyColorVariants.length === 0
             ? legacySkus.map(({ id, size, stock, itemNumber }) => ({ id, size, stock, itemNumber: itemNumber || null }))
             : [],
@@ -879,6 +887,32 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
             </label>
           ))}
         </div>
+      </section>
+
+      {/* ── Samlebestilling ─────────────────────────────────────────────────── */}
+      <section>
+        <p className="text-sm font-medium text-gray-700 mb-3">Samlebestilling</p>
+        <label className="flex items-center gap-2 cursor-pointer select-none mb-3">
+          <input
+            type="checkbox"
+            checked={isGroupOrder}
+            onChange={(e) => setIsGroupOrder(e.target.checked)}
+            className="w-4 h-4 accent-secondary"
+          />
+          <span className="text-sm">Dette produkt indgår i en samlebestilling</span>
+        </label>
+        {isGroupOrder && (
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">Deadline for samlebestilling</label>
+            <input
+              type="datetime-local"
+              value={groupOrderDeadline}
+              onChange={(e) => setGroupOrderDeadline(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
+            />
+            <p className="text-xs text-gray-400 mt-1">Ordrer frigives til behandling efter denne dato.</p>
+          </div>
+        )}
       </section>
 
       {/* ── Main images ─────────────────────────────────────────────────────── */}

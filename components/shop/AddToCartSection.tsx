@@ -50,6 +50,8 @@ export function AddToCartSection({
       clubRoleRequired: product.clubRoleRequired ?? null,
       colorName: colorName || undefined,
       isOnSale,
+      isGroupOrder: product.isGroupOrder,
+      groupOrderDeadline: product.groupOrderDeadline ? product.groupOrderDeadline.toISOString() : null,
     });
 
     const colorLabel = colorName ? ` · ${colorName}` : "";

@@ -12,7 +12,7 @@ export function SimpleAddToCart({
   skus,
   vatPct,
 }: {
-  product: Pick<Product, "id" | "name" | "price" | "description" | "membersOnly" | "clubRoleRequired" | "images" | "salePrice" | "salePriceStart" | "salePriceEnd">;
+  product: Pick<Product, "id" | "name" | "price" | "description" | "membersOnly" | "clubRoleRequired" | "images" | "salePrice" | "salePriceStart" | "salePriceEnd" | "isGroupOrder" | "groupOrderDeadline">;
   skus: SKU[];
   vatPct: number;
 }) {
@@ -35,6 +35,8 @@ export function SimpleAddToCart({
       image: product.images[0],
       clubRoleRequired: product.clubRoleRequired ?? null,
       isOnSale,
+      isGroupOrder: product.isGroupOrder,
+      groupOrderDeadline: product.groupOrderDeadline ? product.groupOrderDeadline.toISOString() : null,
     });
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);

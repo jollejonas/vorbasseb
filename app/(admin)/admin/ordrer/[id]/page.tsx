@@ -95,6 +95,22 @@ export default async function AdminOrderDetailPage({ params }: Params) {
         <PrintButton />
       </div>
 
+      {/* Group order hold banner */}
+      {order.groupOrderHoldUntil && (
+        <div className={`flex items-start gap-3 rounded-xl px-4 py-3 mb-6 ${new Date(order.groupOrderHoldUntil) > new Date() ? "bg-blue-50 border border-blue-200" : "bg-green-50 border border-green-200"}`}>
+          <span className="text-lg mt-0.5">{new Date(order.groupOrderHoldUntil) > new Date() ? "⏳" : "✅"}</span>
+          <div>
+            <p className={`text-sm font-semibold ${new Date(order.groupOrderHoldUntil) > new Date() ? "text-blue-900" : "text-green-900"}`}>
+              {new Date(order.groupOrderHoldUntil) > new Date() ? "Samlebestilling — må ikke behandles endnu" : "Samlebestilling — klar til behandling"}
+            </p>
+            <p className={`text-sm mt-0.5 ${new Date(order.groupOrderHoldUntil) > new Date() ? "text-blue-700" : "text-green-700"}`}>
+              Deadline:{" "}
+              {new Intl.DateTimeFormat("da-DK", { dateStyle: "full", timeStyle: "short", timeZone: "Europe/Copenhagen" }).format(new Date(order.groupOrderHoldUntil))}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="grid md:grid-cols-2 gap-6 mb-8">
         {/* Customer info */}
         <section className="border rounded-xl p-5 space-y-2">

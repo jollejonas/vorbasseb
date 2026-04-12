@@ -86,6 +86,8 @@ export async function POST(req: NextRequest) {
       published: body.published ?? true,
       featured: body.featured ?? false,
       images: body.images ?? [],
+      isGroupOrder: body.isGroupOrder ?? false,
+      groupOrderDeadline: body.groupOrderDeadline ? new Date(body.groupOrderDeadline) : null,
       skus: (!hasColorVariants && !body.optionGroups?.length) ? { create: body.skus ?? [] } : undefined,
     },
     include: { skus: true, category: true },

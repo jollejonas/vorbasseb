@@ -169,6 +169,8 @@ export function ProductOptionsSection({ product, skus, optionGroups, vatPct = 25
       customizationFee: extraFee > 0 ? extraFee : undefined,
       clubRoleRequired: product.clubRoleRequired ?? null,
       isOnSale,
+      isGroupOrder: product.isGroupOrder,
+      groupOrderDeadline: product.groupOrderDeadline ? product.groupOrderDeadline.toISOString() : null,
     });
 
     const colorLabel = colorName ? ` · ${colorName}` : "";

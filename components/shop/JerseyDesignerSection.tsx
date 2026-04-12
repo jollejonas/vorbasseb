@@ -213,6 +213,8 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
       optionSelections: optionSelections.length > 0 ? optionSelections : undefined,
       customizationFee: designerFee > 0 ? designerFee : undefined,
       isOnSale,
+      isGroupOrder: product.isGroupOrder,
+      groupOrderDeadline: product.groupOrderDeadline ? product.groupOrderDeadline.toISOString() : null,
     });
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);

@@ -33,6 +33,8 @@ export async function POST(req: NextRequest) {
           salePrice: true,
           salePriceStart: true,
           salePriceEnd: true,
+          isGroupOrder: true,
+          groupOrderDeadline: true,
           optionGroups: {
             select: {
               label: true,
@@ -316,6 +318,17 @@ export async function POST(req: NextRequest) {
 
   // ── Stripe path ───────────────────────────────────────────────────────────
 
+  // Compute group order hold date (latest deadline of all group-order items in cart)
+  let groupOrderHoldUntil: Date | null = null;
+  for (const sku of skusWithProducts) {
+    if (sku.product.isGroupOrder && sku.product.groupOrderDeadline) {
+      const deadline = new Date(sku.product.groupOrderDeadline);
+      if (!groupOrderHoldUntil || deadline > groupOrderHoldUntil) {
+        groupOrderHoldUntil = deadline;
+      }
+    }
+  }
+
   // Create PENDING order with all items before redirecting to Stripe
   const pendingOrder = await prisma.order.create({
     data: {
@@ -325,6 +338,7 @@ export async function POST(req: NextRequest) {
       total: finalTotal,
       shippingFee: shipping,
       discountApplied: totalDiscountOre,
+      groupOrderHoldUntil,
       items: { create: orderItemsData },
     },
     select: { id: true },

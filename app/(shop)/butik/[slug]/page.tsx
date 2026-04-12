@@ -95,6 +95,29 @@ export default async function ProductPage({ params }: Props) {
         <span className="text-gray-900">{product.name}</span>
       </nav>
 
+      {/* Group order banner */}
+      {product.isGroupOrder && (
+        <div className="mb-6 flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+          <span className="text-blue-600 text-lg mt-0.5">📦</span>
+          <div>
+            <p className="text-sm font-semibold text-blue-900">Samlebestilling</p>
+            <p className="text-sm text-blue-700 mt-0.5">
+              Dette produkt indgår i en samlebestilling. Din betaling gennemføres straks, men ordren behandles og sendes først efter deadline.
+            </p>
+            {product.groupOrderDeadline && (
+              <p className="text-sm font-medium text-blue-800 mt-1">
+                Deadline:{" "}
+                {new Date(product.groupOrderDeadline).toLocaleString("da-DK", {
+                  timeZone: "Europe/Copenhagen",
+                  dateStyle: "long",
+                  timeStyle: "short",
+                })}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       {product.designerEnabled ? (
         <JerseyDesignerSection
           product={product}

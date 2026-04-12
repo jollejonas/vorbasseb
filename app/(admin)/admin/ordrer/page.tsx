@@ -96,6 +96,14 @@ export default async function AdminOrdrerPage({ searchParams }: Props) {
                 <tr key={order.id}>
                   <td className="py-4 pr-4 font-mono text-sm text-gray-500 whitespace-nowrap">
                     #{order.orderNumber}
+                    {order.groupOrderHoldUntil && (
+                      <span
+                        className={`ml-1 text-xs font-semibold px-1.5 py-0.5 rounded ${new Date(order.groupOrderHoldUntil) > new Date() ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700"}`}
+                        title={`Samlebestilling — hold til: ${new Intl.DateTimeFormat("da-DK", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Copenhagen" }).format(new Date(order.groupOrderHoldUntil))}`}
+                      >
+                        {new Date(order.groupOrderHoldUntil) > new Date() ? "⏳ Hold" : "✓ Klar"}
+                      </span>
+                    )}
                   </td>
                   <td className="py-4 pr-4 text-gray-500 whitespace-nowrap">
                     {new Intl.DateTimeFormat("da-DK").format(new Date(order.createdAt))}
