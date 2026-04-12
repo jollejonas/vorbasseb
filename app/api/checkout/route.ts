@@ -275,6 +275,18 @@ export async function POST(req: NextRequest) {
     };
   });
 
+  // Compute group order hold date (latest deadline of all group-order items in cart)
+  // Must be computed before both zero-total and Stripe paths.
+  let groupOrderHoldUntil: Date | null = null;
+  for (const sku of skusWithProducts) {
+    if (sku.product.isGroupOrder && sku.product.groupOrderDeadline) {
+      const deadline = new Date(sku.product.groupOrderDeadline);
+      if (!groupOrderHoldUntil || deadline > groupOrderHoldUntil) {
+        groupOrderHoldUntil = deadline;
+      }
+    }
+  }
+
   // ── Zero-total path: skip Stripe, create PAID order directly ─────────────
   if (finalTotal <= 0 && appliedGrantIds.length > 0) {
     await prisma.$transaction(async (tx) => {
@@ -298,6 +310,7 @@ export async function POST(req: NextRequest) {
           total: 0,
           shippingFee: 0,
           discountApplied: grantDiscountTotal,
+          groupOrderHoldUntil,
           items: { create: orderItemsData },
         },
         select: { id: true },
@@ -317,17 +330,6 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Stripe path ───────────────────────────────────────────────────────────
-
-  // Compute group order hold date (latest deadline of all group-order items in cart)
-  let groupOrderHoldUntil: Date | null = null;
-  for (const sku of skusWithProducts) {
-    if (sku.product.isGroupOrder && sku.product.groupOrderDeadline) {
-      const deadline = new Date(sku.product.groupOrderDeadline);
-      if (!groupOrderHoldUntil || deadline > groupOrderHoldUntil) {
-        groupOrderHoldUntil = deadline;
-      }
-    }
-  }
 
   // Create PENDING order with all items before redirecting to Stripe
   const pendingOrder = await prisma.order.create({
