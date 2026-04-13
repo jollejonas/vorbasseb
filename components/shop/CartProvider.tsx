@@ -139,16 +139,19 @@ function readLocalCart(): CartItem[] {
 }
 
 function mergeCartItems(localItems: CartItem[], serverItems: CartItem[]): CartItem[] {
+  // Server is authoritative for items that exist on both sides.
+  // Local-only items (added while logged out / offline) are appended.
   const merged = new Map<string, CartItem>();
 
-  for (const item of [...serverItems, ...localItems]) {
+  for (const item of serverItems) {
+    merged.set(itemKey(item), item);
+  }
+
+  for (const item of localItems) {
     const key = itemKey(item);
-    const existing = merged.get(key);
-    if (existing) {
-      merged.set(key, { ...item, quantity: existing.quantity + item.quantity });
-      continue;
+    if (!merged.has(key)) {
+      merged.set(key, item);
     }
-    merged.set(key, item);
   }
 
   return Array.from(merged.values());
