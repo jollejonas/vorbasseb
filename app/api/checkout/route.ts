@@ -368,7 +368,7 @@ export async function POST(req: NextRequest) {
     lineItems.push({
       price_data: {
         currency: "dkk",
-        product_data: { name, images: item.image ? [item.image] : [] },
+        product_data: { name, images: item.image?.startsWith("https://") ? [item.image] : [] },
         unit_amount: unitPriceInclVat,
       },
       quantity: item.quantity,
@@ -445,9 +445,11 @@ export async function POST(req: NextRequest) {
       locale: "da",
     });
   } catch (err) {
+    // Log the error so it shows in Vercel logs
+    console.error("[checkout] Stripe session creation failed:", err instanceof Error ? err.message : err);
     // Clean up the pending order so it doesn't accumulate
     await prisma.order.delete({ where: { id: pendingOrder.id } }).catch(() => {});
-    throw err;
+    return NextResponse.json({ error: "Stripe fejl — prøv igen" }, { status: 500 });
   }
 
   // Store the Stripe session ID on the order for idempotency
