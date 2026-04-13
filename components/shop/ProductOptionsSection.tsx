@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { useCart } from "./CartProvider";
+import { GroupOrderConfirmDialog } from "./GroupOrderConfirmDialog";
 import { formatPrice, withVat } from "@/lib/utils";
 import { getEffectivePrice } from "@/lib/pricing";
 import { sanitizeHtml } from "@/lib/sanitizeHtml";
@@ -35,6 +36,7 @@ type Props = {
 
 export function ProductOptionsSection({ product, skus, optionGroups, vatPct = 25 }: Props) {
   const { addItem } = useCart();
+  const [showGroupOrderDialog, setShowGroupOrderDialog] = useState(false);
   const { effectivePrice, isOnSale } = getEffectivePrice(product.price, product.salePrice, product.salePriceStart, product.salePriceEnd);
 
   // For COLOR + SIZE groups: track selected value IDs (pre-select first in-stock color)
@@ -109,45 +111,42 @@ export function ProductOptionsSection({ product, skus, optionGroups, vatPct = 25
     return total;
   }, 0);
 
-  function handleAddToCart() {
+  function validateAddToCart(): boolean {
     if (!activeSku && (colorGroup || sizeGroup)) {
       if (colorGroup && !selectedOptions[colorGroup.id]) {
         toast.error("Vælg venligst en farve");
-        return;
+        return false;
       }
       if (sizeGroup && !selectedOptions[sizeGroup.id]) {
         toast.error("Vælg venligst en størrelse");
-        return;
+        return false;
       }
       toast.error("Ugyldig kombination");
-      return;
+      return false;
     }
-
-    // Validate required other groups
     for (const g of otherGroups) {
       if (g.required && !textInputs[g.id]) {
         toast.error(`Udfyld venligst: ${g.label}`);
-        return;
+        return false;
       }
     }
-
     if (activeSku && activeSku.stock === 0) {
       toast.error("Denne variant er udsolgt");
-      return;
+      return false;
     }
+    return true;
+  }
 
+  function doAddToCart() {
     const colorName = selectedColorValue?.label;
     const sizeValueId = sizeGroup ? selectedOptions[sizeGroup.id] : null;
     const sizeValue = sizeGroup?.values.find((v) => v.id === sizeValueId);
 
-    // Build optionSelections snapshot for non-inventory groups
     const optionSelections = otherGroups
       .filter((g) => textInputs[g.id])
       .map((g) => ({
         groupLabel: g.label,
-        value: g.type === "SELECT"
-          ? (textInputs[g.id] ?? "")
-          : (textInputs[g.id] ?? ""),
+        value: textInputs[g.id] ?? "",
       }));
 
     const skuToUse = activeSku ?? skus[0];
@@ -178,7 +177,23 @@ export function ProductOptionsSection({ product, skus, optionGroups, vatPct = 25
     toast.success(`${product.name} (${sizeLabel}${colorLabel}) lagt i kurven`);
   }
 
+  function handleAddToCart() {
+    if (!validateAddToCart()) return;
+    if (product.isGroupOrder) {
+      setShowGroupOrderDialog(true);
+      return;
+    }
+    doAddToCart();
+  }
+
   return (
+    <>
+    <GroupOrderConfirmDialog
+      open={showGroupOrderDialog}
+      deadline={product.groupOrderDeadline ? product.groupOrderDeadline.toISOString() : null}
+      onConfirm={() => { setShowGroupOrderDialog(false); doAddToCart(); }}
+      onCancel={() => setShowGroupOrderDialog(false)}
+    />
     <div className="grid md:grid-cols-2 gap-8">
       {/* Gallery */}
       <div>
@@ -397,5 +412,6 @@ export function ProductOptionsSection({ product, skus, optionGroups, vatPct = 25
         </button>
       </div>
     </div>
+    </>
   );
 }

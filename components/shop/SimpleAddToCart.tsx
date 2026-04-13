@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useCart } from "./CartProvider";
+import { GroupOrderConfirmDialog } from "./GroupOrderConfirmDialog";
 import { formatPrice, withVat } from "@/lib/utils";
 import { getEffectivePrice } from "@/lib/pricing";
 import { sanitizeHtml } from "@/lib/sanitizeHtml";
@@ -18,12 +19,13 @@ export function SimpleAddToCart({
 }) {
   const { addItem } = useCart();
   const [added, setAdded] = useState(false);
+  const [showGroupOrderDialog, setShowGroupOrderDialog] = useState(false);
   const { effectivePrice, isOnSale } = getEffectivePrice(product.price, product.salePrice, product.salePriceStart, product.salePriceEnd);
 
   const availableSku = skus.find((s) => s.stock > 0) ?? skus[0] ?? null;
   const inStock = availableSku !== null && availableSku.stock > 0;
 
-  function handleAdd() {
+  function doAddToCart() {
     if (!availableSku || !inStock) return;
     addItem({
       skuId: availableSku.id,
@@ -42,7 +44,23 @@ export function SimpleAddToCart({
     setTimeout(() => setAdded(false), 2000);
   }
 
+  function handleAdd() {
+    if (!availableSku || !inStock) return;
+    if (product.isGroupOrder) {
+      setShowGroupOrderDialog(true);
+      return;
+    }
+    doAddToCart();
+  }
+
   return (
+    <>
+    <GroupOrderConfirmDialog
+      open={showGroupOrderDialog}
+      deadline={product.groupOrderDeadline ? product.groupOrderDeadline.toISOString() : null}
+      onConfirm={() => { setShowGroupOrderDialog(false); doAddToCart(); }}
+      onCancel={() => setShowGroupOrderDialog(false)}
+    />
     <div className="grid md:grid-cols-2 gap-10">
       {/* Image */}
       <div>
@@ -100,5 +118,6 @@ export function SimpleAddToCart({
         )}
       </div>
     </div>
+    </>
   );
 }

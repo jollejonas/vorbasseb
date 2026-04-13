@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { useCart } from "./CartProvider";
+import { GroupOrderConfirmDialog } from "./GroupOrderConfirmDialog";
 import { getEffectivePrice } from "@/lib/pricing";
 import type { Product, SKU } from "@prisma/client";
 
@@ -25,22 +26,15 @@ export function AddToCartSection({
 }) {
   const { addItem } = useCart();
   const [selectedSku, setSelectedSku] = useState<SKU | null>(null);
+  const [showGroupOrderDialog, setShowGroupOrderDialog] = useState(false);
   const { effectivePrice, isOnSale } = getEffectivePrice(product.price, product.salePrice, product.salePriceStart, product.salePriceEnd);
 
   const sortedSkus = [...skus].sort(
     (a, b) => SIZES_ORDER.indexOf(a.size) - SIZES_ORDER.indexOf(b.size),
   );
 
-  function handleAdd() {
-    if (!selectedSku) {
-      toast.error("Vælg venligst en størrelse");
-      return;
-    }
-    if (selectedSku.stock === 0) {
-      toast.error("Denne størrelse er udsolgt");
-      return;
-    }
-
+  function doAddToCart() {
+    if (!selectedSku) return;
     addItem({
       skuId: selectedSku.id,
       productId: product.id,
@@ -60,7 +54,30 @@ export function AddToCartSection({
     toast.success(`${product.name} (${selectedSku.size}${colorLabel}) lagt i kurven`);
   }
 
+  function handleAdd() {
+    if (!selectedSku) {
+      toast.error("Vælg venligst en størrelse");
+      return;
+    }
+    if (selectedSku.stock === 0) {
+      toast.error("Denne størrelse er udsolgt");
+      return;
+    }
+    if (product.isGroupOrder) {
+      setShowGroupOrderDialog(true);
+      return;
+    }
+    doAddToCart();
+  }
+
   return (
+    <>
+    <GroupOrderConfirmDialog
+      open={showGroupOrderDialog}
+      deadline={product.groupOrderDeadline ? product.groupOrderDeadline.toISOString() : null}
+      onConfirm={() => { setShowGroupOrderDialog(false); doAddToCart(); }}
+      onCancel={() => setShowGroupOrderDialog(false)}
+    />
     <div className="space-y-5">
       {/* Size selector */}
       <div>
@@ -110,5 +127,6 @@ export function AddToCartSection({
         Læg i kurv
       </button>
     </div>
+    </>
   );
 }
