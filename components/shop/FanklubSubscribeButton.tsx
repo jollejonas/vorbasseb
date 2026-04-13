@@ -4,10 +4,8 @@ import { useState } from "react";
 import type { Session } from "next-auth";
 
 export function FanklubSubscribeButton({
-  plan,
   session,
 }: {
-  plan: "monthly" | "yearly";
   session: Session | null;
 }) {
   const [loading, setLoading] = useState(false);
@@ -22,7 +20,7 @@ export function FanklubSubscribeButton({
     const res = await fetch("/api/subscribe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ plan }),
+      body: JSON.stringify({}),
     });
 
     if (!res.ok) {

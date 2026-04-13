@@ -171,35 +171,17 @@ export default async function FanklubPage() {
         ) : (
           <section className="mb-14">
             <h2 className="text-2xl font-bold mb-6">Meld dig ind i ForzaHestene</h2>
-            <div className="grid md:grid-cols-2 gap-6">
-              {/* Monthly */}
-              <div className="border-2 border-gray-200 rounded-2xl p-8">
-                <h3 className="text-xl font-bold mb-2">Månedligt</h3>
-                <div className="text-4xl font-bold text-secondary mb-1">
-                  49 kr<span className="text-lg font-normal text-gray-500">/md</span>
-                </div>
-                <p className="text-gray-400 text-sm mb-6">Faktureres månedligt · opsiges til enhver tid</p>
-                <ul className="space-y-3 mb-8 text-left">
-                  {BENEFITS.map((b) => (
-                    <li key={b.title} className="flex items-start gap-2 text-sm">
-                      <Check size={16} className="text-primary mt-0.5 shrink-0" />
-                      {b.title}
-                    </li>
-                  ))}
-                </ul>
-                <FanklubSubscribeButton plan="monthly" session={session} />
-              </div>
-
+            <div className="flex justify-center">
               {/* Yearly */}
-              <div className="border-2 border-secondary rounded-2xl p-8 relative">
+              <div className="border-2 border-secondary rounded-2xl p-8 relative max-w-sm w-full">
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-secondary text-white text-xs font-bold px-4 py-1 rounded-full flex items-center gap-1.5">
-                  <Trophy size={11} /> BEDSTE TILBUD
+                  <Trophy size={11} /> ÅRLIGT MEDLEMSKAB
                 </div>
                 <h3 className="text-xl font-bold mb-2">Årligt</h3>
                 <div className="text-4xl font-bold text-secondary mb-1">
-                  449 kr<span className="text-lg font-normal text-gray-500">/år</span>
+                  250 kr<span className="text-lg font-normal text-gray-500">/år</span>
                 </div>
-                <p className="text-green-600 text-sm font-medium mb-6">Spar 139 kr ift. månedlig</p>
+                <p className="text-gray-400 text-sm mb-6">Faktureres årligt · opsiges til enhver tid</p>
                 <ul className="space-y-3 mb-8 text-left">
                   {BENEFITS.map((b) => (
                     <li key={b.title} className="flex items-start gap-2 text-sm">
@@ -208,7 +190,7 @@ export default async function FanklubPage() {
                     </li>
                   ))}
                 </ul>
-                <FanklubSubscribeButton plan="yearly" session={session} />
+                <FanklubSubscribeButton session={session} />
               </div>
             </div>
             <p className="text-sm text-gray-400 text-center mt-4">

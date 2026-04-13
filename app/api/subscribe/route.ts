@@ -9,15 +9,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Ikke logget ind" }, { status: 401 });
   }
 
-  const { plan }: { plan: "monthly" | "yearly" } = await req.json();
-
-  const priceId =
-    plan === "yearly"
-      ? process.env.STRIPE_PRICE_YEARLY
-      : process.env.STRIPE_PRICE_MONTHLY;
+  const priceId = process.env.STRIPE_PRICE_YEARLY;
 
   if (!priceId) {
-    console.error(`[subscribe] Missing env var: STRIPE_PRICE_${plan.toUpperCase()}`);
+    console.error("[subscribe] Missing env var: STRIPE_PRICE_YEARLY");
     return NextResponse.json({ error: "Abonnement ikke konfigureret" }, { status: 500 });
   }
 
