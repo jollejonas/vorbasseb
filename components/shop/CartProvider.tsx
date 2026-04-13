@@ -46,6 +46,7 @@ export type CartItem = {
   price: number; // øre
   quantity: number;
   image?: string;
+  variantId?: string; // ID of the selected ColorVariant (if applicable)
   customName?: string;
   customNumber?: string;
   customizationFee?: number; // øre
