@@ -82,7 +82,13 @@ function reducer(state: CartState, action: Action): CartState {
         return {
           items: state.items.map((i) =>
             itemKey(i) === key
-              ? { ...i, quantity: i.quantity + action.item.quantity }
+              ? {
+                  ...i,
+                  quantity: i.quantity + action.item.quantity,
+                  // Refresh group-order fields from the freshly fetched product data
+                  isGroupOrder: action.item.isGroupOrder,
+                  groupOrderDeadline: action.item.groupOrderDeadline,
+                }
               : i,
           ),
         };
