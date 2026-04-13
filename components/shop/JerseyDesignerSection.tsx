@@ -6,6 +6,7 @@ import { formatPrice, withVat } from "@/lib/utils";
 import { getEffectivePrice } from "@/lib/pricing";
 import { sanitizeHtml } from "@/lib/sanitizeHtml";
 import { PrintConfirmDialog } from "./PrintConfirmDialog";
+import { GroupOrderConfirmDialog } from "./GroupOrderConfirmDialog";
 import type { Product, SKU, DesignerZone, DesignerLogo, ProductOptionGroup, ProductOptionValue, SKUOptionValue, GlobalColor } from "@prisma/client";
 
 type SkuFull = SKU & { optionValues: { optionValueId: string }[] };
@@ -48,6 +49,7 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
   const [textInputs, setTextInputs] = useState<Record<string, string>>({});
   const [added, setAdded] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+  const [showGroupOrderDialog, setShowGroupOrderDialog] = useState(false);
 
   function withTextConfirm(action: () => void) {
     if (isDesignerOpen && addText.trim().length > 0) {
@@ -60,6 +62,8 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
   const colorGroup = optionGroups.find((g) => g.type === "COLOR");
   const sizeGroup = optionGroups.find((g) => g.type === "SIZE");
   const otherGroups = optionGroups.filter((g) => g.type !== "COLOR" && g.type !== "SIZE");
+  const colorGroupId = colorGroup?.id;
+  const sizeGroupId = sizeGroup?.id;
 
   // Color-aware static image (shown when designer is closed)
   const selectedColorValue = colorGroup?.values.find((v) => v.id === selectedOptions[colorGroup!.id]);
@@ -149,15 +153,15 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
     setPrintElements((prev) => prev.filter((_, i) => i !== idx));
   }
 
-  const activeSku = useMemo((): SkuFull | null => {
+  const activeSku: SkuFull | null = (() => {
     const required: string[] = [];
-    if (colorGroup) {
-      const id = selectedOptions[colorGroup.id];
+    if (colorGroupId) {
+      const id = selectedOptions[colorGroupId];
       if (!id) return null;
       required.push(id);
     }
-    if (sizeGroup) {
-      const id = selectedOptions[sizeGroup.id];
+    if (sizeGroupId) {
+      const id = selectedOptions[sizeGroupId];
       if (!id) return null;
       required.push(id);
     }
@@ -168,9 +172,9 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
         return required.every((id) => ids.includes(id)) && sku.stock > 0;
       }) ?? null
     );
-  }, [skus, colorGroup, sizeGroup, selectedOptions]);
+  })();
 
-  function handleAddToCart() {
+  function doAddToCart() {
     if (!activeSku) return;
     const selectedSizeLabel = sizeGroup
       ? (sizeGroup.values.find((v) => v.id === selectedOptions[sizeGroup.id])?.label ?? activeSku.size ?? "One Size")
@@ -220,6 +224,15 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
     });
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
+  }
+
+  function handleAddToCart() {
+    if (!activeSku) return;
+    if (product.isGroupOrder) {
+      setShowGroupOrderDialog(true);
+      return;
+    }
+    doAddToCart();
   }
 
   const canAddToCart = activeSku !== null && activeSku.stock > 0;
@@ -666,6 +679,12 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
       open={pendingAction !== null}
       onConfirm={() => { pendingAction?.(); setPendingAction(null); }}
       onCancel={() => setPendingAction(null)}
+    />
+    <GroupOrderConfirmDialog
+      open={showGroupOrderDialog}
+      deadline={product.groupOrderDeadline ? product.groupOrderDeadline.toISOString() : null}
+      onConfirm={() => { setShowGroupOrderDialog(false); doAddToCart(); }}
+      onCancel={() => setShowGroupOrderDialog(false)}
     />
     </>
   );

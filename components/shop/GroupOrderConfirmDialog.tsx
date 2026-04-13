@@ -48,7 +48,7 @@ export function GroupOrderConfirmDialog({ open, deadline, onConfirm, onCancel }:
             onClick={onConfirm}
             className="flex-1 bg-primary hover:bg-primary-dark text-secondary font-semibold text-sm py-2.5 rounded-xl transition"
           >
-            Ja, jeg accepterer
+            Accepter
           </button>
           <button
             onClick={onCancel}
