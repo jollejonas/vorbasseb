@@ -8,6 +8,44 @@ import type { Product, SKU, Category, ClubRole, ColorVariant, ProductOptionGroup
 import { X } from "lucide-react";
 import { TipTapEditor } from "@/components/admin/TipTapEditor";
 
+// ─── Timezone helpers (Europe/Copenhagen) ────────────────────────────────────
+
+/** Format a UTC Date as YYYY-MM-DDTHH:MM in Copenhagen local time for datetime-local inputs. */
+function toCopenhagenDatetimeLocal(date: Date): string {
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: "Europe/Copenhagen",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const p: Record<string, string> = {};
+  parts.forEach(({ type, value }) => { p[type] = value; });
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
+}
+
+/**
+ * Interpret a datetime-local string (YYYY-MM-DDTHH:MM) as Copenhagen local time
+ * and return the corresponding UTC ISO string.
+ */
+function copenhagenLocalToISO(localStr: string): string {
+  // Treat the string as UTC first, then find the Copenhagen offset at that point.
+  const asIfUtc = new Date(localStr + "Z");
+  const formatter = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Copenhagen",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  });
+  // sv-SE gives "YYYY-MM-DD HH:MM" — parse as UTC to get Copenhagen wall-clock time
+  const copenhagenWallUtc = new Date(formatter.format(asIfUtc).replace(" ", "T") + "Z");
+  // Offset = how many ms ahead Copenhagen is of UTC at this moment
+  const offsetMs = copenhagenWallUtc.getTime() - asIfUtc.getTime();
+  // Subtract offset to get the actual UTC instant for that Copenhagen local time
+  return new Date(asIfUtc.getTime() - offsetMs).toISOString();
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type OptionValueWithColor = ProductOptionValue & { globalColor: GlobalColor | null };
@@ -217,7 +255,7 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
   const [isGroupOrder, setIsGroupOrder] = useState((product as typeof product & { isGroupOrder?: boolean })?.isGroupOrder ?? false);
   const [groupOrderDeadline, setGroupOrderDeadline] = useState(
     (product as typeof product & { groupOrderDeadline?: Date | string | null })?.groupOrderDeadline
-      ? new Date((product as typeof product & { groupOrderDeadline: Date | string }).groupOrderDeadline).toISOString().slice(0, 16)
+      ? toCopenhagenDatetimeLocal(new Date((product as typeof product & { groupOrderDeadline: Date | string }).groupOrderDeadline))
       : ""
   );
   const [description, setDescription] = useState(product?.description ?? "");
@@ -696,7 +734,7 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
           modelNumber: modelNumber || null, description, images,
           membersOnly, membersEarlyAccess, clubRoleRequired: clubRoleRequired || null,
           published, featured, designerEnabled,
-          isGroupOrder, groupOrderDeadline: groupOrderDeadline || null,
+          isGroupOrder, groupOrderDeadline: groupOrderDeadline ? copenhagenLocalToISO(groupOrderDeadline) : null,
           optionGroups: groupsPayload,
           skuMatrix: matrixPayload,
           clearColorVariants: migratedToOptions,
@@ -712,7 +750,7 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
           modelNumber: modelNumber || null, description, images,
           membersOnly, membersEarlyAccess, clubRoleRequired: clubRoleRequired || null,
           published, featured, designerEnabled,
-          isGroupOrder, groupOrderDeadline: groupOrderDeadline || null,
+          isGroupOrder, groupOrderDeadline: groupOrderDeadline ? copenhagenLocalToISO(groupOrderDeadline) : null,
           skus: legacyColorVariants.length === 0
             ? legacySkus.map(({ id, size, stock, itemNumber }) => ({ id, size, stock, itemNumber: itemNumber || null }))
             : [],
