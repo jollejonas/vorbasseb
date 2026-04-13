@@ -99,6 +99,7 @@ export function ProductColorSection({ product, skus, colorVariants, vatPct }: Pr
           product={product}
           skus={activeSkus}
           colorName={selectedColor?.name}
+          image={activeImages[0]}
         />
       </div>
     </div>

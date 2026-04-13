@@ -16,10 +16,12 @@ export function AddToCartSection({
   product,
   skus,
   colorName,
+  image,
 }: {
   product: Product;
   skus: SKU[];
   colorName?: string;
+  image?: string;
 }) {
   const { addItem } = useCart();
   const [selectedSku, setSelectedSku] = useState<SKU | null>(null);
@@ -46,7 +48,7 @@ export function AddToCartSection({
       size: selectedSku.size,
       price: effectivePrice,
       quantity: 1,
-      image: product.images[0],
+      image: image ?? product.images[0],
       clubRoleRequired: product.clubRoleRequired ?? null,
       colorName: colorName || undefined,
       isOnSale,
