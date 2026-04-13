@@ -139,6 +139,8 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
 
     const label = clickedZone.label;
     setClickedZoneId(null);
+    setAddText("");
+    setAddLogoId(null);
     setToast(`Tryk tilføjet til ${label}`);
     setTimeout(() => setToast(null), 2500);
   }
