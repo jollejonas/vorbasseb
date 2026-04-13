@@ -115,12 +115,26 @@ export function CartView() {
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-sm text-gray-500">
-                    Størrelse: {item.size}
-                    {item.colorName && ` · ${item.colorName}`}
-                    {item.customName && ` · Tryk: ${item.customName}`}
-                    {item.customNumber && ` #${item.customNumber}`}
-                  </p>
+                  <div className="text-sm text-gray-500">
+                    <p>
+                      Størrelse: {item.size}
+                      {item.colorName && ` · ${item.colorName}`}
+                      {item.customName && ` · Tryk: ${item.customName}`}
+                      {item.customNumber && ` #${item.customNumber}`}
+                    </p>
+                    {item.printElements && item.printElements.length > 0 && (
+                      <p className="mt-0.5">
+                        Tryk:{" "}
+                        {item.printElements
+                          .map((el) =>
+                            el.type === "text"
+                              ? `${el.zoneLabel}: ${el.value}`
+                              : `${el.zoneLabel}: Logo`
+                          )
+                          .join(", ")}
+                      </p>
+                    )}
+                  </div>
                 )}
                 {isGranted ? (
                   <p className="text-sm font-bold text-green-600 mt-1">Gratis (tildelt af klub)</p>
