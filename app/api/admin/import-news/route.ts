@@ -12,15 +12,21 @@ export async function GET(req: NextRequest) {
   }
 
   const year = req.nextUrl.searchParams.get("year") ?? new Date().getFullYear().toString();
-  const articles = await fetchNewsListing(year);
 
-  const existingSlugs = new Set(
-    (await prisma.newsPost.findMany({ select: { slug: true } })).map((p) => p.slug),
-  );
+  try {
+    const articles = await fetchNewsListing(year);
 
-  return NextResponse.json({
-    articles: articles.map((a) => ({ ...a, exists: existingSlugs.has(a.slug) })),
-  });
+    const existingSlugs = new Set(
+      (await prisma.newsPost.findMany({ select: { slug: true } })).map((p) => p.slug),
+    );
+
+    return NextResponse.json({
+      articles: articles.map((a) => ({ ...a, exists: existingSlugs.has(a.slug) })),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
 
 // ── POST: import a single article ─────────────────────────────────────────
@@ -31,7 +37,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { articleUrl } = await req.json();
+  let articleUrl: string;
+  try {
+    const body = await req.json();
+    articleUrl = body.articleUrl;
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
   if (!articleUrl) return NextResponse.json({ error: "Missing articleUrl" }, { status: 400 });
 
   try {
