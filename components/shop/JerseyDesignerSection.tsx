@@ -86,13 +86,25 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
 
   // Per-color designer image resolution
   // If a color is selected and has designer images configured → use those; otherwise fall back to product-level
-  const colorHasFrontImage = selectedColorValue != null && selectedColorValue.designerFrontImageIdx != null && selectedColorValue.images.length > 0;
-  const frontImage = colorHasFrontImage
-    ? selectedColorValue!.images[selectedColorValue!.designerFrontImageIdx!]
-    : product.images[product.designerFrontImageIdx ?? 0];
-  const backImage = selectedColorValue?.designerBackImageIdx != null && selectedColorValue.images.length > 0
-    ? selectedColorValue.images[selectedColorValue.designerBackImageIdx]
-    : product.images[product.designerBackImageIdx ?? 0];
+  const colorImages = selectedColorValue?.images ?? [];
+  const selectedColorFrontImage =
+    selectedColorValue?.designerFrontImageIdx != null
+      ? (colorImages[selectedColorValue.designerFrontImageIdx] ?? null)
+      : null;
+  const selectedColorBackImage =
+    selectedColorValue?.designerBackImageIdx != null
+      ? (colorImages[selectedColorValue.designerBackImageIdx] ?? null)
+      : null;
+  const productFrontImage =
+    product.images[product.designerFrontImageIdx ?? 0] ??
+    product.images[0] ??
+    null;
+  const productBackImage =
+    product.designerBackImageIdx != null
+      ? (product.images[product.designerBackImageIdx] ?? null)
+      : null;
+  const frontImage = selectedColorFrontImage ?? productFrontImage;
+  const backImage = selectedColorBackImage ?? productBackImage;
   const printColor =
     (selectedColorValue?.designerPrintColor) ||
     product.designerPrintColor ||
@@ -100,14 +112,12 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
 
   // Designer is available for this color only if the color value has a front image configured
   // (or if there is no color group at all — single-color product using product-level settings)
-  const colorDesignerAvailable = !colorGroup || colorHasFrontImage;
+  const colorDesignerAvailable = frontImage !== null;
 
   // Has a back designer image available (for front/back toggle)
-  const hasBackImage = colorGroup
-    ? (selectedColorValue?.designerBackImageIdx != null && selectedColorValue.images.length > 0)
-    : product.designerBackImageIdx != null;
+  const hasBackImage = backImage !== null;
 
-  const previewImage = previewSide === "front" ? frontImage : backImage;
+  const previewImage = previewSide === "front" ? frontImage : (backImage ?? frontImage);
 
   const interactiveZones = zones.filter((z) => !z.fixedLogo);
   const fixedZones = zones.filter((z) => z.fixedLogo);
@@ -546,8 +556,16 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
                   type="button"
                   onClick={() => withTextConfirm(() => {
                     setSelectedOptions((p) => ({ ...p, [colorGroup.id]: v.id }));
-                    // Close designer if switching to a color without designer images
-                    const hasDesigner = v.designerFrontImageIdx != null && v.images.length > 0;
+                    // Close designer if neither per-color nor product-level fallback has a front image.
+                    const colorFrontImage =
+                      v.designerFrontImageIdx != null
+                        ? (v.images[v.designerFrontImageIdx] ?? null)
+                        : null;
+                    const fallbackFrontImage =
+                      product.images[product.designerFrontImageIdx ?? 0] ??
+                      product.images[0] ??
+                      null;
+                    const hasDesigner = colorFrontImage !== null || fallbackFrontImage !== null;
                     if (!hasDesigner && isDesignerOpen) { setIsDesignerOpen(false); setClickedZoneId(null); }
                   })}
                   title={v.label}

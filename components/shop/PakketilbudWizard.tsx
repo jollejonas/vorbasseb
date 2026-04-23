@@ -113,6 +113,11 @@ function isSizeAvailableForOptions(
   });
 }
 
+function resolveImageByIndex(images: string[] | undefined, idx: number | null | undefined): string | null {
+  if (idx == null) return null;
+  return images?.[idx] ?? null;
+}
+
 function initialStep(product: ProductFull): StepState {
   const selectedOptions: Record<string, string> = {};
   const colorGroup = product.optionGroups.find((g) => g.type === "COLOR");
@@ -195,7 +200,9 @@ function ItemStep({
 
   // ── Designer local ephemeral state ────────────────────────────────────────
   const [designerOpen, setDesignerOpen] = useState(false);
-  useEffect(() => { setDesignerOpen(false); onDesignerOpenChange?.(false); }, [stepIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Reset local/passed designer state when navigating between pakketilbud steps.
+  // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
+  useEffect(() => { setDesignerOpen(false); onDesignerOpenChange?.(false); }, [stepIndex]);
   const [previewSide, setPreviewSide] = useState<"front" | "back">("front");
   const [clickedZoneId, setClickedZoneId] = useState<number | null>(null);
   const [addType, setAddType] = useState<"text" | "logo">("text");
@@ -285,19 +292,43 @@ function ItemStep({
     : product.images;
 
   // Color-aware designer fields — mirrors JerseyDesignerSection logic
-  const colorHasFrontImage =
-    !!selectedColorValue &&
-    selectedColorValue.designerFrontImageIdx != null &&
-    selectedColorValue.images.length > 0;
-  const colorAwareProduct = colorHasFrontImage
-    ? {
-        ...product,
-        images: selectedColorValue!.images,
-        designerFrontImageIdx: selectedColorValue!.designerFrontImageIdx,
-        designerBackImageIdx: selectedColorValue!.designerBackImageIdx,
-        designerPrintColor: selectedColorValue!.designerPrintColor ?? product.designerPrintColor,
-      }
-    : product;
+  const productFrontImage =
+    resolveImageByIndex(product.images, product.designerFrontImageIdx) ??
+    product.images[0] ??
+    null;
+  const productBackImage = resolveImageByIndex(product.images, product.designerBackImageIdx);
+  const colorFrontImage = resolveImageByIndex(
+    selectedColorValue?.images,
+    selectedColorValue?.designerFrontImageIdx,
+  );
+  const colorBackImage = resolveImageByIndex(
+    selectedColorValue?.images,
+    selectedColorValue?.designerBackImageIdx,
+  );
+  const resolvedFrontImage = colorFrontImage ?? productFrontImage;
+  const resolvedBackImage = colorBackImage ?? productBackImage;
+  const designerImages = [
+    resolvedFrontImage,
+    ...(resolvedBackImage && resolvedBackImage !== resolvedFrontImage ? [resolvedBackImage] : []),
+  ].filter((img): img is string => img !== null);
+
+  const colorAwareProduct = {
+    ...product,
+    images: designerImages.length > 0 ? designerImages : product.images,
+    designerFrontImageIdx: resolvedFrontImage ? 0 : null,
+    designerBackImageIdx: resolvedBackImage
+      ? (resolvedBackImage === resolvedFrontImage ? 0 : 1)
+      : null,
+    designerPrintColor: selectedColorValue?.designerPrintColor ?? product.designerPrintColor,
+  };
+  const designerAvailableForSelection =
+    hasDesigner &&
+    colorAwareProduct.designerFrontImageIdx !== null &&
+    !!colorAwareProduct.images[colorAwareProduct.designerFrontImageIdx];
+  const hasBackDesignerImage =
+    colorAwareProduct.designerBackImageIdx !== null &&
+    !!colorAwareProduct.images[colorAwareProduct.designerBackImageIdx];
+  const effectivePreviewSide = hasBackDesignerImage ? previewSide : "front";
 
   // ── Legacy color variants ─────────────────────────────────────────────────
   const selectedColorVariant = product.colorVariants.find(
@@ -363,11 +394,19 @@ function ItemStep({
                       key={v.id}
                       type="button"
                       onClick={() =>
-                        withTextConfirm(() =>
+                        withTextConfirm(() => {
                           onChange({
                             selectedOptions: { ...stepState.selectedOptions, [colorGroup.id]: v.id },
-                          })
-                        )
+                          });
+                          const nextColorFrontImage = resolveImageByIndex(v.images, v.designerFrontImageIdx);
+                          const nextResolvedFrontImage = nextColorFrontImage ?? productFrontImage;
+                          const nextDesignerAvailable = hasDesigner && nextResolvedFrontImage !== null;
+                          if (!nextDesignerAvailable && designerOpen) {
+                            handleDesignerOpenChange(false);
+                            setClickedZoneId(null);
+                            setPreviewSide("front");
+                          }
+                        })
                       }
                       title={v.label}
                       className={`w-8 h-8 rounded-full border-2 transition ${
@@ -549,7 +588,7 @@ function ItemStep({
   );
 
   // ── Designer open: canvas replaces gallery in left column ─────────────────
-  if (hasDesigner && designerOpen) {
+  if (designerAvailableForSelection && designerOpen) {
     return (
       <>
       <div className="grid md:grid-cols-2 gap-6">
@@ -558,7 +597,7 @@ function ItemStep({
           product={colorAwareProduct}
           zones={product.designerZones}
           printElements={stepState.printElements}
-          previewSide={previewSide}
+          previewSide={effectivePreviewSide}
           clickedZoneId={clickedZoneId}
           onZoneClick={handleZoneClick}
           toastMsg={toastMsg}
@@ -586,8 +625,8 @@ function ItemStep({
             addFontSize={addFontSize}
             onAddFontSizeChange={setAddFontSize}
             onConfirmAdd={handleConfirmAdd}
-            hasBack={colorAwareProduct.designerBackImageIdx !== null}
-            previewSide={previewSide}
+            hasBack={hasBackDesignerImage}
+            previewSide={effectivePreviewSide}
             onPreviewSideChange={setPreviewSide}
             onCloseDesigner={() => { handleDesignerOpenChange(false); setClickedZoneId(null); }}
           />
@@ -636,7 +675,7 @@ function ItemStep({
       {/* Right: options + toggle button */}
       <div>
         {optionsJsx}
-        {hasDesigner && (
+        {designerAvailableForSelection && (
           <div className="mt-5">
             <button
               type="button"
