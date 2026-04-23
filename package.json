@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "seed": "dotenv -e .env -- ts-node --transpile-only prisma/seed.ts",
+    "sync-github": "ts-node --transpile-only scripts/github-paperclip-sync.ts",
     "postinstall": "prisma generate"
   },
   "prisma": {
