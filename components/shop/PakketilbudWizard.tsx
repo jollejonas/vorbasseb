@@ -284,6 +284,21 @@ function ItemStep({
       : product.images
     : product.images;
 
+  // Color-aware designer fields — mirrors JerseyDesignerSection logic
+  const colorHasFrontImage =
+    !!selectedColorValue &&
+    selectedColorValue.designerFrontImageIdx != null &&
+    selectedColorValue.images.length > 0;
+  const colorAwareProduct = colorHasFrontImage
+    ? {
+        ...product,
+        images: selectedColorValue!.images,
+        designerFrontImageIdx: selectedColorValue!.designerFrontImageIdx,
+        designerBackImageIdx: selectedColorValue!.designerBackImageIdx,
+        designerPrintColor: selectedColorValue!.designerPrintColor ?? product.designerPrintColor,
+      }
+    : product;
+
   // ── Legacy color variants ─────────────────────────────────────────────────
   const selectedColorVariant = product.colorVariants.find(
     (cv) => cv.id === stepState.selectedColorVariantId,
@@ -540,7 +555,7 @@ function ItemStep({
       <div className="grid md:grid-cols-2 gap-6">
         {/* Left: jersey canvas */}
         <JerseyDesignerCanvas
-          product={product}
+          product={colorAwareProduct}
           zones={product.designerZones}
           printElements={stepState.printElements}
           previewSide={previewSide}
@@ -571,7 +586,7 @@ function ItemStep({
             addFontSize={addFontSize}
             onAddFontSizeChange={setAddFontSize}
             onConfirmAdd={handleConfirmAdd}
-            hasBack={product.designerBackImageIdx !== null}
+            hasBack={colorAwareProduct.designerBackImageIdx !== null}
             previewSide={previewSide}
             onPreviewSideChange={setPreviewSide}
             onCloseDesigner={() => { handleDesignerOpenChange(false); setClickedZoneId(null); }}
