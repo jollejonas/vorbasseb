@@ -46,13 +46,12 @@ export function TipTapEditor({ content, onChange, placeholder = "Skriv indhold h
     },
   });
 
-  // Sync content from outside (e.g. when editing an existing post)
+  // Sync content from outside (e.g. when loaded async from DB after editor mounts)
   useEffect(() => {
-    if (editor && content && editor.getHTML() !== content) {
-      editor.commands.setContent(content);
+    if (editor && content !== undefined && editor.getHTML() !== content) {
+      editor.commands.setContent(content, false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editor]);
+  }, [editor, content]);
 
   const addLink = useCallback(() => {
     if (!editor) return;
@@ -76,7 +75,7 @@ export function TipTapEditor({ content, onChange, placeholder = "Skriv indhold h
   return (
     <div className="border rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-secondary">
       {/* Toolbar */}
-      <div className="flex flex-wrap gap-0.5 p-2 border-b bg-gray-50">
+      <div className="flex flex-wrap gap-0.5 p-2 border-b bg-gray-50" onMouseDown={e => e.preventDefault()}>
         <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} className={btn(editor.isActive("bold"))} title="Fed"><Bold size={15} /></button>
         <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} className={btn(editor.isActive("italic"))} title="Kursiv"><Italic size={15} /></button>
 
