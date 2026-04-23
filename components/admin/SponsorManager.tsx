@@ -15,12 +15,14 @@ export function SponsorManager({ initialSponsors, initialHeading }: Props) {
   const [saving, setSaving] = useState(false);
   const [heading, setHeading] = useState(initialHeading);
   const [headingSaving, setHeadingSaving] = useState(false);
+  const [scriptReady, setScriptReady] = useState(false);
   const widgetRef = useRef<{ open: () => void } | null>(null);
 
   useEffect(() => {
     const script = document.createElement("script");
     script.src = "https://upload-widget.cloudinary.com/global/all.js";
     script.async = true;
+    script.onload = () => setScriptReady(true);
     document.head.appendChild(script);
     return () => { document.head.removeChild(script); };
   }, []);
@@ -29,6 +31,8 @@ export function SponsorManager({ initialSponsors, initialHeading }: Props) {
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = process.env.NEXT_PUBLIC_UPLOAD_PRESET;
     if (!cloudName || !uploadPreset) { setError("Cloudinary er ikke konfigureret"); return; }
+
+    if (!scriptReady) { setError("Upload-widget er ikke klar endnu – prøv igen om et øjeblik"); return; }
 
     if (!widgetRef.current) {
       // @ts-expect-error cloudinary global
@@ -225,9 +229,9 @@ export function SponsorManager({ initialSponsors, initialHeading }: Props) {
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">Logo</label>
           <div className="flex items-center gap-3">
-            <button type="button" onClick={openCloudinaryWidget}
-              className="border border-gray-200 px-4 py-2 rounded-lg text-sm hover:bg-gray-50">
-              {form.logoUrl ? "Skift logo" : "Upload logo"}
+            <button type="button" onClick={openCloudinaryWidget} disabled={!scriptReady}
+              className="border border-gray-200 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50">
+              {!scriptReady ? "Indlæser…" : form.logoUrl ? "Skift logo" : "Upload logo"}
             </button>
             {form.logoUrl && (
               // eslint-disable-next-line @next/next/no-img-element
