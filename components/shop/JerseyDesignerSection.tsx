@@ -30,7 +30,8 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
 
   const [isDesignerOpen, setIsDesignerOpen] = useState(false);
   const [previewSide, setPreviewSide] = useState<"front" | "back">("front");
-  const [printElements, setPrintElements] = useState<PrintElement[]>([]);
+  // Keyed by color option-value ID (or "_default" for products with no color group)
+  const [printElementsByColor, setPrintElementsByColor] = useState<Record<string, PrintElement[]>>({});
 
   // Zone clicked to start add flow
   const [clickedZoneId, setClickedZoneId] = useState<number | null>(null);
@@ -67,6 +68,17 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
 
   // Color-aware static image (shown when designer is closed)
   const selectedColorValue = colorGroup?.values.find((v) => v.id === selectedOptions[colorGroup!.id]);
+
+  // Per-color print element key and current slice
+  const colorKey = selectedColorValue?.id ?? "_default";
+  const printElements = printElementsByColor[colorKey] ?? [];
+  function setPrintElements(updater: PrintElement[] | ((prev: PrintElement[]) => PrintElement[])) {
+    setPrintElementsByColor((prev) => {
+      const current = prev[colorKey] ?? [];
+      const next = typeof updater === "function" ? updater(current) : updater;
+      return { ...prev, [colorKey]: next };
+    });
+  }
   const activeStaticImage =
     (selectedColorValue?.images ?? []).length > 0
       ? selectedColorValue!.images[0]
