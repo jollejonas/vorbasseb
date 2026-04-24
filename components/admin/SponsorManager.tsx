@@ -6,6 +6,7 @@ type Sponsor = { id: string; name: string; logoUrl: string; websiteUrl: string |
 type Props = { initialSponsors: Sponsor[]; initialHeading: string };
 
 const EMPTY_FORM = { name: "", logoUrl: "", websiteUrl: "" };
+const CLOUDINARY_WIDGET_SRC = "https://upload-widget.cloudinary.com/global/all.js";
 
 export function SponsorManager({ initialSponsors, initialHeading }: Props) {
   const [sponsors, setSponsors] = useState<Sponsor[]>(initialSponsors);
@@ -19,18 +20,57 @@ export function SponsorManager({ initialSponsors, initialHeading }: Props) {
   const widgetRef = useRef<{ open: () => void } | null>(null);
 
   useEffect(() => {
-    const script = document.createElement("script");
-    script.src = "https://upload-widget.cloudinary.com/global/all.js";
-    script.async = true;
-    script.onload = () => setScriptReady(true);
-    document.head.appendChild(script);
-    return () => { document.head.removeChild(script); };
+    let cancelled = false;
+
+    const markReady = () => {
+      if (!cancelled) setScriptReady(true);
+    };
+    const markError = () => {
+      if (!cancelled) {
+        setError("Cloudinary widget kunne ikke indlæses. Tjek netværk/CSP og prøv igen.");
+      }
+    };
+
+    // @ts-expect-error cloudinary global
+    if (window.cloudinary?.createUploadWidget) {
+      markReady();
+      return () => { cancelled = true; };
+    }
+
+    const existingScript = document.querySelector<HTMLScriptElement>(`script[src="${CLOUDINARY_WIDGET_SRC}"]`);
+    const script = existingScript ?? document.createElement("script");
+
+    if (!existingScript) {
+      script.src = CLOUDINARY_WIDGET_SRC;
+      script.async = true;
+      document.head.appendChild(script);
+    }
+
+    script.addEventListener("load", markReady);
+    script.addEventListener("error", markError);
+
+    return () => {
+      cancelled = true;
+      script.removeEventListener("load", markReady);
+      script.removeEventListener("error", markError);
+      if (!existingScript && script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+    };
   }, []);
 
   function openCloudinaryWidget() {
-    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-    const uploadPreset = process.env.NEXT_PUBLIC_UPLOAD_PRESET;
-    if (!cloudName || !uploadPreset) { setError("Cloudinary er ikke konfigureret"); return; }
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME?.trim();
+    const uploadPreset = process.env.NEXT_PUBLIC_UPLOAD_PRESET?.trim();
+    const missingEnvVars: string[] = [];
+    if (!cloudName) missingEnvVars.push("NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME");
+    if (!uploadPreset) missingEnvVars.push("NEXT_PUBLIC_UPLOAD_PRESET");
+    if (missingEnvVars.length > 0) {
+      setError(
+        `Cloudinary er ikke konfigureret. Mangler: ${missingEnvVars.join(", ")} i .env.local (genstart server bagefter).`
+      );
+      return;
+    }
 
     if (!scriptReady) { setError("Upload-widget er ikke klar endnu – prøv igen om et øjeblik"); return; }
 
@@ -39,7 +79,13 @@ export function SponsorManager({ initialSponsors, initialHeading }: Props) {
 
       if (!widgetRef.current) {
         // @ts-expect-error cloudinary global
-        const createdWidget = window.cloudinary?.createUploadWidget(
+        const cloudinary = window.cloudinary;
+        if (!cloudinary?.createUploadWidget) {
+          setError("Cloudinary widget er ikke tilgængelig endnu. Genindlæs siden og prøv igen.");
+          return;
+        }
+
+        const createdWidget = cloudinary.createUploadWidget(
           { cloudName, uploadPreset, multiple: false, resourceType: "image", folder: "vbk-sponsorer", clientAllowedFormats: ["jpg", "jpeg", "png", "webp", "svg"], maxFileSize: 5000000 },
           (
             error: unknown,
@@ -59,7 +105,13 @@ export function SponsorManager({ initialSponsors, initialHeading }: Props) {
         widgetRef.current = createdWidget;
       }
 
-      widgetRef.current.open();
+      const widget = widgetRef.current;
+      if (!widget) {
+        setError("Upload-widget kunne ikke startes. Prøv at genindlæse siden.");
+        return;
+      }
+
+      widget.open();
     } catch {
       setError("Upload-widget fejlede uventet. Prøv igen eller genindlæs siden.");
     }
