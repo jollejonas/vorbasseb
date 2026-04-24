@@ -1,11 +1,11 @@
 "use client";
 
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, useEditorState, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, type MouseEvent } from "react";
 import {
   Bold,
   Italic,
@@ -41,9 +41,24 @@ export function TipTapEditor({ content, onChange, placeholder = "Skriv indhold h
     editorProps: {
       attributes: {
         class:
-          "min-h-[300px] prose prose-sm max-w-none focus:outline-none px-4 py-3",
+          "min-h-[300px] max-w-none focus:outline-none px-4 py-3 [&_p]:my-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:list-outside [&_ul]:pl-6 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:list-outside [&_ol]:pl-6 [&_li]:my-1",
       },
     },
+  });
+
+  const toolbarState = useEditorState({
+    editor,
+    selector: ({ editor }) => ({
+      bold: editor.isActive("bold"),
+      italic: editor.isActive("italic"),
+      heading2: editor.isActive("heading", { level: 2 }),
+      heading3: editor.isActive("heading", { level: 3 }),
+      bulletList: editor.isActive("bulletList"),
+      orderedList: editor.isActive("orderedList"),
+      link: editor.isActive("link"),
+      canUndo: editor.can().chain().focus().undo().run(),
+      canRedo: editor.can().chain().focus().redo().run(),
+    }),
   });
 
   // Sync content from outside (e.g. when loaded async from DB after editor mounts)
@@ -67,7 +82,12 @@ export function TipTapEditor({ content, onChange, placeholder = "Skriv indhold h
     editor.chain().focus().setImage({ src: url }).run();
   }, [editor]);
 
-  if (!editor) return null;
+  const runToolbarCommand = useCallback((event: MouseEvent<HTMLButtonElement>, command: () => void) => {
+    event.preventDefault();
+    command();
+  }, []);
+
+  if (!editor || !toolbarState) return null;
 
   const btn = (active: boolean) =>
     `p-1.5 rounded transition ${active ? "bg-secondary text-white" : "text-gray-600 hover:bg-gray-100"}`;
@@ -75,29 +95,101 @@ export function TipTapEditor({ content, onChange, placeholder = "Skriv indhold h
   return (
     <div className="border rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-secondary">
       {/* Toolbar */}
-      <div className="flex flex-wrap gap-0.5 p-2 border-b bg-gray-50" onMouseDown={e => e.preventDefault()}>
-        <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} className={btn(editor.isActive("bold"))} title="Fed"><Bold size={15} /></button>
-        <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} className={btn(editor.isActive("italic"))} title="Kursiv"><Italic size={15} /></button>
+      <div className="flex flex-wrap gap-0.5 p-2 border-b bg-gray-50" onMouseDown={(e) => e.preventDefault()}>
+        <button
+          type="button"
+          onMouseDown={(event) => runToolbarCommand(event, () => { editor.chain().focus().toggleBold().run(); })}
+          className={btn(toolbarState.bold)}
+          title="Fed"
+        >
+          <Bold size={15} />
+        </button>
+        <button
+          type="button"
+          onMouseDown={(event) => runToolbarCommand(event, () => { editor.chain().focus().toggleItalic().run(); })}
+          className={btn(toolbarState.italic)}
+          title="Kursiv"
+        >
+          <Italic size={15} />
+        </button>
 
         <div className="w-px bg-gray-200 mx-1 self-stretch" />
 
-        <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} className={btn(editor.isActive("heading", { level: 2 }))} title="Overskrift 2"><Heading2 size={15} /></button>
-        <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} className={btn(editor.isActive("heading", { level: 3 }))} title="Overskrift 3"><Heading3 size={15} /></button>
+        <button
+          type="button"
+          onMouseDown={(event) => runToolbarCommand(event, () => { editor.chain().focus().toggleHeading({ level: 2 }).run(); })}
+          className={btn(toolbarState.heading2)}
+          title="Overskrift 2"
+        >
+          <Heading2 size={15} />
+        </button>
+        <button
+          type="button"
+          onMouseDown={(event) => runToolbarCommand(event, () => { editor.chain().focus().toggleHeading({ level: 3 }).run(); })}
+          className={btn(toolbarState.heading3)}
+          title="Overskrift 3"
+        >
+          <Heading3 size={15} />
+        </button>
 
         <div className="w-px bg-gray-200 mx-1 self-stretch" />
 
-        <button type="button" onClick={() => editor.chain().focus().toggleBulletList().run()} className={btn(editor.isActive("bulletList"))} title="Punktliste"><List size={15} /></button>
-        <button type="button" onClick={() => editor.chain().focus().toggleOrderedList().run()} className={btn(editor.isActive("orderedList"))} title="Nummereret liste"><ListOrdered size={15} /></button>
+        <button
+          type="button"
+          onMouseDown={(event) => runToolbarCommand(event, () => { editor.chain().focus().toggleBulletList().run(); })}
+          className={btn(toolbarState.bulletList)}
+          title="Punktliste"
+        >
+          <List size={15} />
+        </button>
+        <button
+          type="button"
+          onMouseDown={(event) => runToolbarCommand(event, () => { editor.chain().focus().toggleOrderedList().run(); })}
+          className={btn(toolbarState.orderedList)}
+          title="Nummereret liste"
+        >
+          <ListOrdered size={15} />
+        </button>
 
         <div className="w-px bg-gray-200 mx-1 self-stretch" />
 
-        <button type="button" onClick={addLink} className={btn(editor.isActive("link"))} title="Indsæt link"><LinkIcon size={15} /></button>
-        <button type="button" onClick={addImage} className={btn(false)} title="Indsæt billede via URL"><ImageIcon size={15} /></button>
+        <button
+          type="button"
+          onMouseDown={(event) => runToolbarCommand(event, addLink)}
+          className={btn(toolbarState.link)}
+          title="Indsæt link"
+        >
+          <LinkIcon size={15} />
+        </button>
+        <button
+          type="button"
+          onMouseDown={(event) => runToolbarCommand(event, addImage)}
+          className={btn(false)}
+          title="Indsæt billede via URL"
+        >
+          <ImageIcon size={15} />
+        </button>
 
         <div className="w-px bg-gray-200 mx-1 self-stretch" />
 
-        <button type="button" onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} className={btn(false) + " disabled:opacity-30"} title="Fortryd"><Undo size={15} /></button>
-        <button type="button" onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} className={btn(false) + " disabled:opacity-30"} title="Gentag"><Redo size={15} /></button>
+        <button
+          type="button"
+          onMouseDown={(event) => runToolbarCommand(event, () => { editor.chain().focus().undo().run(); })}
+          disabled={!toolbarState.canUndo}
+          className={btn(false) + " disabled:opacity-30"}
+          title="Fortryd"
+        >
+          <Undo size={15} />
+        </button>
+        <button
+          type="button"
+          onMouseDown={(event) => runToolbarCommand(event, () => { editor.chain().focus().redo().run(); })}
+          disabled={!toolbarState.canRedo}
+          className={btn(false) + " disabled:opacity-30"}
+          title="Gentag"
+        >
+          <Redo size={15} />
+        </button>
       </div>
 
       {/* Editor area */}
