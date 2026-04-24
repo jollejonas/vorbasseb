@@ -103,7 +103,7 @@ export async function importArticle(articleUrl: string): Promise<ImportArticleRe
   const slug = urlToSlug(articleUrl);
 
   const existing = await prisma.newsPost.findUnique({ where: { slug } });
-  if (existing && existing.title !== slug && existing.title.includes(" ")) {
+  if (existing && existing.title !== slug) {
     return { id: existing.id, skipped: true };
   }
 
