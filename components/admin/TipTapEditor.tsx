@@ -64,7 +64,7 @@ export function TipTapEditor({ content, onChange, placeholder = "Skriv indhold h
   // Sync content from outside (e.g. when loaded async from DB after editor mounts)
   useEffect(() => {
     if (editor && content !== undefined && editor.getHTML() !== content) {
-      editor.commands.setContent(content, false);
+      editor.commands.setContent(content, { emitUpdate: false });
     }
   }, [editor, content]);
 
