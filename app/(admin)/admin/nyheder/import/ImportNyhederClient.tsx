@@ -76,6 +76,7 @@ export default function ImportNyhederClient() {
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
+      if (document.hidden) return;
       void fetchArticles({ silent: true });
     }, POLL_INTERVAL_MS);
 
