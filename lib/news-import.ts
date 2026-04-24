@@ -3,6 +3,11 @@ import * as cheerio from "cheerio";
 import { sanitizeHtml } from "@/lib/sanitizeHtml";
 
 export const NEWS_BASE_URL = "https://live-911-vorbasse-b-af-1912.umbraco-proxy.com";
+const LISTING_FETCH_TIMEOUT_MS = 10_000;
+const ARTICLE_FETCH_TIMEOUT_MS = 15_000;
+const NEWS_FETCH_HEADERS = {
+  "user-agent": "VBKNewsSync/1.0 (+https://vbkshoppen.dk)",
+};
 
 const DANISH_MONTHS: Record<string, number> = {
   januar: 0, februar: 1, marts: 2, april: 3, maj: 4, juni: 5,
@@ -32,10 +37,22 @@ export async function fetchNewsListing(
     const pageUrl = page === 0 ? listingBase : `${listingBase}?no=${page}`;
     let html: string;
     try {
-      const res = await fetch(pageUrl, { cache: "no-store" });
-      if (!res.ok) break;
+      const res = await fetch(pageUrl, {
+        cache: "no-store",
+        headers: NEWS_FETCH_HEADERS,
+        signal: AbortSignal.timeout(LISTING_FETCH_TIMEOUT_MS),
+      });
+      if (!res.ok) {
+        if (page === 0) {
+          throw new Error(`Unable to fetch news listing (${res.status})`);
+        }
+        break;
+      }
       html = await res.text();
     } catch {
+      if (page === 0) {
+        throw new Error("Unable to reach news listing");
+      }
       break;
     }
 
@@ -66,7 +83,8 @@ export async function fetchNewsListing(
         ? `${rawDate[1]}.${rawDate[2]}.${rawDate[3]}`
         : (cardText.match(/\d{1,2}\.\s+\w+\s+\d{4}/) ?? [""])[0];
 
-      articles.push({ title: text || slug, url: NEWS_BASE_URL + href, date, slug });
+      const url = href.startsWith("http") ? href : NEWS_BASE_URL + href;
+      articles.push({ title: text || slug, url, date, slug });
       found++;
     });
 
@@ -89,7 +107,11 @@ export async function importArticle(articleUrl: string): Promise<ImportArticleRe
     return { id: existing.id, skipped: true };
   }
 
-  const res = await fetch(articleUrl, { cache: "no-store" });
+  const res = await fetch(articleUrl, {
+    cache: "no-store",
+    headers: NEWS_FETCH_HEADERS,
+    signal: AbortSignal.timeout(ARTICLE_FETCH_TIMEOUT_MS),
+  });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const html = await res.text();
 

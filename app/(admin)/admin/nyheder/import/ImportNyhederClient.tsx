@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Download, RefreshCw, CheckCircle, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
+import Link from "next/link";
 
 type ExternalArticle = {
   title: string;
@@ -12,28 +13,83 @@ type ExternalArticle = {
   exists: boolean;
 };
 
+type ImportNewsListResponse = {
+  articles?: ExternalArticle[];
+  error?: string;
+};
+
+type ImportNewsPostResponse = {
+  ok?: boolean;
+  id?: string;
+  skipped?: boolean;
+  error?: string;
+};
+
+const POLL_INTERVAL_MS = 45_000;
+
+function getUnexpectedResponseMessage(status: number, raw: string): string {
+  if (raw.includes("<!DOCTYPE") || raw.includes("<html")) {
+    if (status === 401 || status === 403) {
+      return "Sessionen er udlobet. Log ind igen.";
+    }
+    return "Serveren returnerede HTML i stedet for JSON.";
+  }
+  return `Ugyldigt svar fra serveren (${status}).`;
+}
+
+async function parseApiResponse<T extends { error?: string }>(res: Response): Promise<T> {
+  const raw = await res.text();
+  if (!raw) return {} as T;
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    throw new Error(getUnexpectedResponseMessage(res.status, raw));
+  }
+}
+
 export default function ImportNyhederClient() {
   const [year, setYear] = useState(new Date().getFullYear().toString());
   const [articles, setArticles] = useState<ExternalArticle[]>([]);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState<Set<string>>(new Set());
 
-  const fetchArticles = useCallback(async () => {
-    setLoading(true);
+  const fetchArticles = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) setLoading(true);
     try {
-      const res = await fetch(`/api/admin/import-news?year=${year}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Fejl");
-      setArticles(data.articles);
+      const res = await fetch(`/api/admin/import-news?year=${year}`, { cache: "no-store" });
+      const data = await parseApiResponse<ImportNewsListResponse>(res);
+      if (!res.ok) throw new Error(data.error ?? "Kunne ikke hente artikler");
+      setArticles(data.articles ?? []);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Kunne ikke hente artikler");
+      if (!silent) {
+        toast.error(err instanceof Error ? err.message : "Kunne ikke hente artikler");
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [year]);
 
   useEffect(() => {
-    fetchArticles();
+    void fetchArticles();
+  }, [fetchArticles]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      void fetchArticles({ silent: true });
+    }, POLL_INTERVAL_MS);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void fetchArticles({ silent: true });
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [fetchArticles]);
 
   async function handleImport(article: ExternalArticle) {
@@ -44,7 +100,7 @@ export default function ImportNyhederClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ articleUrl: article.url }),
       });
-      const data = await res.json();
+      const data = await parseApiResponse<ImportNewsPostResponse>(res);
       if (!res.ok) throw new Error(data.error ?? "Fejl");
 
       toast.success(`"${article.title}" importeret`);
@@ -74,9 +130,9 @@ export default function ImportNyhederClient() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-10">
       <div className="flex items-center gap-4 mb-8">
-        <a href="/admin/nyheder" className="text-sm text-gray-500 hover:text-secondary">
+        <Link href="/admin/nyheder" className="text-sm text-gray-500 hover:text-secondary">
           ← Nyheder
-        </a>
+        </Link>
         <h1 className="text-3xl font-bold">Importer nyheder</h1>
       </div>
 
@@ -93,6 +149,10 @@ export default function ImportNyhederClient() {
         og importerer dem som nyheder på denne side.
       </p>
 
+      <p className="text-xs text-gray-500 mb-5">
+        Listen opdateres automatisk hvert 45. sekund.
+      </p>
+
       {/* Controls */}
       <div className="flex items-center gap-3 mb-6">
         <select
@@ -105,7 +165,7 @@ export default function ImportNyhederClient() {
         </select>
 
         <button
-          onClick={fetchArticles}
+          onClick={() => void fetchArticles()}
           disabled={loading}
           className="flex items-center gap-2 border rounded-lg px-4 py-2 text-sm hover:bg-gray-50 transition disabled:opacity-50"
         >
@@ -200,7 +260,7 @@ export default function ImportNyhederClient() {
       <p className="text-xs text-gray-400 mt-4">
         Artikler importeres med deres originale publiceringsdato og er synlige med det samme.
         Du kan redigere dem i{" "}
-        <a href="/admin/nyheder" className="underline">nyheder-oversigten</a>.
+        <Link href="/admin/nyheder" className="underline">nyheder-oversigten</Link>.
       </p>
     </div>
   );
