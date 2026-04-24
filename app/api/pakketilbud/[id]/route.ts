@@ -16,7 +16,6 @@ const PAKKE_INCLUDE = {
             orderBy: { position: "asc" as const },
           },
           skus: {
-            where: { colorVariantId: null },
             include: { optionValues: { select: { optionValueId: true } } },
           },
           colorVariants: {

@@ -35,7 +35,6 @@ export default async function PakketilbudPage({ params }: Props) {
                 },
                 _count: { select: { skus: { where: { stock: { gt: 0 } } } } },
                 skus: {
-                  where: { colorVariantId: null },
                   include: { optionValues: { select: { optionValueId: true } } },
                 },
                 colorVariants: {
