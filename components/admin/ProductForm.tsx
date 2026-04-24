@@ -7,6 +7,10 @@ import { slugify } from "@/lib/utils";
 import type { Product, SKU, Category, ClubRole, ColorVariant, ProductOptionGroup, ProductOptionValue, GlobalColor, OptionGroupTemplate, OptionGroupTemplateValue, DesignerZone, DesignerLogo } from "@prisma/client";
 import { X } from "lucide-react";
 import { TipTapEditor } from "@/components/admin/TipTapEditor";
+import {
+  normalizeDesignerZonePlacements,
+  type DesignerZonePlacementMap,
+} from "@/lib/designerZonePlacements";
 
 // ─── Timezone helpers (Europe/Copenhagen) ────────────────────────────────────
 
@@ -65,6 +69,21 @@ type OptionType = "COLOR" | "SIZE" | "TEXT" | "SELECT" | "CUSTOM";
 
 type CategoryOption = { id: string; name: string; children: { id: string; name: string }[] };
 
+type DesignerZoneRow = {
+  side: "front" | "back";
+  label: string;
+  position: string;
+  allowText: boolean;
+  allowLogo: boolean;
+  previewX: number;
+  previewY: number;
+  previewW: number;
+  previewH: number;
+  priceKr: string;
+  tipText: string;
+  fixedLogoId: number | null;
+};
+
 type OptionValueRow = {
   id?: string;
   _key: string;
@@ -80,6 +99,7 @@ type OptionValueRow = {
   designerFrontImageIdx?: number | null;
   designerBackImageIdx?: number | null;
   designerPrintColor?: string;
+  designerZonePlacements?: DesignerZonePlacementMap | null;
 };
 
 type OptionGroupRow = {
@@ -161,6 +181,9 @@ function buildInitialProductState(product: ProductWithRelations | undefined): {
         designerFrontImageIdx: (v as typeof v & { designerFrontImageIdx?: number | null }).designerFrontImageIdx ?? null,
         designerBackImageIdx: (v as typeof v & { designerBackImageIdx?: number | null }).designerBackImageIdx ?? null,
         designerPrintColor: (v as typeof v & { designerPrintColor?: string | null }).designerPrintColor ?? "",
+        designerZonePlacements: normalizeDesignerZonePlacements(
+          (v as typeof v & { designerZonePlacements?: unknown }).designerZonePlacements
+        ),
       };
     }),
   }));
@@ -271,22 +294,7 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
     product?.designerBackImageIdx ?? ""
   );
   const [designerPrintColor, setDesignerPrintColor] = useState(product?.designerPrintColor ?? "#FFFFFF");
-  type ZoneRow = {
-    side: "front" | "back";
-    label: string;
-    position: string;
-    allowText: boolean;
-    allowLogo: boolean;
-    previewX: number;
-    previewY: number;
-    previewW: number;
-    previewH: number;
-    priceKr: string;
-    tipText: string;
-    fixedLogoId: number | null;
-  };
-
-  const [designerZones, setDesignerZones] = useState<ZoneRow[]>(
+  const [designerZones, setDesignerZones] = useState<DesignerZoneRow[]>(
     (product?.designerZones ?? []).map((z) => ({
       side: z.side as "front" | "back",
       label: z.label,
@@ -497,7 +505,7 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
     const valueKey = nextKey();
     setOptionGroups((prev) =>
       prev.map((g) => g._key !== groupKey ? g : {
-        ...g, values: [...g.values, { ...value, _key: valueKey, images: [], imageLabels: [] }],
+        ...g, values: [...g.values, { ...value, _key: valueKey, images: [], imageLabels: [], designerZonePlacements: null }],
       })
     );
     return valueKey;
@@ -590,6 +598,7 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
       globalColorHex: v.globalColor?.hex,
       images: v.images,
       imageLabels: [],
+      designerZonePlacements: null,
     }));
     const newGroup: OptionGroupRow = {
       _key: groupKey,
@@ -682,6 +691,20 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
 
   // ── Submit ────────────────────────────────────────────────────────────────────
 
+  function normalizePlacementsForSave(
+    placements: DesignerZonePlacementMap | null | undefined,
+    zoneCount: number
+  ): DesignerZonePlacementMap | null {
+    const normalized = normalizeDesignerZonePlacements(placements);
+    if (!normalized) return null;
+    const boundedEntries = Object.entries(normalized).filter(([k]) => {
+      const idx = Number(k);
+      return Number.isInteger(idx) && idx >= 0 && idx < zoneCount;
+    });
+    if (boundedEntries.length === 0) return null;
+    return Object.fromEntries(boundedEntries);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const priceVal = parseFloat(priceKr);
@@ -715,6 +738,10 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
             designerFrontImageIdx: v.designerFrontImageIdx ?? null,
             designerBackImageIdx: v.designerBackImageIdx ?? null,
             designerPrintColor: v.designerPrintColor || null,
+            designerZonePlacements: normalizePlacementsForSave(
+              v.designerZonePlacements,
+              designerZones.length
+            ),
           })),
         }));
 
@@ -1044,6 +1071,7 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
                 onUpdateValue={(vKey, patch) => updateOptionValue(g._key, vKey, patch)}
                 onUpload={(vKey) => openCloudinaryWidget({ type: "colorValue", key: vKey })}
                 designerEnabled={designerEnabled}
+                designerZones={designerZones}
                 gi={gi}
               />
             ))}
@@ -1329,7 +1357,7 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
 
                 function commitPendingArea() {
                   if (!pendingArea) return;
-                  const newZones: ZoneRow[] = [];
+                  const newZones: DesignerZoneRow[] = [];
                   selectedCells.forEach((key) => {
                     const [row, col] = key.split(",").map(Number);
                     newZones.push({
@@ -1356,7 +1384,7 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
 
                 function commitWholeArea() {
                   if (!pendingArea) return;
-                  const newZone: ZoneRow = {
+                  const newZone: DesignerZoneRow = {
                     side: zoneEditorSide,
                     label: "Tryk",
                     position: "custom",
@@ -1566,7 +1594,7 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
                       {/* Properties panel */}
                       {selectedZoneIdx !== null && designerZones[selectedZoneIdx] && (() => {
                         const zone = designerZones[selectedZoneIdx];
-                        const update = (patch: Partial<ZoneRow>) =>
+                        const update = (patch: Partial<DesignerZoneRow>) =>
                           setDesignerZones((prev) => prev.map((z, i) => i === selectedZoneIdx ? { ...z, ...patch } : z));
                         return (
                           <div className="w-44 shrink-0 space-y-3 text-sm">
@@ -1670,7 +1698,7 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
 function OptionGroupEditor({
   group, globalColors, sizePresets,
   onUpdate, onRemove, onAddValue, onRemoveValue, onUpdateValue, onUpload,
-  designerEnabled,
+  designerEnabled, designerZones = [],
 }: {
   group: OptionGroupRow;
   globalColors: GlobalColor[];
@@ -1685,6 +1713,7 @@ function OptionGroupEditor({
   onUpdateValue: (key: string, patch: Partial<OptionValueRow>) => void;
   onUpload: (key: string) => void;
   designerEnabled?: boolean;
+  designerZones?: DesignerZoneRow[];
   gi?: number;
 }) {
   const typeLabels: Record<OptionType, string> = {
@@ -1814,43 +1843,139 @@ function OptionGroupEditor({
                   </div>
                   {/* Designer per-color settings — only shown when designer is enabled and value has images */}
                   {designerEnabled && v.images.length > 0 && (
-                    <div className="grid grid-cols-3 gap-2 pt-1 border-t border-dashed border-gray-200">
-                      <div>
-                        <label className="block text-[10px] font-medium text-gray-400 mb-1">Designer forside</label>
-                        <select
-                          value={v.designerFrontImageIdx ?? ""}
-                          onChange={(e) => onUpdateValue(v._key, { designerFrontImageIdx: e.target.value === "" ? null : Number(e.target.value) })}
-                          className="w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-secondary"
-                        >
-                          <option value="">— Ikke konfigureret —</option>
-                          {v.images.map((_, i) => (
-                            <option key={i} value={i}>{v.imageLabels?.[i] || `Billede ${i + 1}`}</option>
-                          ))}
-                        </select>
+                    <div className="space-y-2 pt-1 border-t border-dashed border-gray-200">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-medium text-gray-400 mb-1">Designer forside</label>
+                          <select
+                            value={v.designerFrontImageIdx ?? ""}
+                            onChange={(e) => onUpdateValue(v._key, { designerFrontImageIdx: e.target.value === "" ? null : Number(e.target.value) })}
+                            className="w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-secondary"
+                          >
+                            <option value="">— Ikke konfigureret —</option>
+                            {v.images.map((_, i) => (
+                              <option key={i} value={i}>{v.imageLabels?.[i] || `Billede ${i + 1}`}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-medium text-gray-400 mb-1">Designer bagside</label>
+                          <select
+                            value={v.designerBackImageIdx ?? ""}
+                            onChange={(e) => onUpdateValue(v._key, { designerBackImageIdx: e.target.value === "" ? null : Number(e.target.value) })}
+                            className="w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-secondary"
+                          >
+                            <option value="">— Ingen bagside —</option>
+                            {v.images.map((_, i) => (
+                              <option key={i} value={i}>{v.imageLabels?.[i] || `Billede ${i + 1}`}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-medium text-gray-400 mb-1">Tryk-farve</label>
+                          <input
+                            type="color"
+                            value={v.designerPrintColor || "#ffffff"}
+                            onChange={(e) => onUpdateValue(v._key, { designerPrintColor: e.target.value })}
+                            className="w-full h-7 border rounded cursor-pointer p-0.5"
+                            title="Farve på trykket tekst/logo"
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-[10px] font-medium text-gray-400 mb-1">Designer bagside</label>
-                        <select
-                          value={v.designerBackImageIdx ?? ""}
-                          onChange={(e) => onUpdateValue(v._key, { designerBackImageIdx: e.target.value === "" ? null : Number(e.target.value) })}
-                          className="w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-secondary"
-                        >
-                          <option value="">— Ingen bagside —</option>
-                          {v.images.map((_, i) => (
-                            <option key={i} value={i}>{v.imageLabels?.[i] || `Billede ${i + 1}`}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-medium text-gray-400 mb-1">Tryk-farve</label>
-                        <input
-                          type="color"
-                          value={v.designerPrintColor || "#ffffff"}
-                          onChange={(e) => onUpdateValue(v._key, { designerPrintColor: e.target.value })}
-                          className="w-full h-7 border rounded cursor-pointer p-0.5"
-                          title="Farve på trykket tekst/logo"
-                        />
-                      </div>
+
+                      {designerZones.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <p className="text-[10px] font-medium text-gray-400">Zonepositioner for denne farve</p>
+                            {v.designerZonePlacements && (
+                              <button
+                                type="button"
+                                onClick={() => onUpdateValue(v._key, { designerZonePlacements: null })}
+                                className="text-[10px] text-gray-500 hover:text-secondary"
+                              >
+                                Nulstil alle
+                              </button>
+                            )}
+                          </div>
+                          <div className="space-y-1 max-h-64 overflow-auto pr-1">
+                            {designerZones.map((zone, zoneIdx) => {
+                              const placementKey = String(zoneIdx);
+                              const override = v.designerZonePlacements?.[placementKey];
+                              const currentPlacement = override ?? {
+                                previewX: zone.previewX,
+                                previewY: zone.previewY,
+                                previewW: zone.previewW,
+                                previewH: zone.previewH,
+                              };
+                              const patchPlacement = (
+                                field: "previewX" | "previewY" | "previewW" | "previewH",
+                                nextValue: number
+                              ) => {
+                                const nextMap: DesignerZonePlacementMap = {
+                                  ...(v.designerZonePlacements ?? {}),
+                                  [placementKey]: {
+                                    ...currentPlacement,
+                                    [field]: nextValue,
+                                  },
+                                };
+                                onUpdateValue(v._key, {
+                                  designerZonePlacements: normalizeDesignerZonePlacements(nextMap),
+                                });
+                              };
+
+                              return (
+                                <div key={`${v._key}-zone-${zoneIdx}`} className="border rounded p-2 bg-gray-50/70 space-y-1.5">
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-[10px] text-gray-600 font-medium">
+                                      {zone.label || `Zone ${zoneIdx + 1}`} ({zone.side === "front" ? "Forside" : "Bagside"})
+                                    </p>
+                                    {override && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const nextMap = { ...(v.designerZonePlacements ?? {}) };
+                                          delete nextMap[placementKey];
+                                          onUpdateValue(v._key, {
+                                            designerZonePlacements: normalizeDesignerZonePlacements(nextMap),
+                                          });
+                                        }}
+                                        className="text-[10px] text-gray-500 hover:text-secondary"
+                                      >
+                                        Nulstil
+                                      </button>
+                                    )}
+                                  </div>
+                                  <div className="grid grid-cols-4 gap-1">
+                                    {([
+                                      { key: "previewX", label: "X", value: currentPlacement.previewX },
+                                      { key: "previewY", label: "Y", value: currentPlacement.previewY },
+                                      { key: "previewW", label: "B", value: currentPlacement.previewW },
+                                      { key: "previewH", label: "H", value: currentPlacement.previewH },
+                                    ] as const).map((fieldDef) => (
+                                      <label key={fieldDef.key} className="text-[10px] text-gray-500">
+                                        {fieldDef.label}
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          max={100}
+                                          step={0.1}
+                                          value={fieldDef.value}
+                                          onChange={(e) => {
+                                            const parsed = Number.parseFloat(e.target.value);
+                                            if (!Number.isFinite(parsed)) return;
+                                            patchPlacement(fieldDef.key, parsed);
+                                          }}
+                                          className="mt-0.5 w-full border rounded px-1 py-0.5 text-[10px] focus:outline-none focus:ring-1 focus:ring-secondary"
+                                        />
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

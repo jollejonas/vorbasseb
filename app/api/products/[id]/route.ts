@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { generateItemNumber } from "@/lib/itemNumber";
+import { normalizeDesignerZonePlacements } from "@/lib/designerZonePlacements";
+import { Prisma } from "@prisma/client";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -50,6 +52,7 @@ type OptionValueInput = {
   designerFrontImageIdx?: number | null;
   designerBackImageIdx?: number | null;
   designerPrintColor?: string | null;
+  designerZonePlacements?: unknown | null;
 };
 
 type OptionGroupInput = {
@@ -184,6 +187,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
                 designerFrontImageIdx: v.designerFrontImageIdx ?? null,
                 designerBackImageIdx: v.designerBackImageIdx ?? null,
                 designerPrintColor: v.designerPrintColor ?? null,
+                designerZonePlacements:
+                  normalizeDesignerZonePlacements(v.designerZonePlacements) ?? Prisma.DbNull,
               },
             });
             valueId = v.id;
@@ -201,6 +206,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
                 designerFrontImageIdx: v.designerFrontImageIdx ?? null,
                 designerBackImageIdx: v.designerBackImageIdx ?? null,
                 designerPrintColor: v.designerPrintColor ?? null,
+                designerZonePlacements:
+                  normalizeDesignerZonePlacements(v.designerZonePlacements) ?? Prisma.DbNull,
               },
             });
             valueId = created.id;

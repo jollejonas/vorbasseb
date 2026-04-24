@@ -258,6 +258,7 @@ model ProductOptionValue {
   designerFrontImageIdx Int?        // index into images[] to use as front canvas template
   designerBackImageIdx  Int?        // index into images[] to use as back canvas template
   designerPrintColor    String?     // hex e.g. "#FFFFFF" — overrides product.designerPrintColor
+  designerZonePlacements Json?      // optional per-zone preview overrides keyed by zone order index
   skuValues     SKUOptionValue[]
 
   @@index([groupId, position])

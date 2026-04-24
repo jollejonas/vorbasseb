@@ -9,6 +9,7 @@ import { PrintConfirmDialog } from "./PrintConfirmDialog";
 import { formatPrice, withVat } from "@/lib/utils";
 import { getEffectivePrice } from "@/lib/pricing";
 import { sanitizeHtml } from "@/lib/sanitizeHtml";
+import { applyDesignerZonePlacements } from "@/lib/designerZonePlacements";
 import type {
   Product,
   SKU,
@@ -341,6 +342,10 @@ function ItemStep({
 
   const selectedColorValueId = colorGroup ? stepState.selectedOptions[colorGroup.id] : undefined;
   const selectedColorValue = colorGroup?.values.find((v) => v.id === selectedColorValueId);
+  const effectiveDesignerZones = applyDesignerZonePlacements(
+    product.designerZones,
+    selectedColorValue?.designerZonePlacements
+  );
   const optionColorImages = (selectedColorValue?.images ?? []).length > 0
     ? selectedColorValue!.images
     : resolveOptionColorFallbackImages(selectedColorValue, product.colorVariants, product.skus);
@@ -654,7 +659,7 @@ function ItemStep({
         {/* Left: jersey canvas */}
         <JerseyDesignerCanvas
           product={colorAwareProduct}
-          zones={product.designerZones}
+          zones={effectiveDesignerZones}
           printElements={stepState.printElements}
           previewSide={effectivePreviewSide}
           clickedZoneId={clickedZoneId}
@@ -666,7 +671,7 @@ function ItemStep({
         <div className="space-y-3">
           {optionsJsx}
           <JerseyDesignerControls
-            zones={product.designerZones}
+            zones={effectiveDesignerZones}
             logos={logos}
             vatPct={vatPct}
             printElements={stepState.printElements}

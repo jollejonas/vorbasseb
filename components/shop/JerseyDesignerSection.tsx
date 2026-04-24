@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useCart, type PrintElement } from "./CartProvider";
 import { formatPrice, withVat } from "@/lib/utils";
 import { getEffectivePrice } from "@/lib/pricing";
 import { sanitizeHtml } from "@/lib/sanitizeHtml";
+import { applyDesignerZonePlacements } from "@/lib/designerZonePlacements";
 import { PrintConfirmDialog } from "./PrintConfirmDialog";
 import { GroupOrderConfirmDialog } from "./GroupOrderConfirmDialog";
 import type { Product, SKU, DesignerZone, DesignerLogo, ProductOptionGroup, ProductOptionValue, SKUOptionValue, GlobalColor } from "@prisma/client";
@@ -68,6 +69,10 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
 
   // Color-aware static image (shown when designer is closed)
   const selectedColorValue = colorGroup?.values.find((v) => v.id === selectedOptions[colorGroup!.id]);
+  const effectiveZones = applyDesignerZonePlacements(
+    zones,
+    selectedColorValue?.designerZonePlacements
+  );
 
   // Per-color print element key and current slice
   const colorKey = selectedColorValue?.id ?? "_default";
@@ -119,16 +124,13 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
 
   const previewImage = previewSide === "front" ? frontImage : (backImage ?? frontImage);
 
-  const interactiveZones = zones.filter((z) => !z.fixedLogo);
-  const fixedZones = zones.filter((z) => z.fixedLogo);
+  const interactiveZones = effectiveZones.filter((z) => !z.fixedLogo);
+  const fixedZones = effectiveZones.filter((z) => z.fixedLogo);
   const visibleZones = interactiveZones.filter((z) => z.side === previewSide);
   const visibleElements = printElements.filter((p) => p.side === previewSide);
 
-  const zoneMap = useMemo(() => {
-    const m = new Map<number, DesignerZone>();
-    zones.forEach((z) => m.set(z.id, z));
-    return m;
-  }, [zones]);
+  const zoneMap = new Map<number, DesignerZone>();
+  effectiveZones.forEach((z) => zoneMap.set(z.id, z));
 
   const clickedZone = clickedZoneId !== null ? (zoneMap.get(clickedZoneId) ?? null) : null;
 
