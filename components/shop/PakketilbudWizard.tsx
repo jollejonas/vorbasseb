@@ -148,10 +148,17 @@ function resolveOptionColorFallbackImages(
     : null;
   if (byHex) return byHex.images;
 
+  // Try label match first, then globalColor name as fallback
   const byName = selectedLabel
     ? variantsWithImages.find((cv) => normalizeLabel(cv.name) === selectedLabel)
     : null;
   if (byName) return byName.images;
+
+  const globalColorName = normalizeLabel(selectedColorValue.globalColor?.name);
+  if (globalColorName && globalColorName !== selectedLabel) {
+    const byGlobalColorName = variantsWithImages.find((cv) => normalizeLabel(cv.name) === globalColorName);
+    if (byGlobalColorName) return byGlobalColorName.images;
+  }
 
   const linkedVariantCounts = new Map<string, number>();
   for (const sku of skus) {
@@ -171,15 +178,6 @@ function resolveOptionColorFallbackImages(
     if (ranked.length > 0) {
       const hasTie = ranked.length > 1 && ranked[0].count === ranked[1].count;
       if (!hasTie) return ranked[0].variant.images;
-    }
-  }
-
-  // Last resort for hybrid datasets where color values and color variants were created in the same sequence.
-  if (colorValues.length === colorVariants.length) {
-    const selectedColorIndex = colorValues.findIndex((v) => v.id === selectedColorValue.id);
-    if (selectedColorIndex >= 0) {
-      const byPosition = colorVariants[selectedColorIndex];
-      if (byPosition?.images.length) return byPosition.images;
     }
   }
 
