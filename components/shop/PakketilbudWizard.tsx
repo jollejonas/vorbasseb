@@ -129,6 +129,84 @@ function normalizeLabel(value: string | null | undefined): string {
   return value?.trim().toLowerCase() ?? "";
 }
 
+const COLOR_ALIAS_MAP: Record<string, string> = {
+  sort: "black",
+  black: "black",
+  hvid: "white",
+  white: "white",
+  gra: "gray",
+  graa: "gray",
+  gray: "gray",
+  grey: "gray",
+  rod: "red",
+  roed: "red",
+  red: "red",
+  bla: "blue",
+  blaa: "blue",
+  blue: "blue",
+  navy: "navy",
+  marine: "navy",
+  gron: "green",
+  groen: "green",
+  green: "green",
+  gul: "yellow",
+  yellow: "yellow",
+  orange: "orange",
+  lilla: "purple",
+  purple: "purple",
+  pink: "pink",
+  brun: "brown",
+  brown: "brown",
+};
+
+function normalizeToken(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function tokenizeColorLabel(value: string | null | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(/[^A-Za-z0-9]+/)
+    .map(normalizeToken)
+    .filter(Boolean);
+}
+
+function canonicalColorTokens(value: string | null | undefined): string[] {
+  const tokens = tokenizeColorLabel(value).map((token) => COLOR_ALIAS_MAP[token] ?? token);
+  return [...new Set(tokens)];
+}
+
+type RGB = { r: number; g: number; b: number };
+
+function parseHexColor(hex: string | null | undefined): RGB | null {
+  const normalized = normalizeHex(hex);
+  if (!normalized) return null;
+  const clean = normalized.slice(1);
+  if (!/^[0-9a-f]{3}$|^[0-9a-f]{6}$/i.test(clean)) return null;
+
+  const expanded = clean.length === 3
+    ? clean.split("").map((ch) => `${ch}${ch}`).join("")
+    : clean;
+  const numeric = Number.parseInt(expanded, 16);
+  if (Number.isNaN(numeric)) return null;
+
+  return {
+    r: (numeric >> 16) & 0xff,
+    g: (numeric >> 8) & 0xff,
+    b: numeric & 0xff,
+  };
+}
+
+function colorDistanceSq(a: RGB, b: RGB): number {
+  const dr = a.r - b.r;
+  const dg = a.g - b.g;
+  const db = a.b - b.b;
+  return dr * dr + dg * dg + db * db;
+}
+
 function resolveOptionColorFallbackImages(
   selectedColorValue: OptionValueFull | undefined,
   colorValues: OptionValueFull[],
@@ -171,6 +249,53 @@ function resolveOptionColorFallbackImages(
     if (ranked.length > 0) {
       const hasTie = ranked.length > 1 && ranked[0].count === ranked[1].count;
       if (!hasTie) return ranked[0].variant.images;
+    }
+  }
+
+  const selectedCanonicalTokens = canonicalColorTokens(selectedColorValue.label);
+  if (selectedCanonicalTokens.length > 0) {
+    const rankedByCanonicalName = variantsWithImages
+      .map((cv) => {
+        const variantTokens = new Set(canonicalColorTokens(cv.name));
+        const overlapScore = selectedCanonicalTokens.reduce(
+          (score, token) => (variantTokens.has(token) ? score + 1 : score),
+          0,
+        );
+        return { overlapScore, variant: cv };
+      })
+      .filter((entry) => entry.overlapScore > 0)
+      .sort((a, b) => b.overlapScore - a.overlapScore);
+
+    if (rankedByCanonicalName.length > 0) {
+      const hasTie =
+        rankedByCanonicalName.length > 1 &&
+        rankedByCanonicalName[0].overlapScore === rankedByCanonicalName[1].overlapScore;
+      if (!hasTie) return rankedByCanonicalName[0].variant.images;
+    }
+  }
+
+  const selectedRgb = parseHexColor(selectedColorValue.globalColor?.hex);
+  if (selectedRgb) {
+    const rankedByHexDistance = variantsWithImages
+      .map((cv) => {
+        const variantRgb = parseHexColor(cv.hex);
+        return variantRgb
+          ? { distanceSq: colorDistanceSq(selectedRgb, variantRgb), variant: cv }
+          : null;
+      })
+      .filter((entry): entry is { distanceSq: number; variant: ColorVariantWithSkus } => entry !== null)
+      .sort((a, b) => a.distanceSq - b.distanceSq);
+
+    if (rankedByHexDistance.length > 0) {
+      const closest = rankedByHexDistance[0];
+      const runnerUp = rankedByHexDistance[1];
+      const maxDistanceSq = 85 * 85;
+      const minLeadSq = 12 * 12;
+      const clearlyBest = !runnerUp || (runnerUp.distanceSq - closest.distanceSq) >= minLeadSq;
+
+      if (closest.distanceSq <= maxDistanceSq && clearlyBest) {
+        return closest.variant.images;
+      }
     }
   }
 
