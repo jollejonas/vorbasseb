@@ -129,55 +129,151 @@ function normalizeLabel(value: string | null | undefined): string {
   return value?.trim().toLowerCase() ?? "";
 }
 
+function normalizeColorToken(value: string | null | undefined): string {
+  const compact = normalizeLabel(value).replace(/[\s_-]+/g, "");
+  if (!compact) return "";
+  const ascii = compact
+    .replace(/æ/g, "ae")
+    .replace(/ø/g, "oe")
+    .replace(/å/g, "aa")
+    .replace(/[äáàâ]/g, "a")
+    .replace(/[öóòô]/g, "o")
+    .replace(/[üúùû]/g, "u");
+
+  switch (ascii) {
+    case "sort":
+    case "black":
+      return "black";
+    case "hvid":
+    case "white":
+      return "white";
+    case "bla":
+    case "blue":
+      return "blue";
+    case "morkebla":
+    case "navy":
+    case "marine":
+    case "darkblue":
+      return "navy";
+    case "rod":
+    case "red":
+      return "red";
+    case "gron":
+    case "green":
+      return "green";
+    case "gul":
+    case "yellow":
+      return "yellow";
+    case "gra":
+    case "gray":
+    case "grey":
+      return "gray";
+    case "lilla":
+    case "purple":
+    case "violet":
+      return "purple";
+    case "orange":
+      return "orange";
+    default:
+      return ascii;
+  }
+}
+
+function matchesAnyColorName(variantName: string | null | undefined, candidateNames: Array<string | null | undefined>): boolean {
+  const variantToken = normalizeColorToken(variantName);
+  if (!variantToken) return false;
+  return candidateNames.some((name) => {
+    const token = normalizeColorToken(name);
+    return token !== "" && token === variantToken;
+  });
+}
+
 function resolveOptionColorFallbackImages(
   selectedColorValue: OptionValueFull | undefined,
-  colorValues: OptionValueFull[],
   colorVariants: ColorVariantWithSkus[],
   skus: SkuWithOptions[],
+  selectedOptions: Record<string, string>,
+  sizeGroup: OptionGroupFull | undefined,
 ): string[] {
   if (!selectedColorValue) return [];
 
   const variantsWithImages = colorVariants.filter((cv) => cv.images.length > 0);
   if (variantsWithImages.length === 0) return [];
+  const variantById = new Map(variantsWithImages.map((cv) => [cv.id, cv]));
 
   const selectedHex = normalizeHex(selectedColorValue.globalColor?.hex);
-  const selectedLabel = normalizeLabel(selectedColorValue.label);
+  const selectedLabel = selectedColorValue.label;
+  const globalColorName = selectedColorValue.globalColor?.name;
+  const candidateColorNames = [selectedLabel, globalColorName];
 
   const byHex = selectedHex
     ? variantsWithImages.find((cv) => normalizeHex(cv.hex) === selectedHex)
     : null;
   if (byHex) return byHex.images;
 
-  // Try label match first, then globalColor name as fallback
-  const byName = selectedLabel
-    ? variantsWithImages.find((cv) => normalizeLabel(cv.name) === selectedLabel)
-    : null;
+  const byName = variantsWithImages.find((cv) => matchesAnyColorName(cv.name, candidateColorNames));
   if (byName) return byName.images;
 
-  const globalColorName = normalizeLabel(selectedColorValue.globalColor?.name);
-  if (globalColorName && globalColorName !== selectedLabel) {
-    const byGlobalColorName = variantsWithImages.find((cv) => normalizeLabel(cv.name) === globalColorName);
-    if (byGlobalColorName) return byGlobalColorName.images;
+  const selectedSizeValueId = sizeGroup ? selectedOptions[sizeGroup.id] : undefined;
+  if (selectedSizeValueId) {
+    const sizeMatchedSkus = skus.filter((sku) =>
+      !!sku.colorVariantId &&
+      sku.optionValues.some((ov) => ov.optionValueId === selectedColorValue.id) &&
+      sku.optionValues.some((ov) => ov.optionValueId === selectedSizeValueId),
+    );
+    const preferredSizeSku = sizeMatchedSkus.find((sku) => sku.stock > 0) ?? sizeMatchedSkus[0];
+    const byExactSku = preferredSizeSku?.colorVariantId
+      ? variantById.get(preferredSizeSku.colorVariantId) ?? null
+      : null;
+    if (byExactSku) return byExactSku.images;
   }
 
-  const linkedVariantCounts = new Map<string, number>();
+  const linkedVariantScores = new Map<string, { selectedSizeMatches: number; inStockMatches: number; totalMatches: number }>();
   for (const sku of skus) {
     if (!sku.colorVariantId) continue;
+    if (!variantById.has(sku.colorVariantId)) continue;
     if (!sku.optionValues.some((ov) => ov.optionValueId === selectedColorValue.id)) continue;
-    linkedVariantCounts.set(sku.colorVariantId, (linkedVariantCounts.get(sku.colorVariantId) ?? 0) + 1);
+
+    const entry = linkedVariantScores.get(sku.colorVariantId) ?? {
+      selectedSizeMatches: 0,
+      inStockMatches: 0,
+      totalMatches: 0,
+    };
+    entry.totalMatches += 1;
+    if (sku.stock > 0) entry.inStockMatches += 1;
+    if (selectedSizeValueId && sku.optionValues.some((ov) => ov.optionValueId === selectedSizeValueId)) {
+      entry.selectedSizeMatches += 1;
+    }
+    linkedVariantScores.set(sku.colorVariantId, entry);
   }
-  if (linkedVariantCounts.size > 0) {
-    const ranked = [...linkedVariantCounts.entries()]
-      .map(([variantId, count]) => ({
-        count,
-        variant: variantsWithImages.find((cv) => cv.id === variantId) ?? null,
+  if (linkedVariantScores.size > 0) {
+    const ranked = [...linkedVariantScores.entries()]
+      .map(([variantId, score]) => ({
+        score,
+        variant: variantById.get(variantId) ?? null,
       }))
-      .filter((entry): entry is { count: number; variant: ColorVariantWithSkus } => entry.variant !== null)
-      .sort((a, b) => b.count - a.count);
+      .filter((entry): entry is { score: { selectedSizeMatches: number; inStockMatches: number; totalMatches: number }; variant: ColorVariantWithSkus } => entry.variant !== null)
+      .sort((a, b) => (
+        b.score.selectedSizeMatches - a.score.selectedSizeMatches ||
+        b.score.inStockMatches - a.score.inStockMatches ||
+        b.score.totalMatches - a.score.totalMatches
+      ));
 
     if (ranked.length > 0) {
-      const hasTie = ranked.length > 1 && ranked[0].count === ranked[1].count;
-      if (!hasTie) return ranked[0].variant.images;
+      const best = ranked[0];
+      const topTied = ranked.filter((entry) =>
+        entry.score.selectedSizeMatches === best.score.selectedSizeMatches &&
+        entry.score.inStockMatches === best.score.inStockMatches &&
+        entry.score.totalMatches === best.score.totalMatches,
+      );
+
+      if (topTied.length === 1) return best.variant.images;
+
+      const tiedByName = topTied.find((entry) => matchesAnyColorName(entry.variant.name, candidateColorNames));
+      if (tiedByName) return tiedByName.variant.images;
+
+      // Deterministic fallback when multiple variants remain tied after SKU scoring.
+      return topTied[0].variant.images;
     }
   }
 
@@ -372,9 +468,10 @@ function ItemStep({
     ? selectedColorValue!.images
     : resolveOptionColorFallbackImages(
       selectedColorValue,
-      colorGroup?.values ?? [],
       product.colorVariants,
       product.skus,
+      stepState.selectedOptions,
+      sizeGroup,
     );
   const activeImages = hasOptionGroups
     ? optionColorImages.length > 0
@@ -486,8 +583,30 @@ function ItemStep({
                       type="button"
                       onClick={() =>
                         withTextConfirm(() => {
+                          if (stepState.selectedOptions[colorGroup.id] === v.id) return;
+                          const nextSelectedOptions = { ...stepState.selectedOptions, [colorGroup.id]: v.id };
+                          if (sizeGroup) {
+                            const selectedSizeValue = sizeGroup.values.find(
+                              (sizeValue) => sizeValue.id === nextSelectedOptions[sizeGroup.id],
+                            );
+                            const selectedSizeIsAvailable = selectedSizeValue
+                              ? isSizeAvailableForOptions(
+                                product.skus,
+                                selectedSizeValue,
+                                colorGroup,
+                                nextSelectedOptions,
+                              )
+                              : false;
+                            if (!selectedSizeIsAvailable) {
+                              const nextAvailableSize = sizeGroup.values.find((sizeValue) =>
+                                isSizeAvailableForOptions(product.skus, sizeValue, colorGroup, nextSelectedOptions),
+                              );
+                              if (nextAvailableSize) nextSelectedOptions[sizeGroup.id] = nextAvailableSize.id;
+                              else delete nextSelectedOptions[sizeGroup.id];
+                            }
+                          }
                           onChange({
-                            selectedOptions: { ...stepState.selectedOptions, [colorGroup.id]: v.id },
+                            selectedOptions: nextSelectedOptions,
                           });
                           const nextColorFrontImage = resolveImageByIndex(v.images, v.designerFrontImageIdx);
                           const nextResolvedFrontImage = nextColorFrontImage ?? productFrontImage;
