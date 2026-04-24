@@ -125,6 +125,13 @@ function normalizeHex(hex: string | null | undefined): string {
   return v.startsWith("#") ? v : `#${v}`;
 }
 
+function toValidHex(value: string | null | undefined): string | null {
+  const normalized = normalizeHex(value);
+  if (!normalized) return null;
+  const clean = normalized.slice(1);
+  return /^[0-9a-f]{3}$|^[0-9a-f]{6}$/i.test(clean) ? normalized : null;
+}
+
 function normalizeLabel(value: string | null | undefined): string {
   return value?.trim().toLowerCase() ?? "";
 }
@@ -179,13 +186,24 @@ function canonicalColorTokens(value: string | null | undefined): string[] {
   return [...new Set(tokens)];
 }
 
+function uniqueNormalizedLabels(values: Array<string | null | undefined>): string[] {
+  const labels = values.map(normalizeLabel).filter(Boolean);
+  return [...new Set(labels)];
+}
+
+function getVariantSearchLabels(variant: ColorVariantWithSkus): string[] {
+  const labels = [variant.name];
+  // Legacy imports sometimes stored color names in the hex field.
+  if (!toValidHex(variant.hex)) labels.push(variant.hex);
+  return uniqueNormalizedLabels(labels);
+}
+
 type RGB = { r: number; g: number; b: number };
 
 function parseHexColor(hex: string | null | undefined): RGB | null {
-  const normalized = normalizeHex(hex);
+  const normalized = toValidHex(hex);
   if (!normalized) return null;
   const clean = normalized.slice(1);
-  if (!/^[0-9a-f]{3}$|^[0-9a-f]{6}$/i.test(clean)) return null;
 
   const expanded = clean.length === 3
     ? clean.split("").map((ch) => `${ch}${ch}`).join("")
@@ -218,16 +236,22 @@ function resolveOptionColorFallbackImages(
   const variantsWithImages = colorVariants.filter((cv) => cv.images.length > 0);
   if (variantsWithImages.length === 0) return [];
 
-  const selectedHex = normalizeHex(selectedColorValue.globalColor?.hex);
-  const selectedLabel = normalizeLabel(selectedColorValue.label);
+  const selectedHex = toValidHex(selectedColorValue.globalColor?.hex);
+  const selectedLabels = uniqueNormalizedLabels([
+    selectedColorValue.label,
+    selectedColorValue.globalColor?.name,
+  ]);
 
   const byHex = selectedHex
-    ? variantsWithImages.find((cv) => normalizeHex(cv.hex) === selectedHex)
+    ? variantsWithImages.find((cv) => toValidHex(cv.hex) === selectedHex)
     : null;
   if (byHex) return byHex.images;
 
-  const byName = selectedLabel
-    ? variantsWithImages.find((cv) => normalizeLabel(cv.name) === selectedLabel)
+  const byName = selectedLabels.length > 0
+    ? variantsWithImages.find((cv) => {
+        const variantLabels = getVariantSearchLabels(cv);
+        return selectedLabels.some((label) => variantLabels.includes(label));
+      })
     : null;
   if (byName) return byName.images;
 
@@ -252,11 +276,13 @@ function resolveOptionColorFallbackImages(
     }
   }
 
-  const selectedCanonicalTokens = canonicalColorTokens(selectedColorValue.label);
+  const selectedCanonicalTokens = [
+    ...new Set(selectedLabels.flatMap((label) => canonicalColorTokens(label))),
+  ];
   if (selectedCanonicalTokens.length > 0) {
     const rankedByCanonicalName = variantsWithImages
       .map((cv) => {
-        const variantTokens = new Set(canonicalColorTokens(cv.name));
+        const variantTokens = new Set(getVariantSearchLabels(cv).flatMap((label) => canonicalColorTokens(label)));
         const overlapScore = selectedCanonicalTokens.reduce(
           (score, token) => (variantTokens.has(token) ? score + 1 : score),
           0,
