@@ -380,6 +380,7 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const widgetRef = useRef<any>(null);
   const uploadTarget = useRef<"main" | { type: "colorValue"; key: string } | { type: "legacyColor"; idx: number }>("main");
+  const [scriptReady, setScriptReady] = useState(false);
 
   // ── Effects ─────────────────────────────────────────────────────────────────
 
@@ -418,6 +419,7 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
     const script = document.createElement("script");
     script.src = "https://upload-widget.cloudinary.com/global/all.js";
     script.async = true;
+    script.onload = () => setScriptReady(true);
     document.head.appendChild(script);
     return () => { document.head.removeChild(script); };
   }, []);
@@ -431,6 +433,7 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
       toast.error("Cloudinary er ikke konfigureret");
       return;
     }
+    if (!scriptReady) { toast.error("Upload-widget er ikke klar endnu – prøv igen om et øjeblik"); return; }
     uploadTarget.current = target;
     if (!widgetRef.current) {
       // @ts-expect-error cloudinary global
@@ -967,10 +970,10 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
               </button>
             </div>
           ))}
-          <button type="button" onClick={() => openCloudinaryWidget("main")}
-            className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:border-secondary hover:text-secondary transition gap-1">
+          <button type="button" onClick={() => openCloudinaryWidget("main")} disabled={!scriptReady}
+            className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:border-secondary hover:text-secondary transition gap-1 disabled:opacity-50 disabled:cursor-not-allowed">
             <span className="text-2xl leading-none">+</span>
-            <span className="text-xs">Upload</span>
+            <span className="text-xs">{scriptReady ? "Upload" : "…"}</span>
           </button>
         </div>
         <p className="text-xs text-gray-400">Første billede bruges som thumbnail. Max 5 MB.</p>
