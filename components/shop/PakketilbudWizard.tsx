@@ -131,8 +131,21 @@ function normalizeLabel(value: string | null | undefined): string {
 function resolveOptionColorFallbackImages(
   selectedColorValue: OptionValueFull | undefined,
   colorVariants: ColorVariantWithSkus[],
+  skus: SkuWithOptions[],
 ): string[] {
   if (!selectedColorValue) return [];
+
+  const linkedVariantIds = new Set(
+    skus
+      .filter((sku) => sku.optionValues.some((ov) => ov.optionValueId === selectedColorValue.id))
+      .map((sku) => sku.colorVariantId)
+      .filter((id): id is string => Boolean(id)),
+  );
+  const bySkuLink =
+    linkedVariantIds.size > 0
+      ? colorVariants.find((cv) => cv.images.length > 0 && linkedVariantIds.has(cv.id))
+      : null;
+  if (bySkuLink) return bySkuLink.images;
 
   const selectedHex = normalizeHex(selectedColorValue.globalColor?.hex);
   const selectedLabel = normalizeLabel(selectedColorValue.label);
@@ -326,12 +339,11 @@ function ItemStep({
     (g) => g.type !== "COLOR" && g.type !== "SIZE",
   );
 
-  const selectedColorValue = colorGroup?.values.find(
-    (v) => v.id === stepState.selectedOptions[colorGroup.id],
-  );
+  const selectedColorValueId = colorGroup ? stepState.selectedOptions[colorGroup.id] : undefined;
+  const selectedColorValue = colorGroup?.values.find((v) => v.id === selectedColorValueId);
   const optionColorImages = (selectedColorValue?.images ?? []).length > 0
     ? selectedColorValue!.images
-    : resolveOptionColorFallbackImages(selectedColorValue, product.colorVariants);
+    : resolveOptionColorFallbackImages(selectedColorValue, product.colorVariants, product.skus);
   const activeImages = hasOptionGroups
     ? optionColorImages.length > 0
       ? optionColorImages
