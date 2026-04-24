@@ -230,9 +230,6 @@ function ItemStep({
 
   // ── Designer local ephemeral state ────────────────────────────────────────
   const [designerOpen, setDesignerOpen] = useState(false);
-  // Reset local/passed designer state when navigating between pakketilbud steps.
-  // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
-  useEffect(() => { setDesignerOpen(false); onDesignerOpenChange?.(false); }, [stepIndex]);
   const [previewSide, setPreviewSide] = useState<"front" | "back">("front");
   const [clickedZoneId, setClickedZoneId] = useState<number | null>(null);
   const [addType, setAddType] = useState<"text" | "logo">("text");
@@ -242,6 +239,18 @@ function ItemStep({
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
 
+  // Reset local/passed designer state when navigating between pakketilbud steps.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    setDesignerOpen(false);
+    setClickedZoneId(null);
+    setAddText("");
+    setAddLogoId(null);
+    onDesignerOpenChange?.(false);
+    onAddTextChange?.("");
+  }, [stepIndex, onAddTextChange, onDesignerOpenChange]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   function handleAddTextChange(val: string) {
     setAddText(val);
     onAddTextChange?.(val);
@@ -249,9 +258,10 @@ function ItemStep({
   function handleDesignerOpenChange(val: boolean) {
     setDesignerOpen(val);
     onDesignerOpenChange?.(val);
+    if (!val) onAddTextChange?.("");
   }
   function withTextConfirm(action: () => void) {
-    if (designerOpen && addText.trim().length > 0) {
+    if (designerOpen && clickedZoneId !== null && addText.trim().length > 0) {
       setPendingAction(() => action);
     } else {
       action();
@@ -272,10 +282,11 @@ function ItemStep({
     else if (!zone.allowText && zone.allowLogo) setAddType("logo");
     else setAddType("text");
     setAddText("");
+    onAddTextChange?.("");
     setAddLogoId(null);
     setAddFontSize("medium");
     setPreviewSide(zone.side as "front" | "back");
-  }, []);
+  }, [onAddTextChange]);
 
   const handleConfirmAdd = useCallback(() => {
     if (!clickedZone) return;
@@ -302,8 +313,11 @@ function ItemStep({
 
     setToastMsg(`Tryk tilføjet til ${clickedZone.label}`);
     setClickedZoneId(null);
+    setAddText("");
+    onAddTextChange?.("");
+    setAddLogoId(null);
     setTimeout(() => setToastMsg(null), 2500);
-  }, [clickedZone, addType, addText, addLogoId, addFontSize, logos, stepState.printElements, onChange]);
+  }, [clickedZone, addType, addText, addLogoId, addFontSize, logos, stepState.printElements, onChange, onAddTextChange]);
 
   // ── Option groups ─────────────────────────────────────────────────────────
   const colorGroup = product.optionGroups.find((g) => g.type === "COLOR");
@@ -648,7 +662,7 @@ function ItemStep({
               onChange({ printElements: stepState.printElements.filter((_, idx) => idx !== i) })
             }
             clickedZone={clickedZone}
-            onClosePanel={() => setClickedZoneId(null)}
+            onClosePanel={() => { setClickedZoneId(null); setAddText(""); onAddTextChange?.(""); }}
             addType={addType}
             onAddTypeChange={setAddType}
             addText={addText}
@@ -661,7 +675,7 @@ function ItemStep({
             hasBack={hasBackDesignerImage}
             previewSide={effectivePreviewSide}
             onPreviewSideChange={setPreviewSide}
-            onCloseDesigner={() => { handleDesignerOpenChange(false); setClickedZoneId(null); }}
+            onCloseDesigner={() => { handleDesignerOpenChange(false); setClickedZoneId(null); setAddText(""); onAddTextChange?.(""); }}
           />
         </div>
       </div>

@@ -53,7 +53,7 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
   const [showGroupOrderDialog, setShowGroupOrderDialog] = useState(false);
 
   function withTextConfirm(action: () => void) {
-    if (isDesignerOpen && addText.trim().length > 0) {
+    if (isDesignerOpen && clickedZoneId !== null && addText.trim().length > 0) {
       setPendingAction(() => action);
     } else {
       action();
@@ -395,7 +395,7 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
                   </div>
                   <button
                     type="button"
-                    onClick={() => setClickedZoneId(null)}
+                    onClick={() => { setClickedZoneId(null); setAddText(""); }}
                     className="text-gray-400 hover:text-gray-600 text-xl leading-none"
                   >
                     ×
@@ -483,7 +483,7 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
                   </button>
                   <button
                     type="button"
-                    onClick={() => setClickedZoneId(null)}
+                    onClick={() => { setClickedZoneId(null); setAddText(""); }}
                     className="border border-gray-200 px-4 py-2 rounded-lg text-sm text-gray-600 hover:border-gray-400"
                   >
                     Annuller
