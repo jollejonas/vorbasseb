@@ -561,12 +561,25 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
                       v.designerFrontImageIdx != null
                         ? (v.images[v.designerFrontImageIdx] ?? null)
                         : null;
+                    const colorBackImage =
+                      v.designerBackImageIdx != null
+                        ? (v.images[v.designerBackImageIdx] ?? null)
+                        : null;
                     const fallbackFrontImage =
                       product.images[product.designerFrontImageIdx ?? 0] ??
                       product.images[0] ??
                       null;
+                    const fallbackBackImage =
+                      product.designerBackImageIdx != null
+                        ? (product.images[product.designerBackImageIdx] ?? null)
+                        : null;
                     const hasDesigner = colorFrontImage !== null || fallbackFrontImage !== null;
+                    const hasBackDesigner = colorBackImage !== null || fallbackBackImage !== null;
                     if (!hasDesigner && isDesignerOpen) { setIsDesignerOpen(false); setClickedZoneId(null); }
+                    if (!hasBackDesigner && previewSide === "back") {
+                      setPreviewSide("front");
+                      if (clickedZone?.side === "back") setClickedZoneId(null);
+                    }
                   })}
                   title={v.label}
                   className={`w-8 h-8 rounded-full border-2 transition ${
