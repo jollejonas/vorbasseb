@@ -227,7 +227,6 @@ function colorDistanceSq(a: RGB, b: RGB): number {
 
 function resolveOptionColorFallbackImages(
   selectedColorValue: OptionValueFull | undefined,
-  colorValues: OptionValueFull[],
   colorVariants: ColorVariantWithSkus[],
   skus: SkuWithOptions[],
 ): string[] {
@@ -242,18 +241,18 @@ function resolveOptionColorFallbackImages(
     selectedColorValue.globalColor?.name,
   ]);
 
-  const byHex = selectedHex
-    ? variantsWithImages.find((cv) => toValidHex(cv.hex) === selectedHex)
-    : null;
-  if (byHex) return byHex.images;
+  if (selectedHex) {
+    const byHex = variantsWithImages.filter((cv) => toValidHex(cv.hex) === selectedHex);
+    if (byHex.length === 1) return byHex[0].images;
+  }
 
-  const byName = selectedLabels.length > 0
-    ? variantsWithImages.find((cv) => {
-        const variantLabels = getVariantSearchLabels(cv);
-        return selectedLabels.some((label) => variantLabels.includes(label));
-      })
-    : null;
-  if (byName) return byName.images;
+  if (selectedLabels.length > 0) {
+    const byName = variantsWithImages.filter((cv) => {
+      const variantLabels = getVariantSearchLabels(cv);
+      return selectedLabels.some((label) => variantLabels.includes(label));
+    });
+    if (byName.length === 1) return byName[0].images;
+  }
 
   const linkedVariantCounts = new Map<string, number>();
   for (const sku of skus) {
@@ -322,15 +321,6 @@ function resolveOptionColorFallbackImages(
       if (closest.distanceSq <= maxDistanceSq && clearlyBest) {
         return closest.variant.images;
       }
-    }
-  }
-
-  // Last resort for hybrid datasets where color values and color variants were created in the same sequence.
-  if (colorValues.length === colorVariants.length) {
-    const selectedColorIndex = colorValues.findIndex((v) => v.id === selectedColorValue.id);
-    if (selectedColorIndex >= 0) {
-      const byPosition = colorVariants[selectedColorIndex];
-      if (byPosition?.images.length) return byPosition.images;
     }
   }
 
@@ -525,7 +515,6 @@ function ItemStep({
     ? selectedColorValue!.images
     : resolveOptionColorFallbackImages(
       selectedColorValue,
-      colorGroup?.values ?? [],
       product.colorVariants,
       product.skus,
     );
@@ -639,8 +628,36 @@ function ItemStep({
                       type="button"
                       onClick={() =>
                         withTextConfirm(() => {
+                          const nextSelectedOptions = {
+                            ...stepState.selectedOptions,
+                            [colorGroup.id]: v.id,
+                          };
+                          if (sizeGroup) {
+                            const currentSizeId = stepState.selectedOptions[sizeGroup.id];
+                            const currentSizeValue = sizeGroup.values.find((sv) => sv.id === currentSizeId);
+                            const currentSizeStillAvailable = currentSizeValue
+                              ? isSizeAvailableForOptions(
+                                product.skus,
+                                currentSizeValue,
+                                colorGroup,
+                                nextSelectedOptions,
+                              )
+                              : false;
+                            if (!currentSizeStillAvailable) {
+                              const firstAvailableSize = sizeGroup.values.find((sv) =>
+                                isSizeAvailableForOptions(
+                                  product.skus,
+                                  sv,
+                                  colorGroup,
+                                  nextSelectedOptions,
+                                )
+                              );
+                              if (firstAvailableSize) nextSelectedOptions[sizeGroup.id] = firstAvailableSize.id;
+                              else delete nextSelectedOptions[sizeGroup.id];
+                            }
+                          }
                           onChange({
-                            selectedOptions: { ...stepState.selectedOptions, [colorGroup.id]: v.id },
+                            selectedOptions: nextSelectedOptions,
                           });
                           const nextColorFrontImage = resolveImageByIndex(v.images, v.designerFrontImageIdx);
                           const nextResolvedFrontImage = nextColorFrontImage ?? productFrontImage;
