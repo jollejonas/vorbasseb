@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { useCloudinaryWidgetScript } from "@/lib/useCloudinaryWidgetScript";
 
 type Sponsor = { id: string; name: string; logoUrl: string; websiteUrl: string | null; position: number };
 type Props = { initialSponsors: Sponsor[]; initialHeading: string };
 
 const EMPTY_FORM = { name: "", logoUrl: "", websiteUrl: "" };
-const CLOUDINARY_WIDGET_SRC = "https://upload-widget.cloudinary.com/global/all.js";
 
 export function SponsorManager({ initialSponsors, initialHeading }: Props) {
   const [sponsors, setSponsors] = useState<Sponsor[]>(initialSponsors);
@@ -16,48 +16,8 @@ export function SponsorManager({ initialSponsors, initialHeading }: Props) {
   const [saving, setSaving] = useState(false);
   const [heading, setHeading] = useState(initialHeading);
   const [headingSaving, setHeadingSaving] = useState(false);
-  const [scriptReady, setScriptReady] = useState(false);
   const widgetRef = useRef<{ open: () => void } | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const markReady = () => {
-      if (!cancelled) setScriptReady(true);
-    };
-    const markError = () => {
-      if (!cancelled) {
-        setError("Cloudinary widget kunne ikke indlæses. Tjek netværk/CSP og prøv igen.");
-      }
-    };
-
-    // @ts-expect-error cloudinary global
-    if (window.cloudinary?.createUploadWidget) {
-      markReady();
-      return () => { cancelled = true; };
-    }
-
-    const existingScript = document.querySelector<HTMLScriptElement>(`script[src="${CLOUDINARY_WIDGET_SRC}"]`);
-    const script = existingScript ?? document.createElement("script");
-
-    if (!existingScript) {
-      script.src = CLOUDINARY_WIDGET_SRC;
-      script.async = true;
-      document.head.appendChild(script);
-    }
-
-    script.addEventListener("load", markReady);
-    script.addEventListener("error", markError);
-
-    return () => {
-      cancelled = true;
-      script.removeEventListener("load", markReady);
-      script.removeEventListener("error", markError);
-      if (!existingScript && script.parentNode) {
-        script.parentNode.removeChild(script);
-      }
-    };
-  }, []);
+  const { scriptReady, scriptError } = useCloudinaryWidgetScript();
 
   function openCloudinaryWidget() {
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME?.trim();
@@ -72,7 +32,7 @@ export function SponsorManager({ initialSponsors, initialHeading }: Props) {
       return;
     }
 
-    if (!scriptReady) { setError("Upload-widget er ikke klar endnu – prøv igen om et øjeblik"); return; }
+    if (!scriptReady) { setError(scriptError ?? "Upload-widget er ikke klar endnu – prøv igen om et øjeblik"); return; }
 
     try {
       setError("");
