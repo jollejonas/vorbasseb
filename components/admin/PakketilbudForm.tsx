@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { slugify, formatPrice } from "@/lib/utils";
 import { X, GripVertical, ChevronUp, ChevronDown } from "lucide-react";
 import { TipTapEditor } from "@/components/admin/TipTapEditor";
+import { useCloudinaryWidgetScript } from "@/lib/useCloudinaryWidgetScript";
 
 type ProductResult = {
   id: string;
@@ -113,14 +114,7 @@ export function PakketilbudForm({ pakketilbud }: { pakketilbud?: PakketilbudData
 
   // Cloudinary widget
   const widgetRef = useRef<{ open: () => void } | null>(null);
-
-  useEffect(() => {
-    const script = document.createElement("script");
-    script.src = "https://upload-widget.cloudinary.com/global/all.js";
-    script.async = true;
-    document.head.appendChild(script);
-    return () => { document.head.removeChild(script); };
-  }, []);
+  const { scriptReady, scriptError } = useCloudinaryWidgetScript();
 
   function openCloudinaryWidget() {
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
@@ -129,9 +123,18 @@ export function PakketilbudForm({ pakketilbud }: { pakketilbud?: PakketilbudData
       toast.error("Cloudinary er ikke konfigureret");
       return;
     }
+    if (!scriptReady) {
+      toast.error(scriptError ?? "Upload-widget er ikke klar endnu - prov igen om et ojeblik");
+      return;
+    }
     if (!widgetRef.current) {
       // @ts-expect-error cloudinary global
-      widgetRef.current = window.cloudinary?.createUploadWidget(
+      const cloudinary = window.cloudinary;
+      if (!cloudinary?.createUploadWidget) {
+        toast.error("Cloudinary widget er ikke tilgaengelig endnu. Genindlaes siden og prov igen.");
+        return;
+      }
+      widgetRef.current = cloudinary.createUploadWidget(
         { cloudName, uploadPreset, multiple: true, resourceType: "image", folder: "vbk-pakketilbud", clientAllowedFormats: ["jpg", "jpeg", "png", "webp"], maxFileSize: 5000000 },
         (error: unknown, result: { event: string; info: { secure_url: string } }) => {
           if (error) { toast.error("Upload fejlede"); return; }
@@ -383,7 +386,8 @@ export function PakketilbudForm({ pakketilbud }: { pakketilbud?: PakketilbudData
           <button
             type="button"
             onClick={openCloudinaryWidget}
-            className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400 hover:border-primary hover:text-primary transition text-2xl"
+            disabled={!scriptReady}
+            className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400 hover:border-primary hover:text-primary transition text-2xl disabled:opacity-50 disabled:cursor-not-allowed"
           >
             +
           </button>

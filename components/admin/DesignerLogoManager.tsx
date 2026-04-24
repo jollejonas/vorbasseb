@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { useCloudinaryWidgetScript } from "@/lib/useCloudinaryWidgetScript";
 
 type Logo = {
   id: number;
@@ -23,23 +24,25 @@ export function DesignerLogoManager({ initialLogos }: Props) {
   const [saving, setSaving] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const widgetRef = useRef<any>(null);
-
-  useEffect(() => {
-    const script = document.createElement("script");
-    script.src = "https://upload-widget.cloudinary.com/global/all.js";
-    script.async = true;
-    document.head.appendChild(script);
-    return () => { document.head.removeChild(script); };
-  }, []);
+  const { scriptReady, scriptError } = useCloudinaryWidgetScript();
 
   function openUpload() {
     if (!CLOUD_NAME || !UPLOAD_PRESET) {
       alert("Cloudinary er ikke konfigureret");
       return;
     }
+    if (!scriptReady) {
+      alert(scriptError ?? "Upload-widget er ikke klar endnu - prov igen om et ojeblik");
+      return;
+    }
     if (!widgetRef.current) {
       // @ts-expect-error cloudinary global
-      widgetRef.current = window.cloudinary?.createUploadWidget(
+      const cloudinary = window.cloudinary;
+      if (!cloudinary?.createUploadWidget) {
+        alert("Cloudinary widget er ikke tilgaengelig endnu. Genindlaes siden og prov igen.");
+        return;
+      }
+      widgetRef.current = cloudinary.createUploadWidget(
         {
           cloudName: CLOUD_NAME,
           uploadPreset: UPLOAD_PRESET,
@@ -169,9 +172,10 @@ export function DesignerLogoManager({ initialLogos }: Props) {
               <button
                 type="button"
                 onClick={openUpload}
-                className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 whitespace-nowrap"
+                disabled={!scriptReady}
+                className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Upload
+                {scriptReady ? "Upload" : "Indlaeser..."}
               </button>
             </div>
           </div>

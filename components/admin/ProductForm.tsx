@@ -11,6 +11,7 @@ import {
   normalizeDesignerZonePlacements,
   type DesignerZonePlacementMap,
 } from "@/lib/designerZonePlacements";
+import { useCloudinaryWidgetScript } from "@/lib/useCloudinaryWidgetScript";
 
 // ─── Timezone helpers (Europe/Copenhagen) ────────────────────────────────────
 
@@ -388,7 +389,7 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const widgetRef = useRef<any>(null);
   const uploadTarget = useRef<"main" | { type: "colorValue"; key: string } | { type: "legacyColor"; idx: number }>("main");
-  const [scriptReady, setScriptReady] = useState(false);
+  const { scriptReady, scriptError } = useCloudinaryWidgetScript();
 
   // ── Effects ─────────────────────────────────────────────────────────────────
 
@@ -423,14 +424,6 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    const script = document.createElement("script");
-    script.src = "https://upload-widget.cloudinary.com/global/all.js";
-    script.async = true;
-    script.onload = () => setScriptReady(true);
-    document.head.appendChild(script);
-    return () => { document.head.removeChild(script); };
-  }, []);
 
   // ── Cloudinary upload ────────────────────────────────────────────────────────
 
@@ -441,11 +434,19 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
       toast.error("Cloudinary er ikke konfigureret");
       return;
     }
-    if (!scriptReady) { toast.error("Upload-widget er ikke klar endnu – prøv igen om et øjeblik"); return; }
+    if (!scriptReady) {
+      toast.error(scriptError ?? "Upload-widget er ikke klar endnu - prov igen om et ojeblik");
+      return;
+    }
     uploadTarget.current = target;
     if (!widgetRef.current) {
       // @ts-expect-error cloudinary global
-      widgetRef.current = window.cloudinary?.createUploadWidget(
+      const cloudinary = window.cloudinary;
+      if (!cloudinary?.createUploadWidget) {
+        toast.error("Cloudinary widget er ikke tilgaengelig endnu. Genindlaes siden og prov igen.");
+        return;
+      }
+      widgetRef.current = cloudinary.createUploadWidget(
         { cloudName, uploadPreset, multiple: true, resourceType: "image", folder: "vbk-produkter", clientAllowedFormats: ["jpg", "jpeg", "png", "webp"], maxFileSize: 5000000 },
         (error: unknown, result: { event: string; info: { secure_url: string } }) => {
           if (error) { toast.error("Upload fejlede"); return; }
@@ -2407,3 +2408,4 @@ function LegacyVariantSection({
     </>
   );
 }
+

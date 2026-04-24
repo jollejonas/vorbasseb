@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { slugify } from "@/lib/utils";
 import { TipTapEditor } from "@/components/admin/TipTapEditor";
+import { useCloudinaryWidgetScript } from "@/lib/useCloudinaryWidgetScript";
 import type { NewsPost } from "@prisma/client";
 
 export function NewsForm({ post }: { post?: NewsPost }) {
@@ -22,18 +23,11 @@ export function NewsForm({ post }: { post?: NewsPost }) {
   const [saving, setSaving] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const widgetRef = useRef<any>(null);
+  const { scriptReady, scriptError } = useCloudinaryWidgetScript();
 
   useEffect(() => {
     if (!slugManual) setSlug(slugify(title));
   }, [title, slugManual]);
-
-  useEffect(() => {
-    const script = document.createElement("script");
-    script.src = "https://upload-widget.cloudinary.com/global/all.js";
-    script.async = true;
-    document.head.appendChild(script);
-    return () => { document.head.removeChild(script); };
-  }, []);
 
   function openCoverImageWidget() {
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
@@ -42,9 +36,18 @@ export function NewsForm({ post }: { post?: NewsPost }) {
       toast.error("Cloudinary er ikke konfigureret (mangler env-variabler)");
       return;
     }
+    if (!scriptReady) {
+      toast.error(scriptError ?? "Upload-widget er ikke klar endnu - prov igen om et ojeblik");
+      return;
+    }
     if (!widgetRef.current) {
       // @ts-expect-error cloudinary global from CDN
-      widgetRef.current = window.cloudinary?.createUploadWidget(
+      const cloudinary = window.cloudinary;
+      if (!cloudinary?.createUploadWidget) {
+        toast.error("Cloudinary widget er ikke tilgaengelig endnu. Genindlaes siden og prov igen.");
+        return;
+      }
+      widgetRef.current = cloudinary.createUploadWidget(
         {
           cloudName,
           uploadPreset,
@@ -159,9 +162,10 @@ export function NewsForm({ post }: { post?: NewsPost }) {
           <button
             type="button"
             onClick={openCoverImageWidget}
-            className="flex items-center gap-2 border-2 border-dashed border-gray-300 rounded-lg px-4 py-3 text-sm text-gray-500 hover:border-secondary hover:text-secondary transition"
+            disabled={!scriptReady}
+            className="flex items-center gap-2 border-2 border-dashed border-gray-300 rounded-lg px-4 py-3 text-sm text-gray-500 hover:border-secondary hover:text-secondary transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <span className="text-lg leading-none">+</span> Upload forsidebillede
+            <span className="text-lg leading-none">+</span> {scriptReady ? "Upload forsidebillede" : "Indlaeser upload-widget..."}
           </button>
         )}
       </div>
