@@ -1,13 +1,22 @@
 import type { NextConfig } from "next";
 
+const cloudinaryCspSources = [
+  "https://upload-widget.cloudinary.com",
+  "https://widget.cloudinary.com",
+  "https://api.cloudinary.com",
+  "https://upload.cloudinary.com",
+  "https://res.cloudinary.com",
+  "https://*.cloudinary.com",
+];
+
 const cspDirectives = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' js.stripe.com cdn.jsdelivr.net upload-widget.cloudinary.com",
-  "style-src 'self' 'unsafe-inline' cdn.jsdelivr.net",
-  "img-src 'self' data: res.cloudinary.com https://*.dbu.dk https://lgu.dk https://www.lgu.dk",
-  "connect-src 'self' api.stripe.com api.cloudinary.com upload.cloudinary.com",
-  "frame-src js.stripe.com widget.cloudinary.com upload-widget.cloudinary.com",
-  "font-src 'self' cdn.jsdelivr.net",
+  `script-src 'self' 'unsafe-inline' https://js.stripe.com https://cdn.jsdelivr.net ${cloudinaryCspSources.join(" ")}`,
+  "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+  `img-src 'self' data: ${cloudinaryCspSources.join(" ")} https://*.dbu.dk https://lgu.dk https://www.lgu.dk`,
+  `connect-src 'self' https://api.stripe.com ${cloudinaryCspSources.join(" ")}`,
+  `frame-src https://js.stripe.com ${cloudinaryCspSources.join(" ")}`,
+  "font-src 'self' https://cdn.jsdelivr.net",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
