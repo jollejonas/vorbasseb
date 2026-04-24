@@ -34,19 +34,35 @@ export function SponsorManager({ initialSponsors, initialHeading }: Props) {
 
     if (!scriptReady) { setError("Upload-widget er ikke klar endnu – prøv igen om et øjeblik"); return; }
 
-    if (!widgetRef.current) {
-      // @ts-expect-error cloudinary global
-      widgetRef.current = window.cloudinary?.createUploadWidget(
-        { cloudName, uploadPreset, multiple: false, resourceType: "image", folder: "vbk-sponsorer", clientAllowedFormats: ["jpg", "jpeg", "png", "webp", "svg"], maxFileSize: 5000000 },
-        (error: unknown, result: { event: string; info: { secure_url: string } }) => {
-          if (error) { setError("Upload fejlede"); return; }
-          if (result.event === "success") {
-            setForm((f) => ({ ...f, logoUrl: result.info.secure_url }));
+    try {
+      setError("");
+
+      if (!widgetRef.current) {
+        // @ts-expect-error cloudinary global
+        const createdWidget = window.cloudinary?.createUploadWidget(
+          { cloudName, uploadPreset, multiple: false, resourceType: "image", folder: "vbk-sponsorer", clientAllowedFormats: ["jpg", "jpeg", "png", "webp", "svg"], maxFileSize: 5000000 },
+          (
+            error: unknown,
+            result?: { event?: string; info?: { secure_url?: string } }
+          ) => {
+            if (error) { setError("Upload fejlede"); return; }
+            const secureUrl = result?.event === "success" ? result.info?.secure_url : null;
+            if (secureUrl) setForm((f) => ({ ...f, logoUrl: secureUrl }));
           }
+        );
+
+        if (!createdWidget || typeof createdWidget.open !== "function") {
+          setError("Upload-widget kunne ikke startes. Prøv at genindlæse siden.");
+          return;
         }
-      );
+
+        widgetRef.current = createdWidget;
+      }
+
+      widgetRef.current.open();
+    } catch {
+      setError("Upload-widget fejlede uventet. Prøv igen eller genindlæs siden.");
     }
-    widgetRef.current?.open();
   }
 
   function startEdit(s: Sponsor) {
