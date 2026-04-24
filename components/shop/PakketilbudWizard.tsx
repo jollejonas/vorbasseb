@@ -118,6 +118,36 @@ function resolveImageByIndex(images: string[] | undefined, idx: number | null | 
   return images?.[idx] ?? null;
 }
 
+function normalizeHex(hex: string | null | undefined): string {
+  if (!hex) return "";
+  const v = hex.trim().toLowerCase();
+  return v.startsWith("#") ? v : `#${v}`;
+}
+
+function normalizeLabel(value: string | null | undefined): string {
+  return value?.trim().toLowerCase() ?? "";
+}
+
+function resolveOptionColorFallbackImages(
+  selectedColorValue: OptionValueFull | undefined,
+  colorVariants: ColorVariantWithSkus[],
+): string[] {
+  if (!selectedColorValue) return [];
+
+  const selectedHex = normalizeHex(selectedColorValue.globalColor?.hex);
+  const selectedLabel = normalizeLabel(selectedColorValue.label);
+
+  const byHex = selectedHex
+    ? colorVariants.find((cv) => cv.images.length > 0 && normalizeHex(cv.hex) === selectedHex)
+    : null;
+  if (byHex) return byHex.images;
+
+  const byName = selectedLabel
+    ? colorVariants.find((cv) => cv.images.length > 0 && normalizeLabel(cv.name) === selectedLabel)
+    : null;
+  return byName?.images ?? [];
+}
+
 function initialStep(product: ProductFull): StepState {
   const selectedOptions: Record<string, string> = {};
   const colorGroup = product.optionGroups.find((g) => g.type === "COLOR");
@@ -285,9 +315,12 @@ function ItemStep({
   const selectedColorValue = colorGroup?.values.find(
     (v) => v.id === stepState.selectedOptions[colorGroup.id],
   );
+  const optionColorImages = (selectedColorValue?.images ?? []).length > 0
+    ? selectedColorValue!.images
+    : resolveOptionColorFallbackImages(selectedColorValue, product.colorVariants);
   const activeImages = hasOptionGroups
-    ? (selectedColorValue?.images ?? []).length > 0
-      ? selectedColorValue!.images
+    ? optionColorImages.length > 0
+      ? optionColorImages
       : product.images
     : product.images;
 
@@ -298,11 +331,11 @@ function ItemStep({
     null;
   const productBackImage = resolveImageByIndex(product.images, product.designerBackImageIdx);
   const colorFrontImage = resolveImageByIndex(
-    selectedColorValue?.images,
+    optionColorImages,
     selectedColorValue?.designerFrontImageIdx,
   );
   const colorBackImage = resolveImageByIndex(
-    selectedColorValue?.images,
+    optionColorImages,
     selectedColorValue?.designerBackImageIdx,
   );
   const resolvedFrontImage = colorFrontImage ?? productFrontImage;
