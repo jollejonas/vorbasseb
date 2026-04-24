@@ -131,35 +131,59 @@ function normalizeLabel(value: string | null | undefined): string {
 
 function resolveOptionColorFallbackImages(
   selectedColorValue: OptionValueFull | undefined,
+  colorValues: OptionValueFull[],
   colorVariants: ColorVariantWithSkus[],
   skus: SkuWithOptions[],
 ): string[] {
   if (!selectedColorValue) return [];
 
-  const linkedVariantIds = new Set(
-    skus
-      .filter((sku) => sku.optionValues.some((ov) => ov.optionValueId === selectedColorValue.id))
-      .map((sku) => sku.colorVariantId)
-      .filter((id): id is string => Boolean(id)),
-  );
-  const bySkuLink =
-    linkedVariantIds.size > 0
-      ? colorVariants.find((cv) => cv.images.length > 0 && linkedVariantIds.has(cv.id))
-      : null;
-  if (bySkuLink) return bySkuLink.images;
+  const variantsWithImages = colorVariants.filter((cv) => cv.images.length > 0);
+  if (variantsWithImages.length === 0) return [];
 
   const selectedHex = normalizeHex(selectedColorValue.globalColor?.hex);
   const selectedLabel = normalizeLabel(selectedColorValue.label);
 
   const byHex = selectedHex
-    ? colorVariants.find((cv) => cv.images.length > 0 && normalizeHex(cv.hex) === selectedHex)
+    ? variantsWithImages.find((cv) => normalizeHex(cv.hex) === selectedHex)
     : null;
   if (byHex) return byHex.images;
 
   const byName = selectedLabel
-    ? colorVariants.find((cv) => cv.images.length > 0 && normalizeLabel(cv.name) === selectedLabel)
+    ? variantsWithImages.find((cv) => normalizeLabel(cv.name) === selectedLabel)
     : null;
-  return byName?.images ?? [];
+  if (byName) return byName.images;
+
+  const linkedVariantCounts = new Map<string, number>();
+  for (const sku of skus) {
+    if (!sku.colorVariantId) continue;
+    if (!sku.optionValues.some((ov) => ov.optionValueId === selectedColorValue.id)) continue;
+    linkedVariantCounts.set(sku.colorVariantId, (linkedVariantCounts.get(sku.colorVariantId) ?? 0) + 1);
+  }
+  if (linkedVariantCounts.size > 0) {
+    const ranked = [...linkedVariantCounts.entries()]
+      .map(([variantId, count]) => ({
+        count,
+        variant: variantsWithImages.find((cv) => cv.id === variantId) ?? null,
+      }))
+      .filter((entry): entry is { count: number; variant: ColorVariantWithSkus } => entry.variant !== null)
+      .sort((a, b) => b.count - a.count);
+
+    if (ranked.length > 0) {
+      const hasTie = ranked.length > 1 && ranked[0].count === ranked[1].count;
+      if (!hasTie) return ranked[0].variant.images;
+    }
+  }
+
+  // Last resort for hybrid datasets where color values and color variants were created in the same sequence.
+  if (colorValues.length === colorVariants.length) {
+    const selectedColorIndex = colorValues.findIndex((v) => v.id === selectedColorValue.id);
+    if (selectedColorIndex >= 0) {
+      const byPosition = colorVariants[selectedColorIndex];
+      if (byPosition?.images.length) return byPosition.images;
+    }
+  }
+
+  return [];
 }
 
 function initialStep(product: ProductFull): StepState {
@@ -348,7 +372,12 @@ function ItemStep({
   );
   const optionColorImages = (selectedColorValue?.images ?? []).length > 0
     ? selectedColorValue!.images
-    : resolveOptionColorFallbackImages(selectedColorValue, product.colorVariants, product.skus);
+    : resolveOptionColorFallbackImages(
+      selectedColorValue,
+      colorGroup?.values ?? [],
+      product.colorVariants,
+      product.skus,
+    );
   const activeImages = hasOptionGroups
     ? optionColorImages.length > 0
       ? optionColorImages
