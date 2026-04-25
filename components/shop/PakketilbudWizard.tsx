@@ -122,7 +122,11 @@ function resolveImageByIndex(images: string[] | undefined, idx: number | null | 
 function normalizeHex(hex: string | null | undefined): string {
   if (!hex) return "";
   const v = hex.trim().toLowerCase();
-  return v.startsWith("#") ? v : `#${v}`;
+  const withHash = v.startsWith("#") ? v : `#${v}`;
+  if (/^#[0-9a-f]{3}$/.test(withHash)) {
+    return `#${withHash[1]}${withHash[1]}${withHash[2]}${withHash[2]}${withHash[3]}${withHash[3]}`;
+  }
+  return withHash;
 }
 
 function normalizeLabel(value: string | null | undefined): string {
@@ -134,8 +138,8 @@ function normalizeColorToken(value: string | null | undefined): string {
   if (!compact) return "";
   const ascii = compact
     .replace(/æ/g, "ae")
-    .replace(/ø/g, "oe")
-    .replace(/å/g, "aa")
+    .replace(/ø/g, "o")
+    .replace(/å/g, "a")
     .replace(/[äáàâ]/g, "a")
     .replace(/[öóòô]/g, "o")
     .replace(/[üúùû]/g, "u");
