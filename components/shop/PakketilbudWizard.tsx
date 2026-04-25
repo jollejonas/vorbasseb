@@ -859,12 +859,23 @@ function ItemStep({
       <div>
         {displayImages.length > 0 ? (
           <div className="space-y-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={displayImages[0]}
-              alt={product.name}
-              className="w-full aspect-square object-cover rounded-2xl"
-            />
+            <div className="relative">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={displayImages[0]}
+                alt={product.name}
+                className="w-full aspect-square object-cover rounded-2xl"
+              />
+              {hasOptionGroups && colorGroup && selectedColorValue && optionColorImages.length === 0 && (
+                <div className="absolute top-2 right-2 flex items-center gap-1.5 bg-white/90 backdrop-blur-sm px-2.5 py-1.5 rounded-lg shadow-sm text-xs font-semibold text-gray-800">
+                  <span
+                    className="w-3.5 h-3.5 rounded-full border border-gray-300 shrink-0"
+                    style={{ background: selectedColorValue.globalColor?.hex ?? "#ccc" }}
+                  />
+                  {selectedColorValue.label}
+                </div>
+              )}
+            </div>
             {displayImages.length > 1 && (
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {displayImages.slice(1).map((url, i) => (
@@ -876,15 +887,6 @@ function ItemStep({
                     className="w-16 h-16 object-cover rounded-lg shrink-0"
                   />
                 ))}
-              </div>
-            )}
-            {hasOptionGroups && colorGroup && selectedColorValue && optionColorImages.length === 0 && (
-              <div className="flex items-center gap-2 text-sm text-gray-600 px-1">
-                <span
-                  className="w-4 h-4 rounded-full border border-gray-300 shrink-0"
-                  style={{ background: selectedColorValue.globalColor?.hex ?? "#ccc" }}
-                />
-                <span>Valgt farve: <strong>{selectedColorValue.label}</strong></span>
               </div>
             )}
           </div>
