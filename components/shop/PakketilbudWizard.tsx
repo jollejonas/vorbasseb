@@ -874,6 +874,15 @@ function ItemStep({
                 ))}
               </div>
             )}
+            {hasOptionGroups && colorGroup && selectedColorValue && optionColorImages.length === 0 && (
+              <div className="flex items-center gap-2 text-sm text-gray-600 px-1">
+                <span
+                  className="w-4 h-4 rounded-full border border-gray-300 shrink-0"
+                  style={{ background: selectedColorValue.globalColor?.hex ?? "#ccc" }}
+                />
+                <span>Valgt farve: <strong>{selectedColorValue.label}</strong></span>
+              </div>
+            )}
           </div>
         ) : (
           <div className="w-full aspect-square bg-gray-100 rounded-2xl flex items-center justify-center text-gray-300 text-sm">
