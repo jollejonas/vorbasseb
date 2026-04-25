@@ -48,23 +48,38 @@ export function TipTapEditor({ content, onChange, placeholder = "Skriv indhold h
 
   const toolbarState = useEditorState({
     editor,
-    selector: ({ editor }) => ({
-      bold: editor.isActive("bold"),
-      italic: editor.isActive("italic"),
-      heading2: editor.isActive("heading", { level: 2 }),
-      heading3: editor.isActive("heading", { level: 3 }),
-      bulletList: editor.isActive("bulletList"),
-      orderedList: editor.isActive("orderedList"),
-      link: editor.isActive("link"),
-      canUndo: editor.can().chain().focus().undo().run(),
-      canRedo: editor.can().chain().focus().redo().run(),
-    }),
+    selector: ({ editor }) => {
+      if (!editor) {
+        return {
+          bold: false,
+          italic: false,
+          heading2: false,
+          heading3: false,
+          bulletList: false,
+          orderedList: false,
+          link: false,
+          canUndo: false,
+          canRedo: false,
+        };
+      }
+      return {
+        bold: editor.isActive("bold"),
+        italic: editor.isActive("italic"),
+        heading2: editor.isActive("heading", { level: 2 }),
+        heading3: editor.isActive("heading", { level: 3 }),
+        bulletList: editor.isActive("bulletList"),
+        orderedList: editor.isActive("orderedList"),
+        link: editor.isActive("link"),
+        canUndo: editor.can().chain().focus().undo().run(),
+        canRedo: editor.can().chain().focus().redo().run(),
+      };
+    },
   });
 
   // Sync content from outside (e.g. when loaded async from DB after editor mounts)
   useEffect(() => {
     if (editor && content !== undefined && editor.getHTML() !== content) {
-      editor.commands.setContent(content, false);
+      editor.commands.setContent(content, { emitUpdate: false });
     }
   }, [editor, content]);
 

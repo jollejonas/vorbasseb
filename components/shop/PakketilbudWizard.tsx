@@ -227,19 +227,78 @@ function colorDistanceSq(a: RGB, b: RGB): number {
 
 function resolveOptionColorFallbackImages(
   selectedColorValue: OptionValueFull | undefined,
+  colorValues: OptionValueFull[],
   colorVariants: ColorVariantWithSkus[],
   skus: SkuWithOptions[],
+  selectedSizeValueId: string | undefined,
 ): string[] {
   if (!selectedColorValue) return [];
+  const selectedColor = selectedColorValue;
 
   const variantsWithImages = colorVariants.filter((cv) => cv.images.length > 0);
   if (variantsWithImages.length === 0) return [];
 
-  const selectedHex = toValidHex(selectedColorValue.globalColor?.hex);
+  const selectedColorPosition = colorValues.find((value) => value.id === selectedColor.id)?.position ?? null;
+  const selectedHex = toValidHex(selectedColor.globalColor?.hex);
   const selectedLabels = uniqueNormalizedLabels([
-    selectedColorValue.label,
-    selectedColorValue.globalColor?.name,
+    selectedColor.label,
+    selectedColor.globalColor?.name,
   ]);
+
+  function rankedLinkedVariants(requireSelectedSize: boolean) {
+    const linkedVariantCounts = new Map<string, number>();
+    for (const sku of skus) {
+      if (!sku.colorVariantId) continue;
+      if (!sku.optionValues.some((ov) => ov.optionValueId === selectedColor.id)) continue;
+      if (
+        requireSelectedSize &&
+        selectedSizeValueId &&
+        !sku.optionValues.some((ov) => ov.optionValueId === selectedSizeValueId)
+      ) {
+        continue;
+      }
+      linkedVariantCounts.set(sku.colorVariantId, (linkedVariantCounts.get(sku.colorVariantId) ?? 0) + 1);
+    }
+    return [...linkedVariantCounts.entries()]
+      .map(([variantId, count]) => ({
+        count,
+        variant: variantsWithImages.find((cv) => cv.id === variantId) ?? null,
+      }))
+      .filter((entry): entry is { count: number; variant: ColorVariantWithSkus } => entry.variant !== null)
+      .sort((a, b) => {
+        if (b.count !== a.count) return b.count - a.count;
+        return a.variant.position - b.variant.position;
+      });
+  }
+
+  function resolveFromRankedVariants(ranked: Array<{ count: number; variant: ColorVariantWithSkus }>): string[] | null {
+    if (ranked.length === 0) return null;
+
+    const bestCount = ranked[0].count;
+    const topRanked = ranked.filter((entry) => entry.count === bestCount);
+    if (topRanked.length === 1) return topRanked[0].variant.images;
+
+    if (selectedColorPosition !== null) {
+      const rankedByPosition = [...topRanked]
+        .map((entry) => ({
+          entry,
+          distance: Math.abs(entry.variant.position - selectedColorPosition),
+        }))
+        .sort((a, b) => a.distance - b.distance);
+      const best = rankedByPosition[0];
+      const runnerUp = rankedByPosition[1];
+      if (!runnerUp || best.distance !== runnerUp.distance) {
+        return best.entry.variant.images;
+      }
+    }
+
+    return null;
+  }
+
+  const bySelectedSizeSkuLink = selectedSizeValueId
+    ? resolveFromRankedVariants(rankedLinkedVariants(true))
+    : null;
+  if (bySelectedSizeSkuLink) return bySelectedSizeSkuLink;
 
   if (selectedHex) {
     const byHex = variantsWithImages.filter((cv) => toValidHex(cv.hex) === selectedHex);
@@ -254,26 +313,8 @@ function resolveOptionColorFallbackImages(
     if (byName.length === 1) return byName[0].images;
   }
 
-  const linkedVariantCounts = new Map<string, number>();
-  for (const sku of skus) {
-    if (!sku.colorVariantId) continue;
-    if (!sku.optionValues.some((ov) => ov.optionValueId === selectedColorValue.id)) continue;
-    linkedVariantCounts.set(sku.colorVariantId, (linkedVariantCounts.get(sku.colorVariantId) ?? 0) + 1);
-  }
-  if (linkedVariantCounts.size > 0) {
-    const ranked = [...linkedVariantCounts.entries()]
-      .map(([variantId, count]) => ({
-        count,
-        variant: variantsWithImages.find((cv) => cv.id === variantId) ?? null,
-      }))
-      .filter((entry): entry is { count: number; variant: ColorVariantWithSkus } => entry.variant !== null)
-      .sort((a, b) => b.count - a.count);
-
-    if (ranked.length > 0) {
-      const hasTie = ranked.length > 1 && ranked[0].count === ranked[1].count;
-      if (!hasTie) return ranked[0].variant.images;
-    }
-  }
+  const bySkuLink = resolveFromRankedVariants(rankedLinkedVariants(false));
+  if (bySkuLink) return bySkuLink;
 
   const selectedCanonicalTokens = [
     ...new Set(selectedLabels.flatMap((label) => canonicalColorTokens(label))),
@@ -299,7 +340,7 @@ function resolveOptionColorFallbackImages(
     }
   }
 
-  const selectedRgb = parseHexColor(selectedColorValue.globalColor?.hex);
+  const selectedRgb = parseHexColor(selectedColor.globalColor?.hex);
   if (selectedRgb) {
     const rankedByHexDistance = variantsWithImages
       .map((cv) => {
@@ -320,6 +361,22 @@ function resolveOptionColorFallbackImages(
 
       if (closest.distanceSq <= maxDistanceSq && clearlyBest) {
         return closest.variant.images;
+      }
+    }
+  }
+
+  if (selectedColorPosition !== null) {
+    const rankedByPositionDistance = variantsWithImages
+      .map((cv) => ({
+        distance: Math.abs(cv.position - selectedColorPosition),
+        variant: cv,
+      }))
+      .sort((a, b) => a.distance - b.distance);
+    if (rankedByPositionDistance.length > 0) {
+      const best = rankedByPositionDistance[0];
+      const runnerUp = rankedByPositionDistance[1];
+      if (!runnerUp || best.distance !== runnerUp.distance) {
+        return best.variant.images;
       }
     }
   }
@@ -506,6 +563,7 @@ function ItemStep({
   );
 
   const selectedColorValueId = colorGroup ? stepState.selectedOptions[colorGroup.id] : undefined;
+  const selectedSizeValueId = sizeGroup ? stepState.selectedOptions[sizeGroup.id] : undefined;
   const selectedColorValue = colorGroup?.values.find((v) => v.id === selectedColorValueId);
   const effectiveDesignerZones = applyDesignerZonePlacements(
     product.designerZones,
@@ -515,8 +573,10 @@ function ItemStep({
     ? selectedColorValue!.images
     : resolveOptionColorFallbackImages(
       selectedColorValue,
+      colorGroup?.values ?? [],
       product.colorVariants,
       product.skus,
+      selectedSizeValueId,
     );
   const activeImages = hasOptionGroups
     ? optionColorImages.length > 0
