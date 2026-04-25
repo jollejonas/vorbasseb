@@ -384,6 +384,31 @@ function resolveOptionColorFallbackImages(
   return [];
 }
 
+function resolveOptionColorProductImageFallback(
+  selectedColorValue: OptionValueFull | undefined,
+  colorValues: OptionValueFull[],
+  productImages: string[],
+): string[] {
+  if (!selectedColorValue || productImages.length === 0 || colorValues.length === 0) return [];
+
+  const selectedIdx = colorValues.findIndex((value) => value.id === selectedColorValue.id);
+  if (selectedIdx < 0) return [];
+
+  // One image per color, ordered by color position.
+  if (productImages.length === colorValues.length) {
+    return productImages[selectedIdx] ? [productImages[selectedIdx]] : [];
+  }
+
+  // N images per color (e.g. front/back), grouped in color order.
+  if (productImages.length % colorValues.length === 0) {
+    const imagesPerColor = productImages.length / colorValues.length;
+    const start = selectedIdx * imagesPerColor;
+    return productImages.slice(start, start + imagesPerColor).filter(Boolean);
+  }
+
+  return [];
+}
+
 function initialStep(product: ProductFull): StepState {
   const selectedOptions: Record<string, string> = {};
   const colorGroup = product.optionGroups.find((g) => g.type === "COLOR");
@@ -569,15 +594,24 @@ function ItemStep({
     product.designerZones,
     selectedColorValue?.designerZonePlacements
   );
-  const optionColorImages = (selectedColorValue?.images ?? []).length > 0
-    ? selectedColorValue!.images
-    : resolveOptionColorFallbackImages(
-      selectedColorValue,
-      colorGroup?.values ?? [],
-      product.colorVariants,
-      product.skus,
-      selectedSizeValueId,
-    );
+  const explicitOptionColorImages = selectedColorValue?.images ?? [];
+  const legacyVariantColorImages = resolveOptionColorFallbackImages(
+    selectedColorValue,
+    colorGroup?.values ?? [],
+    product.colorVariants,
+    product.skus,
+    selectedSizeValueId,
+  );
+  const positionalProductColorImages = resolveOptionColorProductImageFallback(
+    selectedColorValue,
+    colorGroup?.values ?? [],
+    product.images,
+  );
+  const optionColorImages = explicitOptionColorImages.length > 0
+    ? explicitOptionColorImages
+    : legacyVariantColorImages.length > 0
+      ? legacyVariantColorImages
+      : positionalProductColorImages;
   const activeImages = hasOptionGroups
     ? optionColorImages.length > 0
       ? optionColorImages

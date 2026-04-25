@@ -259,6 +259,29 @@ function resolveOptionColorFallbackImages(
   return [];
 }
 
+function resolveOptionColorProductImageFallback(
+  selectedColorValue,
+  colorValues,
+  productImages,
+) {
+  if (!selectedColorValue || productImages.length === 0 || colorValues.length === 0) return [];
+
+  const selectedIdx = colorValues.findIndex((value) => value.id === selectedColorValue.id);
+  if (selectedIdx < 0) return [];
+
+  if (productImages.length === colorValues.length) {
+    return productImages[selectedIdx] ? [productImages[selectedIdx]] : [];
+  }
+
+  if (productImages.length % colorValues.length === 0) {
+    const imagesPerColor = productImages.length / colorValues.length;
+    const start = selectedIdx * imagesPerColor;
+    return productImages.slice(start, start + imagesPerColor).filter(Boolean);
+  }
+
+  return [];
+}
+
 const testCases = [
   {
     name: "Uses selected-size SKU mapping first",
@@ -339,6 +362,26 @@ const testCases = [
     },
     expectedFirstImage: null,
   },
+  {
+    name: "Falls back to product image chunks by color position",
+    input: {
+      selectedColorValue: { id: "black", label: "Sort", position: 1, images: [], globalColor: { name: "Sort", hex: "#000000" } },
+      colorValues: [
+        { id: "blue", label: "Blå", position: 0, globalColor: { name: "Blå", hex: "#223D8F" } },
+        { id: "black", label: "Sort", position: 1, globalColor: { name: "Sort", hex: "#000000" } },
+      ],
+      colorVariants: [],
+      skus: [],
+      selectedSizeValueId: undefined,
+      productImages: [
+        "blue-front.jpg",
+        "blue-back.jpg",
+        "black-front.jpg",
+        "black-back.jpg",
+      ],
+    },
+    expectedFirstImage: "black-front.jpg",
+  },
 ];
 
 let passed = 0;
@@ -351,7 +394,13 @@ for (const testCase of testCases) {
     testCase.input.skus,
     testCase.input.selectedSizeValueId,
   );
-  const actualFirstImage = actual[0] ?? null;
+  const positionalFallback = resolveOptionColorProductImageFallback(
+    testCase.input.selectedColorValue,
+    testCase.input.colorValues,
+    testCase.input.productImages ?? [],
+  );
+  const finalImages = actual.length > 0 ? actual : positionalFallback;
+  const actualFirstImage = finalImages[0] ?? null;
   if (actualFirstImage === testCase.expectedFirstImage) {
     console.log(`[PASS] ${testCase.name}`);
     passed += 1;
