@@ -1084,7 +1084,70 @@ export function PakketilbudWizard({
   const isSummary = currentStep === totalSteps;
 
   function updateStep(idx: number, patch: Partial<StepState>) {
-    setStepStates((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
+    setStepStates((prev) => {
+      const updated = prev.map((s, i) => (i === idx ? { ...s, ...patch } : s));
+
+      if (!patch.selectedOptions) return updated;
+
+      const thisProduct = pakketilbud.items[idx].product;
+      const thisColorGroup = thisProduct.optionGroups.find((g) => g.type === "COLOR");
+      if (!thisColorGroup) return updated;
+
+      const newColorValueId = patch.selectedOptions[thisColorGroup.id];
+      const oldColorValueId = prev[idx].selectedOptions[thisColorGroup.id];
+      if (!newColorValueId || newColorValueId === oldColorValueId) return updated;
+
+      const selectedValue = thisColorGroup.values.find((v) => v.id === newColorValueId);
+      if (!selectedValue) return updated;
+
+      const selectedToken = normalizeColorToken(selectedValue.label);
+      const selectedGlobalColorId = (selectedValue as { globalColorId?: string | null }).globalColorId ?? null;
+      const selectedHex = normalizeHex(selectedValue.globalColor?.hex);
+
+      return updated.map((s, i) => {
+        if (i === idx) return s;
+
+        const otherProduct = pakketilbud.items[i].product;
+        const otherColorGroup = otherProduct.optionGroups.find((g) => g.type === "COLOR");
+        if (!otherColorGroup) return s;
+
+        const matchingValue = otherColorGroup.values.find((v) => {
+          const vWithGlobal = v as typeof v & { globalColorId?: string | null };
+          if (selectedGlobalColorId && vWithGlobal.globalColorId === selectedGlobalColorId) return true;
+          if (selectedHex && normalizeHex(v.globalColor?.hex) === selectedHex) return true;
+          if (selectedToken) {
+            const vToken = normalizeColorToken(v.label);
+            if (vToken && vToken === selectedToken) return true;
+            const gToken = normalizeColorToken(v.globalColor?.name);
+            if (gToken && gToken === selectedToken) return true;
+          }
+          return false;
+        });
+
+        if (!matchingValue) return s;
+        if (s.selectedOptions[otherColorGroup.id] === matchingValue.id) return s;
+
+        const nextSelectedOptions = { ...s.selectedOptions, [otherColorGroup.id]: matchingValue.id };
+        const otherSizeGroup = otherProduct.optionGroups.find((g) => g.type === "SIZE");
+        if (otherSizeGroup) {
+          const currentSize = otherSizeGroup.values.find(
+            (sv) => sv.id === nextSelectedOptions[otherSizeGroup.id],
+          );
+          const sizeStillAvailable = currentSize
+            ? isSizeAvailableForOptions(otherProduct.skus, currentSize, otherColorGroup, nextSelectedOptions)
+            : false;
+          if (!sizeStillAvailable) {
+            const nextSize = otherSizeGroup.values.find((sv) =>
+              isSizeAvailableForOptions(otherProduct.skus, sv, otherColorGroup, nextSelectedOptions),
+            );
+            if (nextSize) nextSelectedOptions[otherSizeGroup.id] = nextSize.id;
+            else delete nextSelectedOptions[otherSizeGroup.id];
+          }
+        }
+
+        return { ...s, selectedOptions: nextSelectedOptions };
+      });
+    });
   }
 
   const currentComplete = isSummary
