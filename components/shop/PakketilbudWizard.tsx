@@ -205,20 +205,14 @@ function resolveOptionColorFallbackImages(
   if (variantsWithImages.length === 0) return [];
   const variantById = new Map(variantsWithImages.map((cv) => [cv.id, cv]));
 
+  const selectedSizeValueId = sizeGroup ? selectedOptions[sizeGroup.id] : undefined;
   const selectedHex = normalizeHex(selectedColorValue.globalColor?.hex);
   const selectedLabel = selectedColorValue.label;
   const globalColorName = selectedColorValue.globalColor?.name;
   const candidateColorNames = [selectedLabel, globalColorName];
 
-  const byHex = selectedHex
-    ? variantsWithImages.find((cv) => normalizeHex(cv.hex) === selectedHex)
-    : null;
-  if (byHex) return byHex.images;
-
-  const byName = variantsWithImages.find((cv) => matchesAnyColorName(cv.name, candidateColorNames));
-  if (byName) return byName.images;
-
-  const selectedSizeValueId = sizeGroup ? selectedOptions[sizeGroup.id] : undefined;
+  // Prefer SKU-linked resolution first so color switches always map to the actual selected option value.
+  // Hex/name-only matching can collapse multiple variants to the same result when swatches overlap.
   if (selectedSizeValueId) {
     const sizeMatchedSkus = skus.filter((sku) =>
       !!sku.colorVariantId &&
@@ -280,6 +274,18 @@ function resolveOptionColorFallbackImages(
       return topTied[0].variant.images;
     }
   }
+
+  const nameMatches = variantsWithImages.filter((cv) => matchesAnyColorName(cv.name, candidateColorNames));
+  if (nameMatches.length === 1) return nameMatches[0].images;
+
+  const hexMatches = selectedHex
+    ? variantsWithImages.filter((cv) => normalizeHex(cv.hex) === selectedHex)
+    : [];
+  if (hexMatches.length === 1) return hexMatches[0].images;
+
+  // Deterministic fallback when metadata matching is ambiguous.
+  if (nameMatches.length > 0) return nameMatches[0].images;
+  if (hexMatches.length > 0) return hexMatches[0].images;
 
   return [];
 }
