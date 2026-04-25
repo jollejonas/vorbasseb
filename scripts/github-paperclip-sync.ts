@@ -188,7 +188,7 @@ async function createPCIssue(ghIssue: GHIssue): Promise<PCIssue> {
         projectId: PROJECT_ID,
         goalId: GOAL_ID,
         parentId: PARENT_ID,
-        originKind: "github",
+        originKind: "github_issue",
         originId: String(ghIssue.number),
       }),
     },
@@ -270,7 +270,7 @@ async function main() {
   // Build lookup maps — primary: originKind/originId; fallback: title pattern for legacy issues
   const pcByGH = new Map<number, PCIssue>();
   for (const pc of pcIssues) {
-    if (pc.originKind === "github" && pc.originId) {
+    if (pc.originKind === "github_issue" && pc.originId) {
       const n = parseInt(pc.originId, 10);
       if (!isNaN(n)) {
         pcByGH.set(n, pc);
