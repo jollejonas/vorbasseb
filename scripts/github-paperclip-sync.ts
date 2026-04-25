@@ -154,6 +154,8 @@ interface PCIssue {
   identifier: string;
   title: string;
   status: string;
+  originKind?: string;
+  originId?: string;
 }
 
 interface PCIssueList {
@@ -186,6 +188,8 @@ async function createPCIssue(ghIssue: GHIssue): Promise<PCIssue> {
         projectId: PROJECT_ID,
         goalId: GOAL_ID,
         parentId: PARENT_ID,
+        originKind: "github",
+        originId: String(ghIssue.number),
       }),
     },
     true
@@ -263,11 +267,19 @@ async function main() {
     getPCIssues(),
   ]);
 
-  // Build lookup maps
+  // Build lookup maps — primary: originKind/originId; fallback: title pattern for legacy issues
   const pcByGH = new Map<number, PCIssue>();
   for (const pc of pcIssues) {
+    if (pc.originKind === "github" && pc.originId) {
+      const n = parseInt(pc.originId, 10);
+      if (!isNaN(n)) {
+        pcByGH.set(n, pc);
+        continue;
+      }
+    }
+    // Legacy fallback: issues created before originKind/originId were set
     const n = extractGHNumber(pc.title);
-    if (n !== null) pcByGH.set(n, pc);
+    if (n !== null && !pcByGH.has(n)) pcByGH.set(n, pc);
   }
 
   const ghByNumber = new Map<number, GHIssue>();
