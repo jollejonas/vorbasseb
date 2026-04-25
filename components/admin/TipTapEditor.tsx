@@ -49,15 +49,15 @@ export function TipTapEditor({ content, onChange, placeholder = "Skriv indhold h
   const toolbarState = useEditorState({
     editor,
     selector: ({ editor }) => ({
-      bold: editor.isActive("bold"),
-      italic: editor.isActive("italic"),
-      heading2: editor.isActive("heading", { level: 2 }),
-      heading3: editor.isActive("heading", { level: 3 }),
-      bulletList: editor.isActive("bulletList"),
-      orderedList: editor.isActive("orderedList"),
-      link: editor.isActive("link"),
-      canUndo: editor.can().chain().focus().undo().run(),
-      canRedo: editor.can().chain().focus().redo().run(),
+      bold: editor?.isActive("bold") ?? false,
+      italic: editor?.isActive("italic") ?? false,
+      heading2: editor?.isActive("heading", { level: 2 }) ?? false,
+      heading3: editor?.isActive("heading", { level: 3 }) ?? false,
+      bulletList: editor?.isActive("bulletList") ?? false,
+      orderedList: editor?.isActive("orderedList") ?? false,
+      link: editor?.isActive("link") ?? false,
+      canUndo: editor?.can().chain().focus().undo().run() ?? false,
+      canRedo: editor?.can().chain().focus().redo().run() ?? false,
     }),
   });
 
