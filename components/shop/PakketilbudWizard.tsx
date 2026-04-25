@@ -667,6 +667,8 @@ function ItemStep({
       : product.images;
 
   const displayImages = hasOptionGroups ? activeImages : legacyImages;
+  const selectedColorHex = toValidHex(selectedColorValue?.globalColor?.hex);
+  const showColorChip = hasOptionGroups && !!selectedColorValue && optionColorImages.length === 0;
 
   const legacySkus =
     product.colorVariants.length > 0
@@ -1000,12 +1002,23 @@ function ItemStep({
       <div>
         {displayImages.length > 0 ? (
           <div className="space-y-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={displayImages[0]}
-              alt={product.name}
-              className="w-full aspect-square object-cover rounded-2xl"
-            />
+            <div className="relative">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={displayImages[0]}
+                alt={product.name}
+                className="w-full aspect-square object-cover rounded-2xl"
+              />
+              {showColorChip && (
+                <div className="absolute left-3 top-3 inline-flex items-center gap-2 rounded-full bg-black/70 px-2.5 py-1 text-xs font-semibold text-white">
+                  <span
+                    className="inline-block h-3 w-3 rounded-full border border-white/70"
+                    style={{ background: selectedColorHex ?? "#9ca3af" }}
+                  />
+                  <span>{selectedColorValue?.label}</span>
+                </div>
+              )}
+            </div>
             {displayImages.length > 1 && (
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {displayImages.slice(1).map((url, i) => (
