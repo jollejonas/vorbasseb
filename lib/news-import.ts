@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import * as cheerio from "cheerio";
-import { sanitizeHtml } from "@/lib/sanitizeHtml";
 
 export const NEWS_BASE_URL = "https://live-911-vorbasse-b-af-1912.umbraco-proxy.com";
 const LISTING_FETCH_TIMEOUT_MS = 10_000;
@@ -13,6 +12,28 @@ const DANISH_MONTHS: Record<string, number> = {
   januar: 0, februar: 1, marts: 2, april: 3, maj: 4, juni: 5,
   juli: 6, august: 7, september: 8, oktober: 9, november: 10, december: 11,
 };
+
+function extractBackgroundImageUrl(styleAttr: string | undefined): string | null {
+  if (!styleAttr) return null;
+
+  const match = styleAttr.match(/background-image\s*:\s*url\((['"]?)([^'")]+)\1\)/i);
+  return match?.[2] ?? null;
+}
+
+function normalizeNewsImageUrl(rawUrl: string | null): string | null {
+  if (!rawUrl) return null;
+
+  const cleanedRaw = rawUrl.trim().replace(/&amp;/gi, "&");
+  if (!cleanedRaw) return null;
+
+  const absoluteUrl = cleanedRaw.startsWith("http")
+    ? cleanedRaw
+    : `${NEWS_BASE_URL}${cleanedRaw.startsWith("/") ? "" : "/"}${cleanedRaw}`;
+
+  return absoluteUrl
+    .replace(/[?&]rnd=[^&]*/g, "")
+    .replace(/\?$/, "");
+}
 
 export function parseDanishDate(text: string): Date | null {
   const m = text.match(/(\d{1,2})\.\s+(\w+)\s+(\d{4})\s+kl[.:]?\s*(\d{1,2}):(\d{2})/i);
@@ -120,12 +141,16 @@ export async function importArticle(articleUrl: string): Promise<ImportArticleRe
   const coverImageRaw =
     $(".theme_newsItem_imageWrap img[data-src]").first().attr("data-src") ??
     $(".theme_newsItem_imageHolder img[data-src]").first().attr("data-src") ??
+    $(".theme_newsItem_imageWrap img[src]").first().attr("src") ??
+    $(".theme_newsItem_imageHolder img[src]").first().attr("src") ??
+    extractBackgroundImageUrl(
+      $(".theme_newsItem_imageWrap .theme_newsItem_image, .theme_newsFolder_img")
+        .first()
+        .attr("style"),
+    ) ??
+    $('meta[property="og:image"]').first().attr("content") ??
     null;
-  const coverImage = coverImageRaw
-    ? (coverImageRaw.startsWith("http") ? coverImageRaw : NEWS_BASE_URL + coverImageRaw)
-        .replace(/[?&]rnd=[^&]*/g, "")
-        .replace(/\?$/, "")
-    : null;
+  const coverImage = normalizeNewsImageUrl(coverImageRaw);
 
   const title =
     $(".theme_newsItem_headerWrap h1").first().text().trim() ||
@@ -156,6 +181,7 @@ export async function importArticle(articleUrl: string): Promise<ImportArticleRe
     bodyParts.push($.html(el) ?? "");
   });
 
+  const { sanitizeHtml } = await import("@/lib/sanitizeHtml");
   const content = sanitizeHtml(bodyParts.join("\n"));
 
   const payload = {

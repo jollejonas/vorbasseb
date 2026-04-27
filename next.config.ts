@@ -8,12 +8,13 @@ const cloudinaryCspSources = [
   "https://res.cloudinary.com",
   "https://*.cloudinary.com",
 ];
+const newsImageCspSource = "https://live-911-vorbasse-b-af-1912.umbraco-proxy.com";
 
 const cspDirectives = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline' https://js.stripe.com https://cdn.jsdelivr.net ${cloudinaryCspSources.join(" ")}`,
   "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
-  `img-src 'self' data: ${cloudinaryCspSources.join(" ")} https://*.dbu.dk https://lgu.dk https://www.lgu.dk`,
+  `img-src 'self' data: ${cloudinaryCspSources.join(" ")} ${newsImageCspSource} https://*.dbu.dk https://lgu.dk https://www.lgu.dk`,
   `connect-src 'self' https://api.stripe.com ${cloudinaryCspSources.join(" ")}`,
   `frame-src https://js.stripe.com ${cloudinaryCspSources.join(" ")}`,
   "font-src 'self' https://cdn.jsdelivr.net",
