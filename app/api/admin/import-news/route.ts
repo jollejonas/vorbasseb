@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import { fetchNewsListing, importArticle } from "@/lib/news-import";
 
 export const runtime = "nodejs";
 
@@ -20,11 +22,6 @@ export async function GET(req: NextRequest) {
     const year = /^\d{4}$/.test(yearParam ?? "")
       ? yearParam!
       : new Date().getFullYear().toString();
-
-    const [{ fetchNewsListing }, { prisma }] = await Promise.all([
-      import("@/lib/news-import"),
-      import("@/lib/prisma"),
-    ]);
 
     const articles = await fetchNewsListing(year);
 
@@ -53,7 +50,6 @@ export async function POST(req: NextRequest) {
     const articleUrl = body.articleUrl;
     if (!articleUrl) return NextResponse.json({ error: "Missing articleUrl" }, { status: 400 });
 
-    const { importArticle } = await import("@/lib/news-import");
     const result = await importArticle(articleUrl);
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {

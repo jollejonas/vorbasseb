@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import * as cheerio from "cheerio";
+import { sanitizeHtml } from "@/lib/sanitizeHtml";
 
 export const NEWS_BASE_URL = "https://live-911-vorbasse-b-af-1912.umbraco-proxy.com";
 const LISTING_FETCH_TIMEOUT_MS = 10_000;
@@ -181,7 +182,6 @@ export async function importArticle(articleUrl: string): Promise<ImportArticleRe
     bodyParts.push($.html(el) ?? "");
   });
 
-  const { sanitizeHtml } = await import("@/lib/sanitizeHtml");
   const content = sanitizeHtml(bodyParts.join("\n"));
 
   const payload = {
