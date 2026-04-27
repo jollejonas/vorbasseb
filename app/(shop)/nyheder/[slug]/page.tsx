@@ -2,23 +2,26 @@ import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { ShareButtons } from "@/components/shop/ShareButtons";
 import { sanitizeHtml } from "@/lib/sanitizeHtml";
 
 type Props = { params: Promise<{ slug: string }> };
 
+const getPost = cache((slug: string) =>
+  prisma.newsPost.findUnique({ where: { slug, publishedAt: { lte: new Date() } } })
+);
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const post = await prisma.newsPost.findUnique({ where: { slug } });
+  const post = await getPost(slug);
   return { title: post?.title ?? "Nyhed" };
 }
 
 export default async function NyhedsartikelPage({ params }: Props) {
   const { slug } = await params;
-  const post = await prisma.newsPost.findUnique({
-    where: { slug, publishedAt: { lte: new Date() } },
-  });
+  const post = await getPost(slug);
 
   if (!post) notFound();
 

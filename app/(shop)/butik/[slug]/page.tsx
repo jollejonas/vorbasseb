@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
+import { cache } from "react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getVatRate } from "@/lib/vat";
@@ -10,9 +11,37 @@ import { JerseyDesignerSection } from "@/components/shop/JerseyDesignerSection";
 
 type Props = { params: Promise<{ slug: string }> };
 
+const getProduct = cache((slug: string) =>
+  prisma.product.findUnique({
+    where: { slug, published: true },
+    include: {
+      skus: {
+        where: { colorVariantId: null },
+        orderBy: { size: "asc" },
+        include: { optionValues: { select: { optionValueId: true } } },
+      },
+      category: { include: { parent: true } },
+      colorVariants: {
+        include: { skus: { orderBy: { size: "asc" } } },
+        orderBy: { position: "asc" },
+      },
+      optionGroups: {
+        include: {
+          values: {
+            include: { globalColor: true, skuValues: true },
+            orderBy: { position: "asc" },
+          },
+        },
+        orderBy: { position: "asc" },
+      },
+      designerZones: { include: { fixedLogo: true }, orderBy: { positionOrd: "asc" } },
+    },
+  })
+);
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const p = await prisma.product.findUnique({ where: { slug } });
+  const p = await getProduct(slug);
   return { title: p?.name ?? "Produkt" };
 }
 
@@ -20,31 +49,7 @@ export default async function ProductPage({ params }: Props) {
   const { slug } = await params;
 
   const [product, vatPct, designerLogos] = await Promise.all([
-    prisma.product.findUnique({
-      where: { slug, published: true },
-      include: {
-        skus: {
-          where: { colorVariantId: null },
-          orderBy: { size: "asc" },
-          include: { optionValues: { select: { optionValueId: true } } },
-        },
-        category: { include: { parent: true } },
-        colorVariants: {
-          include: { skus: { orderBy: { size: "asc" } } },
-          orderBy: { position: "asc" },
-        },
-        optionGroups: {
-          include: {
-            values: {
-              include: { globalColor: true, skuValues: true },
-              orderBy: { position: "asc" },
-            },
-          },
-          orderBy: { position: "asc" },
-        },
-        designerZones: { include: { fixedLogo: true }, orderBy: { positionOrd: "asc" } },
-      },
-    }),
+    getProduct(slug),
     getVatRate(),
     prisma.designerLogo.findMany({ orderBy: { id: "asc" } }),
   ]);

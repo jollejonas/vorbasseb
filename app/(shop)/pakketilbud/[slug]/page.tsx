@@ -1,15 +1,51 @@
 import { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { getVatRate } from "@/lib/vat";
 import { PakketilbudPageClient } from "@/components/shop/PakketilbudPageClient";
 
 type Props = { params: Promise<{ slug: string }> };
 
+const getPakketilbud = cache((slug: string) =>
+  prisma.pakketilbud.findUnique({
+    where: { slug, published: true },
+    include: {
+      items: {
+        include: {
+          product: {
+            include: {
+              optionGroups: {
+                include: {
+                  values: {
+                    include: { globalColor: true, skuValues: true },
+                    orderBy: { position: "asc" },
+                  },
+                },
+                orderBy: { position: "asc" },
+              },
+              _count: { select: { skus: { where: { stock: { gt: 0 } } } } },
+              skus: {
+                include: { optionValues: { select: { optionValueId: true } } },
+              },
+              colorVariants: {
+                include: { skus: { orderBy: { size: "asc" } } },
+                orderBy: { position: "asc" },
+              },
+              designerZones: { include: { fixedLogo: true }, orderBy: { positionOrd: "asc" } },
+            },
+          },
+        },
+        orderBy: { position: "asc" },
+      },
+    },
+  })
+);
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const p = await prisma.pakketilbud.findUnique({ where: { slug } });
+  const p = await getPakketilbud(slug);
   return { title: p?.name ?? "Pakketilbud" };
 }
 
@@ -17,38 +53,7 @@ export default async function PakketilbudPage({ params }: Props) {
   const { slug } = await params;
 
   const [pakketilbud, vatPct, logos] = await Promise.all([
-    prisma.pakketilbud.findUnique({
-      where: { slug, published: true },
-      include: {
-        items: {
-          include: {
-            product: {
-              include: {
-                optionGroups: {
-                  include: {
-                    values: {
-                      include: { globalColor: true, skuValues: true },
-                      orderBy: { position: "asc" },
-                    },
-                  },
-                  orderBy: { position: "asc" },
-                },
-                _count: { select: { skus: { where: { stock: { gt: 0 } } } } },
-                skus: {
-                  include: { optionValues: { select: { optionValueId: true } } },
-                },
-                colorVariants: {
-                  include: { skus: { orderBy: { size: "asc" } } },
-                  orderBy: { position: "asc" },
-                },
-                designerZones: { include: { fixedLogo: true }, orderBy: { positionOrd: "asc" } },
-              },
-            },
-          },
-          orderBy: { position: "asc" },
-        },
-      },
-    }),
+    getPakketilbud(slug),
     getVatRate(),
     prisma.designerLogo.findMany({ orderBy: { id: "asc" } }),
   ]);
