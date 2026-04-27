@@ -33,7 +33,7 @@ export function SponsorManager({ initialSponsors, initialHeading }: Props) {
     }
 
     if (!scriptReady) {
-      setError(scriptError ?? "Upload-widget er ikke klar endnu. Prov igen om et ojeblik.");
+      setError(scriptError ?? "Upload-widget er ikke klar endnu – prøv igen om et øjeblik");
       return;
     }
 

@@ -77,6 +77,8 @@ export interface PCIssue {
   identifier: string;
   title: string;
   status: string;
+  originKind?: string;
+  originId?: string;
 }
 
 export async function getPCIssues(): Promise<PCIssue[]> {
@@ -117,6 +119,8 @@ export async function createPCIssue(gh: {
         projectId: PROJECT_ID,
         goalId: GOAL_ID,
         parentId: PARENT_ID,
+        originKind: "github_issue",
+        originId: String(ghIssue.number),
       }),
     },
     true

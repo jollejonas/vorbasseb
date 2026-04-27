@@ -122,7 +122,11 @@ function resolveImageByIndex(images: string[] | undefined, idx: number | null | 
 function normalizeHex(hex: string | null | undefined): string {
   if (!hex) return "";
   const v = hex.trim().toLowerCase();
-  return v.startsWith("#") ? v : `#${v}`;
+  const withHash = v.startsWith("#") ? v : `#${v}`;
+  if (/^#[0-9a-f]{3}$/.test(withHash)) {
+    return `#${withHash[1]}${withHash[1]}${withHash[2]}${withHash[2]}${withHash[3]}${withHash[3]}`;
+  }
+  return withHash;
 }
 
 function toValidHex(value: string | null | undefined): string | null {
@@ -136,234 +140,161 @@ function normalizeLabel(value: string | null | undefined): string {
   return value?.trim().toLowerCase() ?? "";
 }
 
-const COLOR_ALIAS_MAP: Record<string, string> = {
-  sort: "black",
-  black: "black",
-  hvid: "white",
-  white: "white",
-  gra: "gray",
-  graa: "gray",
-  gray: "gray",
-  grey: "gray",
-  rod: "red",
-  roed: "red",
-  red: "red",
-  bla: "blue",
-  blaa: "blue",
-  blue: "blue",
-  navy: "navy",
-  marine: "navy",
-  gron: "green",
-  groen: "green",
-  green: "green",
-  gul: "yellow",
-  yellow: "yellow",
-  orange: "orange",
-  lilla: "purple",
-  purple: "purple",
-  pink: "pink",
-  brun: "brown",
-  brown: "brown",
-};
+function normalizeColorToken(value: string | null | undefined): string {
+  const compact = normalizeLabel(value).replace(/[\s_-]+/g, "");
+  if (!compact) return "";
+  const ascii = compact
+    .replace(/æ/g, "ae")
+    .replace(/ø/g, "o")
+    .replace(/å/g, "a")
+    .replace(/[äáàâ]/g, "a")
+    .replace(/[öóòô]/g, "o")
+    .replace(/[üúùû]/g, "u");
 
-function normalizeToken(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
+  switch (ascii) {
+    case "sort":
+    case "black":
+      return "black";
+    case "hvid":
+    case "white":
+      return "white";
+    case "bla":
+    case "blue":
+      return "blue";
+    case "morkebla":
+    case "navy":
+    case "marine":
+    case "darkblue":
+      return "navy";
+    case "rod":
+    case "red":
+      return "red";
+    case "gron":
+    case "green":
+      return "green";
+    case "gul":
+    case "yellow":
+      return "yellow";
+    case "gra":
+    case "gray":
+    case "grey":
+      return "gray";
+    case "lilla":
+    case "purple":
+    case "violet":
+      return "purple";
+    case "orange":
+      return "orange";
+    default:
+      return ascii;
+  }
 }
 
-function tokenizeColorLabel(value: string | null | undefined): string[] {
-  if (!value) return [];
-  return value
-    .split(/[^A-Za-z0-9]+/)
-    .map(normalizeToken)
-    .filter(Boolean);
-}
-
-function canonicalColorTokens(value: string | null | undefined): string[] {
-  const tokens = tokenizeColorLabel(value).map((token) => COLOR_ALIAS_MAP[token] ?? token);
-  return [...new Set(tokens)];
-}
-
-function uniqueNormalizedLabels(values: Array<string | null | undefined>): string[] {
-  const labels = values.map(normalizeLabel).filter(Boolean);
-  return [...new Set(labels)];
-}
-
-function getVariantSearchLabels(variant: ColorVariantWithSkus): string[] {
-  const labels = [variant.name];
-  // Legacy imports sometimes stored color names in the hex field.
-  if (!toValidHex(variant.hex)) labels.push(variant.hex);
-  return uniqueNormalizedLabels(labels);
-}
-
-type RGB = { r: number; g: number; b: number };
-
-function parseHexColor(hex: string | null | undefined): RGB | null {
-  const normalized = toValidHex(hex);
-  if (!normalized) return null;
-  const clean = normalized.slice(1);
-
-  const expanded = clean.length === 3
-    ? clean.split("").map((ch) => `${ch}${ch}`).join("")
-    : clean;
-  const numeric = Number.parseInt(expanded, 16);
-  if (Number.isNaN(numeric)) return null;
-
-  return {
-    r: (numeric >> 16) & 0xff,
-    g: (numeric >> 8) & 0xff,
-    b: numeric & 0xff,
-  };
-}
-
-function colorDistanceSq(a: RGB, b: RGB): number {
-  const dr = a.r - b.r;
-  const dg = a.g - b.g;
-  const db = a.b - b.b;
-  return dr * dr + dg * dg + db * db;
+function matchesAnyColorName(variantName: string | null | undefined, candidateNames: Array<string | null | undefined>): boolean {
+  const variantToken = normalizeColorToken(variantName);
+  if (!variantToken) return false;
+  return candidateNames.some((name) => {
+    const token = normalizeColorToken(name);
+    return token !== "" && token === variantToken;
+  });
 }
 
 function resolveOptionColorFallbackImages(
   selectedColorValue: OptionValueFull | undefined,
-  colorValues: OptionValueFull[],
   colorVariants: ColorVariantWithSkus[],
   skus: SkuWithOptions[],
-  selectedSizeValueId: string | undefined,
+  selectedOptions: Record<string, string>,
+  sizeGroup: OptionGroupFull | undefined,
 ): string[] {
   if (!selectedColorValue) return [];
   const selectedColor = selectedColorValue;
 
   const variantsWithImages = colorVariants.filter((cv) => cv.images.length > 0);
   if (variantsWithImages.length === 0) return [];
+  const variantById = new Map(variantsWithImages.map((cv) => [cv.id, cv]));
 
-  const selectedColorPosition = colorValues.find((value) => value.id === selectedColor.id)?.position ?? null;
-  const selectedHex = toValidHex(selectedColor.globalColor?.hex);
-  const selectedLabels = uniqueNormalizedLabels([
-    selectedColor.label,
-    selectedColor.globalColor?.name,
-  ]);
+  const selectedColorPosition = null;
+  const selectedSizeValueId = sizeGroup ? selectedOptions[sizeGroup.id] : undefined;
+  const selectedHex = normalizeHex(selectedColorValue.globalColor?.hex);
+  const selectedLabel = selectedColorValue.label;
+  const globalColorName = selectedColorValue.globalColor?.name;
+  const candidateColorNames = [selectedLabel, globalColorName];
 
-  function rankedLinkedVariants(requireSelectedSize: boolean) {
-    const linkedVariantCounts = new Map<string, number>();
-    for (const sku of skus) {
-      if (!sku.colorVariantId) continue;
-      if (!sku.optionValues.some((ov) => ov.optionValueId === selectedColor.id)) continue;
-      if (
-        requireSelectedSize &&
-        selectedSizeValueId &&
-        !sku.optionValues.some((ov) => ov.optionValueId === selectedSizeValueId)
-      ) {
-        continue;
-      }
-      linkedVariantCounts.set(sku.colorVariantId, (linkedVariantCounts.get(sku.colorVariantId) ?? 0) + 1);
+  // Prefer SKU-linked resolution first so color switches always map to the actual selected option value.
+  // Hex/name-only matching can collapse multiple variants to the same result when swatches overlap.
+  if (selectedSizeValueId) {
+    const sizeMatchedSkus = skus.filter((sku) =>
+      !!sku.colorVariantId &&
+      sku.optionValues.some((ov) => ov.optionValueId === selectedColorValue.id) &&
+      sku.optionValues.some((ov) => ov.optionValueId === selectedSizeValueId),
+    );
+    const preferredSizeSku = sizeMatchedSkus.find((sku) => sku.stock > 0) ?? sizeMatchedSkus[0];
+    const byExactSku = preferredSizeSku?.colorVariantId
+      ? variantById.get(preferredSizeSku.colorVariantId) ?? null
+      : null;
+    if (byExactSku) return byExactSku.images;
+  }
+
+  const linkedVariantScores = new Map<string, { selectedSizeMatches: number; inStockMatches: number; totalMatches: number }>();
+  for (const sku of skus) {
+    if (!sku.colorVariantId) continue;
+    if (!variantById.has(sku.colorVariantId)) continue;
+    if (!sku.optionValues.some((ov) => ov.optionValueId === selectedColorValue.id)) continue;
+
+    const entry = linkedVariantScores.get(sku.colorVariantId) ?? {
+      selectedSizeMatches: 0,
+      inStockMatches: 0,
+      totalMatches: 0,
+    };
+    entry.totalMatches += 1;
+    if (sku.stock > 0) entry.inStockMatches += 1;
+    if (selectedSizeValueId && sku.optionValues.some((ov) => ov.optionValueId === selectedSizeValueId)) {
+      entry.selectedSizeMatches += 1;
     }
-    return [...linkedVariantCounts.entries()]
-      .map(([variantId, count]) => ({
-        count,
-        variant: variantsWithImages.find((cv) => cv.id === variantId) ?? null,
+    linkedVariantScores.set(sku.colorVariantId, entry);
+  }
+  if (linkedVariantScores.size > 0) {
+    const ranked = [...linkedVariantScores.entries()]
+      .map(([variantId, score]) => ({
+        score,
+        variant: variantById.get(variantId) ?? null,
       }))
-      .filter((entry): entry is { count: number; variant: ColorVariantWithSkus } => entry.variant !== null)
-      .sort((a, b) => {
-        if (b.count !== a.count) return b.count - a.count;
-        return a.variant.position - b.variant.position;
-      });
-  }
+      .filter((entry): entry is { score: { selectedSizeMatches: number; inStockMatches: number; totalMatches: number }; variant: ColorVariantWithSkus } => entry.variant !== null)
+      .sort((a, b) => (
+        b.score.selectedSizeMatches - a.score.selectedSizeMatches ||
+        b.score.inStockMatches - a.score.inStockMatches ||
+        b.score.totalMatches - a.score.totalMatches
+      ));
 
-  function resolveFromRankedVariants(ranked: Array<{ count: number; variant: ColorVariantWithSkus }>): string[] | null {
-    if (ranked.length === 0) return null;
+    if (ranked.length > 0) {
+      const best = ranked[0];
+      const topTied = ranked.filter((entry) =>
+        entry.score.selectedSizeMatches === best.score.selectedSizeMatches &&
+        entry.score.inStockMatches === best.score.inStockMatches &&
+        entry.score.totalMatches === best.score.totalMatches,
+      );
 
-    const bestCount = ranked[0].count;
-    const topRanked = ranked.filter((entry) => entry.count === bestCount);
-    if (topRanked.length === 1) return topRanked[0].variant.images;
+      if (topTied.length === 1) return best.variant.images;
 
-    if (selectedColorPosition !== null) {
-      const rankedByPosition = [...topRanked]
-        .map((entry) => ({
-          entry,
-          distance: Math.abs(entry.variant.position - selectedColorPosition),
-        }))
-        .sort((a, b) => a.distance - b.distance);
-      const best = rankedByPosition[0];
-      const runnerUp = rankedByPosition[1];
-      if (!runnerUp || best.distance !== runnerUp.distance) {
-        return best.entry.variant.images;
-      }
-    }
+      const tiedByName = topTied.find((entry) => matchesAnyColorName(entry.variant.name, candidateColorNames));
+      if (tiedByName) return tiedByName.variant.images;
 
-    return null;
-  }
-
-  const bySelectedSizeSkuLink = selectedSizeValueId
-    ? resolveFromRankedVariants(rankedLinkedVariants(true))
-    : null;
-  if (bySelectedSizeSkuLink) return bySelectedSizeSkuLink;
-
-  if (selectedHex) {
-    const byHex = variantsWithImages.filter((cv) => toValidHex(cv.hex) === selectedHex);
-    if (byHex.length === 1) return byHex[0].images;
-  }
-
-  if (selectedLabels.length > 0) {
-    const byName = variantsWithImages.filter((cv) => {
-      const variantLabels = getVariantSearchLabels(cv);
-      return selectedLabels.some((label) => variantLabels.includes(label));
-    });
-    if (byName.length === 1) return byName[0].images;
-  }
-
-  const bySkuLink = resolveFromRankedVariants(rankedLinkedVariants(false));
-  if (bySkuLink) return bySkuLink;
-
-  const selectedCanonicalTokens = [
-    ...new Set(selectedLabels.flatMap((label) => canonicalColorTokens(label))),
-  ];
-  if (selectedCanonicalTokens.length > 0) {
-    const rankedByCanonicalName = variantsWithImages
-      .map((cv) => {
-        const variantTokens = new Set(getVariantSearchLabels(cv).flatMap((label) => canonicalColorTokens(label)));
-        const overlapScore = selectedCanonicalTokens.reduce(
-          (score, token) => (variantTokens.has(token) ? score + 1 : score),
-          0,
-        );
-        return { overlapScore, variant: cv };
-      })
-      .filter((entry) => entry.overlapScore > 0)
-      .sort((a, b) => b.overlapScore - a.overlapScore);
-
-    if (rankedByCanonicalName.length > 0) {
-      const hasTie =
-        rankedByCanonicalName.length > 1 &&
-        rankedByCanonicalName[0].overlapScore === rankedByCanonicalName[1].overlapScore;
-      if (!hasTie) return rankedByCanonicalName[0].variant.images;
+      // Deterministic fallback when multiple variants remain tied after SKU scoring.
+      return topTied[0].variant.images;
     }
   }
 
-  const selectedRgb = parseHexColor(selectedColor.globalColor?.hex);
-  if (selectedRgb) {
-    const rankedByHexDistance = variantsWithImages
-      .map((cv) => {
-        const variantRgb = parseHexColor(cv.hex);
-        return variantRgb
-          ? { distanceSq: colorDistanceSq(selectedRgb, variantRgb), variant: cv }
-          : null;
-      })
-      .filter((entry): entry is { distanceSq: number; variant: ColorVariantWithSkus } => entry !== null)
-      .sort((a, b) => a.distanceSq - b.distanceSq);
+  const nameMatches = variantsWithImages.filter((cv) => matchesAnyColorName(cv.name, candidateColorNames));
+  if (nameMatches.length === 1) return nameMatches[0].images;
 
-    if (rankedByHexDistance.length > 0) {
-      const closest = rankedByHexDistance[0];
-      const runnerUp = rankedByHexDistance[1];
-      const maxDistanceSq = 85 * 85;
-      const minLeadSq = 12 * 12;
-      const clearlyBest = !runnerUp || (runnerUp.distanceSq - closest.distanceSq) >= minLeadSq;
+  const hexMatches = selectedHex
+    ? variantsWithImages.filter((cv) => normalizeHex(cv.hex) === selectedHex)
+    : [];
+  if (hexMatches.length === 1) return hexMatches[0].images;
 
-      if (closest.distanceSq <= maxDistanceSq && clearlyBest) {
-        return closest.variant.images;
-      }
-    }
-  }
+  // Deterministic fallback when metadata matching is ambiguous.
+  if (nameMatches.length > 0) return nameMatches[0].images;
+  if (hexMatches.length > 0) return hexMatches[0].images;
 
   if (selectedColorPosition !== null) {
     const rankedByPositionDistance = variantsWithImages
@@ -384,30 +315,6 @@ function resolveOptionColorFallbackImages(
   return [];
 }
 
-function resolveOptionColorProductImageFallback(
-  selectedColorValue: OptionValueFull | undefined,
-  colorValues: OptionValueFull[],
-  productImages: string[],
-): string[] {
-  if (!selectedColorValue || productImages.length === 0 || colorValues.length === 0) return [];
-
-  const selectedIdx = colorValues.findIndex((value) => value.id === selectedColorValue.id);
-  if (selectedIdx < 0) return [];
-
-  // One image per color, ordered by color position.
-  if (productImages.length === colorValues.length) {
-    return productImages[selectedIdx] ? [productImages[selectedIdx]] : [];
-  }
-
-  // N images per color (e.g. front/back), grouped in color order.
-  if (productImages.length % colorValues.length === 0) {
-    const imagesPerColor = productImages.length / colorValues.length;
-    const start = selectedIdx * imagesPerColor;
-    return productImages.slice(start, start + imagesPerColor).filter(Boolean);
-  }
-
-  return [];
-}
 
 function initialStep(product: ProductFull): StepState {
   const selectedOptions: Record<string, string> = {};
@@ -594,24 +501,15 @@ function ItemStep({
     product.designerZones,
     selectedColorValue?.designerZonePlacements
   );
-  const explicitOptionColorImages = selectedColorValue?.images ?? [];
-  const legacyVariantColorImages = resolveOptionColorFallbackImages(
-    selectedColorValue,
-    colorGroup?.values ?? [],
-    product.colorVariants,
-    product.skus,
-    selectedSizeValueId,
-  );
-  const positionalProductColorImages = resolveOptionColorProductImageFallback(
-    selectedColorValue,
-    colorGroup?.values ?? [],
-    product.images,
-  );
-  const optionColorImages = explicitOptionColorImages.length > 0
-    ? explicitOptionColorImages
-    : legacyVariantColorImages.length > 0
-      ? legacyVariantColorImages
-      : positionalProductColorImages;
+  const optionColorImages = (selectedColorValue?.images ?? []).length > 0
+    ? selectedColorValue!.images
+    : resolveOptionColorFallbackImages(
+      selectedColorValue,
+      product.colorVariants,
+      product.skus,
+      stepState.selectedOptions,
+      sizeGroup,
+    );
   const activeImages = hasOptionGroups
     ? optionColorImages.length > 0
       ? optionColorImages
@@ -667,8 +565,7 @@ function ItemStep({
       : product.images;
 
   const displayImages = hasOptionGroups ? activeImages : legacyImages;
-  const selectedColorHex = toValidHex(selectedColorValue?.globalColor?.hex);
-  const showColorChip = hasOptionGroups && !!selectedColorValue && optionColorImages.length === 0;
+
 
   const legacySkus =
     product.colorVariants.length > 0
@@ -724,31 +621,25 @@ function ItemStep({
                       type="button"
                       onClick={() =>
                         withTextConfirm(() => {
-                          const nextSelectedOptions = {
-                            ...stepState.selectedOptions,
-                            [colorGroup.id]: v.id,
-                          };
+                          if (stepState.selectedOptions[colorGroup.id] === v.id) return;
+                          const nextSelectedOptions = { ...stepState.selectedOptions, [colorGroup.id]: v.id };
                           if (sizeGroup) {
-                            const currentSizeId = stepState.selectedOptions[sizeGroup.id];
-                            const currentSizeValue = sizeGroup.values.find((sv) => sv.id === currentSizeId);
-                            const currentSizeStillAvailable = currentSizeValue
+                            const selectedSizeValue = sizeGroup.values.find(
+                              (sizeValue) => sizeValue.id === nextSelectedOptions[sizeGroup.id],
+                            );
+                            const selectedSizeIsAvailable = selectedSizeValue
                               ? isSizeAvailableForOptions(
                                 product.skus,
-                                currentSizeValue,
+                                selectedSizeValue,
                                 colorGroup,
                                 nextSelectedOptions,
                               )
                               : false;
-                            if (!currentSizeStillAvailable) {
-                              const firstAvailableSize = sizeGroup.values.find((sv) =>
-                                isSizeAvailableForOptions(
-                                  product.skus,
-                                  sv,
-                                  colorGroup,
-                                  nextSelectedOptions,
-                                )
+                            if (!selectedSizeIsAvailable) {
+                              const nextAvailableSize = sizeGroup.values.find((sizeValue) =>
+                                isSizeAvailableForOptions(product.skus, sizeValue, colorGroup, nextSelectedOptions),
                               );
-                              if (firstAvailableSize) nextSelectedOptions[sizeGroup.id] = firstAvailableSize.id;
+                              if (nextAvailableSize) nextSelectedOptions[sizeGroup.id] = nextAvailableSize.id;
                               else delete nextSelectedOptions[sizeGroup.id];
                             }
                           }
@@ -1009,13 +900,13 @@ function ItemStep({
                 alt={product.name}
                 className="w-full aspect-square object-cover rounded-2xl"
               />
-              {showColorChip && (
-                <div className="absolute left-3 top-3 inline-flex items-center gap-2 rounded-full bg-black/70 px-2.5 py-1 text-xs font-semibold text-white">
+              {hasOptionGroups && colorGroup && selectedColorValue && optionColorImages.length === 0 && (
+                <div className="absolute top-2 right-2 flex items-center gap-1.5 bg-white/90 backdrop-blur-sm px-2.5 py-1.5 rounded-lg shadow-sm text-xs font-semibold text-gray-800">
                   <span
-                    className="inline-block h-3 w-3 rounded-full border border-white/70"
-                    style={{ background: selectedColorHex ?? "#9ca3af" }}
+                    className="w-3.5 h-3.5 rounded-full border border-gray-300 shrink-0"
+                    style={{ background: selectedColorValue.globalColor?.hex ?? "#ccc" }}
                   />
-                  <span>{selectedColorValue?.label}</span>
+                  {selectedColorValue.label}
                 </div>
               )}
             </div>
@@ -1227,7 +1118,70 @@ export function PakketilbudWizard({
   const isSummary = currentStep === totalSteps;
 
   function updateStep(idx: number, patch: Partial<StepState>) {
-    setStepStates((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
+    setStepStates((prev) => {
+      const updated = prev.map((s, i) => (i === idx ? { ...s, ...patch } : s));
+
+      if (!patch.selectedOptions) return updated;
+
+      const thisProduct = pakketilbud.items[idx].product;
+      const thisColorGroup = thisProduct.optionGroups.find((g) => g.type === "COLOR");
+      if (!thisColorGroup) return updated;
+
+      const newColorValueId = patch.selectedOptions[thisColorGroup.id];
+      const oldColorValueId = prev[idx].selectedOptions[thisColorGroup.id];
+      if (!newColorValueId || newColorValueId === oldColorValueId) return updated;
+
+      const selectedValue = thisColorGroup.values.find((v) => v.id === newColorValueId);
+      if (!selectedValue) return updated;
+
+      const selectedToken = normalizeColorToken(selectedValue.label);
+      const selectedGlobalColorId = (selectedValue as { globalColorId?: string | null }).globalColorId ?? null;
+      const selectedHex = normalizeHex(selectedValue.globalColor?.hex);
+
+      return updated.map((s, i) => {
+        if (i === idx) return s;
+
+        const otherProduct = pakketilbud.items[i].product;
+        const otherColorGroup = otherProduct.optionGroups.find((g) => g.type === "COLOR");
+        if (!otherColorGroup) return s;
+
+        const matchingValue = otherColorGroup.values.find((v) => {
+          const vWithGlobal = v as typeof v & { globalColorId?: string | null };
+          if (selectedGlobalColorId && vWithGlobal.globalColorId === selectedGlobalColorId) return true;
+          if (selectedHex && normalizeHex(v.globalColor?.hex) === selectedHex) return true;
+          if (selectedToken) {
+            const vToken = normalizeColorToken(v.label);
+            if (vToken && vToken === selectedToken) return true;
+            const gToken = normalizeColorToken(v.globalColor?.name);
+            if (gToken && gToken === selectedToken) return true;
+          }
+          return false;
+        });
+
+        if (!matchingValue) return s;
+        if (s.selectedOptions[otherColorGroup.id] === matchingValue.id) return s;
+
+        const nextSelectedOptions = { ...s.selectedOptions, [otherColorGroup.id]: matchingValue.id };
+        const otherSizeGroup = otherProduct.optionGroups.find((g) => g.type === "SIZE");
+        if (otherSizeGroup) {
+          const currentSize = otherSizeGroup.values.find(
+            (sv) => sv.id === nextSelectedOptions[otherSizeGroup.id],
+          );
+          const sizeStillAvailable = currentSize
+            ? isSizeAvailableForOptions(otherProduct.skus, currentSize, otherColorGroup, nextSelectedOptions)
+            : false;
+          if (!sizeStillAvailable) {
+            const nextSize = otherSizeGroup.values.find((sv) =>
+              isSizeAvailableForOptions(otherProduct.skus, sv, otherColorGroup, nextSelectedOptions),
+            );
+            if (nextSize) nextSelectedOptions[otherSizeGroup.id] = nextSize.id;
+            else delete nextSelectedOptions[otherSizeGroup.id];
+          }
+        }
+
+        return { ...s, selectedOptions: nextSelectedOptions };
+      });
+    });
   }
 
   const currentComplete = isSummary

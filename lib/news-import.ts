@@ -98,7 +98,7 @@ export async function fetchNewsListing(
       }
       seen.add(slug);
 
-      const card = $(el).closest('[class*="newsListItem"], article, .news-item, li').first();
+      const card = $(el).closest('[class*="newsFolder_itemWrap"], [class*="newsListItem"], article, .news-item, li').first();
       const cardText = (card.length ? card : $(el).parent()).text();
       const rawDate = cardText.match(/(\d{2})-(\d{2})-(\d{4})/);
       const date = rawDate
