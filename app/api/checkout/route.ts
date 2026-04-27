@@ -176,7 +176,10 @@ export async function POST(req: NextRequest) {
 
   // Read settings
   const cfg = await prisma.siteSetting
-    .findMany({ where: { key: { in: ["shipping_flat_ore", "shipping_free_ore", "member_discount_pct", "vat_rate"] } } })
+    .findMany({
+      where: { key: { in: ["shipping_flat_ore", "shipping_free_ore", "member_discount_pct", "vat_rate"] } },
+      select: { key: true, value: true },
+    })
     .catch(() => []);
   const flatOre = parseInt(cfg.find((s) => s.key === "shipping_flat_ore")?.value ?? "4900");
   const freeOre = parseInt(cfg.find((s) => s.key === "shipping_free_ore")?.value ?? "49900");
@@ -186,7 +189,10 @@ export async function POST(req: NextRequest) {
   // Member check
   let isMember = false;
   if (session?.user?.id) {
-    const sub = await prisma.subscription.findUnique({ where: { userId: session.user.id } });
+    const sub = await prisma.subscription.findUnique({
+      where: { userId: session.user.id },
+      select: { status: true },
+    });
     isMember = sub?.status === "ACTIVE";
   }
 

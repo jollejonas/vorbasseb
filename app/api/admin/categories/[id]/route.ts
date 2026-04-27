@@ -20,13 +20,17 @@ function toSlugBase(name: string): string {
 }
 
 async function uniqueSlug(base: string, excludeId?: string): Promise<string> {
-  let slug = base;
+  const existing = await prisma.category.findMany({
+    where: { slug: { startsWith: base } },
+    select: { slug: true, id: true },
+  });
+  const taken = new Set(
+    existing.filter((r) => r.id !== excludeId).map((r) => r.slug)
+  );
+  if (!taken.has(base)) return base;
   let i = 2;
-  for (;;) {
-    const existing = await prisma.category.findUnique({ where: { slug } });
-    if (!existing || existing.id === excludeId) return slug;
-    slug = `${base}-${i++}`;
-  }
+  while (taken.has(`${base}-${i}`)) i++;
+  return `${base}-${i}`;
 }
 
 type Params = { params: Promise<{ id: string }> };
