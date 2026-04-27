@@ -10,10 +10,13 @@ type StripePromoCode = {
   times_redeemed: number;
   max_redemptions: number | null;
   expires_at: number | null;
-  coupon: {
-    percent_off: number | null;
-    amount_off: number | null;
-    currency: string | null;
+  promotion: {
+    type: "coupon";
+    coupon: {
+      percent_off: number | null;
+      amount_off: number | null;
+      currency: string | null;
+    } | string | null;
   };
 };
 
@@ -52,7 +55,8 @@ export function PromoCodeList() {
     }
   }
 
-  function formatDiscount(coupon: StripePromoCode["coupon"]) {
+  function formatDiscount(coupon: StripePromoCode["promotion"]["coupon"]) {
+    if (!coupon || typeof coupon === "string") return "–";
     if (coupon.percent_off) return `${coupon.percent_off}%`;
     if (coupon.amount_off)
       return `${(coupon.amount_off / 100).toFixed(2).replace(".", ",")} kr`;
@@ -84,7 +88,7 @@ export function PromoCodeList() {
               {codes.map((c) => (
                 <tr key={c.id}>
                   <td className="py-2.5 pr-4 font-mono font-medium">{c.code}</td>
-                  <td className="py-2.5 pr-4">{formatDiscount(c.coupon)}</td>
+                  <td className="py-2.5 pr-4">{formatDiscount(c.promotion?.coupon)}</td>
                   <td className="py-2.5 pr-4 text-gray-500">
                     {c.times_redeemed}
                     {c.max_redemptions ? ` / ${c.max_redemptions}` : ""}

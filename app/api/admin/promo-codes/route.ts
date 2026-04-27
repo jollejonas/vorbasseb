@@ -17,7 +17,7 @@ export async function GET() {
   const promoCodes = await stripe.promotionCodes.list({
     limit: 50,
     active: true,
-    expand: ["data.coupon"],
+    expand: ["data.promotion.coupon"],
   });
 
   return NextResponse.json(promoCodes.data);
