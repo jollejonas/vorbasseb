@@ -93,6 +93,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
   }
 
   const { id } = await params;
+
+  try {
   const body = await req.json();
 
   const hasOptionGroups = Array.isArray(body.optionGroups) && body.optionGroups.length > 0;
@@ -398,6 +400,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
   });
 
   return NextResponse.json(result);
+  } catch (err) {
+    console.error("PUT /api/products/[id] error:", err);
+    const message = err instanceof Error ? err.message : "Internal server error";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
