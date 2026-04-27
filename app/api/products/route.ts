@@ -1,6 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { generateItemNumber } from "@/lib/itemNumber";
+import { normalizeDesignerZonePlacements } from "@/lib/designerZonePlacements";
+import { Prisma } from "@prisma/client";
+
+type OptionValueInput = {
+  _key: string;
+  label: string;
+  position: number;
+  globalColorId?: string | null;
+  images?: string[];
+  imageLabels?: string[];
+  price?: number | null;
+  costPrice?: number | null;
+  designerFrontImageIdx?: number | null;
+  designerBackImageIdx?: number | null;
+  designerPrintColor?: string | null;
+  designerZonePlacements?: unknown | null;
+};
+
+type OptionGroupInput = {
+  type: "COLOR" | "SIZE" | "TEXT" | "SELECT" | "CUSTOM";
+  label: string;
+  position: number;
+  required: boolean;
+  fee?: number | null;
+  costFee?: number | null;
+  inputType?: string | null;
+  values: OptionValueInput[];
+};
+
+type SkuMatrixEntry = {
+  colorValueKey?: string;
+  sizeValueKey?: string;
+  stock: number;
+  itemNumber?: string | null;
+  itemNumberOverride: boolean;
+  costPrice?: number | null;
+};
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -66,8 +104,9 @@ export async function POST(req: NextRequest) {
       skus: { size: string; stock: number; itemNumber?: string | null }[];
     };
 
+    const hasOptionGroups = Array.isArray(body.optionGroups) && body.optionGroups.length > 0;
     const cvInputs: ColorVariantInput[] = body.colorVariants ?? [];
-    const hasColorVariants = cvInputs.length > 0;
+    const hasColorVariants = !hasOptionGroups && cvInputs.length > 0;
 
     // Create product (+ global skus if no color variants and no option groups)
     const product = await prisma.product.create({
@@ -87,15 +126,90 @@ export async function POST(req: NextRequest) {
         published: body.published ?? true,
         featured: body.featured ?? false,
         images: body.images ?? [],
+        designerEnabled: body.designerEnabled ?? false,
         isGroupOrder: body.isGroupOrder ?? false,
         groupOrderDeadline: body.groupOrderDeadline ? new Date(body.groupOrderDeadline) : null,
-        skus: (!hasColorVariants && !body.optionGroups?.length) ? { create: body.skus ?? [] } : undefined,
+        skus: (!hasColorVariants && !hasOptionGroups) ? { create: body.skus ?? [] } : undefined,
       },
       include: { skus: true, category: true },
     });
 
+    // New option group system
+    if (hasOptionGroups) {
+      const groupInputs = body.optionGroups as OptionGroupInput[];
+      const skuMatrixInputs = (body.skuMatrix ?? []) as SkuMatrixEntry[];
+
+      const keyToValueId = new Map<string, string>();
+      const valueIdToColorCode = new Map<string, string | null>();
+      const valueIdToSizeLabel = new Map<string, string>();
+
+      for (let gi = 0; gi < groupInputs.length; gi++) {
+        const g = groupInputs[gi];
+        const group = await prisma.productOptionGroup.create({
+          data: { productId: product.id, type: g.type, label: g.label, position: gi, required: g.required, fee: g.fee ?? null, costFee: g.costFee ?? null, inputType: g.inputType ?? null },
+        });
+
+        for (let vi = 0; vi < g.values.length; vi++) {
+          const v = g.values[vi];
+          const created = await prisma.productOptionValue.create({
+            data: {
+              groupId: group.id,
+              label: v.label,
+              position: vi,
+              globalColorId: v.globalColorId ?? null,
+              images: v.images ?? [],
+              imageLabels: v.imageLabels ?? [],
+              price: v.price ?? null,
+              costPrice: v.costPrice ?? null,
+              designerFrontImageIdx: v.designerFrontImageIdx ?? null,
+              designerBackImageIdx: v.designerBackImageIdx ?? null,
+              designerPrintColor: v.designerPrintColor ?? null,
+              designerZonePlacements: normalizeDesignerZonePlacements(v.designerZonePlacements) ?? Prisma.DbNull,
+            },
+          });
+          keyToValueId.set(v._key, created.id);
+
+          if (g.type === "COLOR") {
+            if (v.globalColorId) {
+              const gc = await prisma.globalColor.findUnique({ where: { id: v.globalColorId }, select: { code: true } });
+              valueIdToColorCode.set(created.id, gc?.code ?? null);
+            } else {
+              valueIdToColorCode.set(created.id, null);
+            }
+          }
+          if (g.type === "SIZE") {
+            valueIdToSizeLabel.set(created.id, v.label);
+          }
+        }
+      }
+
+      for (const entry of skuMatrixInputs) {
+        const colorValueId = entry.colorValueKey ? (keyToValueId.get(entry.colorValueKey) ?? entry.colorValueKey) : null;
+        const sizeValueId = entry.sizeValueKey ? (keyToValueId.get(entry.sizeValueKey) ?? entry.sizeValueKey) : null;
+        const sizeLabel = sizeValueId ? (valueIdToSizeLabel.get(sizeValueId) ?? "") : "";
+
+        let itemNumber = entry.itemNumber ?? null;
+        if (!entry.itemNumberOverride) {
+          const colorCode = colorValueId ? (valueIdToColorCode.get(colorValueId) ?? null) : null;
+          itemNumber = generateItemNumber(body.modelNumber, colorCode, sizeLabel);
+        }
+
+        const sku = await prisma.sKU.create({
+          data: { productId: product.id, size: sizeLabel, stock: entry.stock, itemNumber, itemNumberOverride: entry.itemNumberOverride, costPrice: entry.costPrice ?? null },
+        });
+
+        const valueLinks = [
+          colorValueId ? { skuId: sku.id, optionValueId: colorValueId } : null,
+          sizeValueId ? { skuId: sku.id, optionValueId: sizeValueId } : null,
+        ].filter(Boolean) as { skuId: string; optionValueId: string }[];
+
+        if (valueLinks.length > 0) {
+          await prisma.sKUOptionValue.createMany({ data: valueLinks });
+        }
+      }
+
     // Legacy color variants path
-    if (hasColorVariants) {
+    } else if (hasColorVariants) {
       for (let i = 0; i < cvInputs.length; i++) {
         const cv = cvInputs[i];
         const created = await prisma.colorVariant.create({
