@@ -58,73 +58,79 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const body = await req.json();
+  try {
+    const body = await req.json();
 
-  type ColorVariantInput = {
-    name: string; hex: string; images: string[]; position?: number;
-    skus: { size: string; stock: number; itemNumber?: string | null }[];
-  };
+    type ColorVariantInput = {
+      name: string; hex: string; images: string[]; position?: number;
+      skus: { size: string; stock: number; itemNumber?: string | null }[];
+    };
 
-  const cvInputs: ColorVariantInput[] = body.colorVariants ?? [];
-  const hasColorVariants = cvInputs.length > 0;
+    const cvInputs: ColorVariantInput[] = body.colorVariants ?? [];
+    const hasColorVariants = cvInputs.length > 0;
 
-  // Create product (+ global skus if no color variants and no option groups)
-  const product = await prisma.product.create({
-    data: {
-      name: body.name,
-      slug: body.slug,
-      description: body.description,
-      categoryId: body.categoryId ?? null,
-      price: body.price,
-      salePrice: body.salePrice ?? null,
-      salePriceStart: body.salePriceStart ? new Date(body.salePriceStart) : null,
-      salePriceEnd: body.salePriceEnd ? new Date(body.salePriceEnd) : null,
-      modelNumber: body.modelNumber ?? null,
-      membersOnly: body.membersOnly ?? false,
-      membersEarlyAccess: body.membersEarlyAccess ?? false,
-      clubRoleRequired: body.clubRoleRequired ?? null,
-      published: body.published ?? true,
-      featured: body.featured ?? false,
-      images: body.images ?? [],
-      isGroupOrder: body.isGroupOrder ?? false,
-      groupOrderDeadline: body.groupOrderDeadline ? new Date(body.groupOrderDeadline) : null,
-      skus: (!hasColorVariants && !body.optionGroups?.length) ? { create: body.skus ?? [] } : undefined,
-    },
-    include: { skus: true, category: true },
-  });
+    // Create product (+ global skus if no color variants and no option groups)
+    const product = await prisma.product.create({
+      data: {
+        name: body.name,
+        slug: body.slug,
+        description: body.description,
+        categoryId: body.categoryId ?? null,
+        price: body.price,
+        salePrice: body.salePrice ?? null,
+        salePriceStart: body.salePriceStart ? new Date(body.salePriceStart) : null,
+        salePriceEnd: body.salePriceEnd ? new Date(body.salePriceEnd) : null,
+        modelNumber: body.modelNumber ?? null,
+        membersOnly: body.membersOnly ?? false,
+        membersEarlyAccess: body.membersEarlyAccess ?? false,
+        clubRoleRequired: body.clubRoleRequired ?? null,
+        published: body.published ?? true,
+        featured: body.featured ?? false,
+        images: body.images ?? [],
+        isGroupOrder: body.isGroupOrder ?? false,
+        groupOrderDeadline: body.groupOrderDeadline ? new Date(body.groupOrderDeadline) : null,
+        skus: (!hasColorVariants && !body.optionGroups?.length) ? { create: body.skus ?? [] } : undefined,
+      },
+      include: { skus: true, category: true },
+    });
 
-  // Legacy color variants path
-  if (hasColorVariants) {
-    for (let i = 0; i < cvInputs.length; i++) {
-      const cv = cvInputs[i];
-      const created = await prisma.colorVariant.create({
-        data: { productId: product.id, name: cv.name, hex: cv.hex, images: cv.images ?? [], position: cv.position ?? i },
-      });
-      if (cv.skus?.length) {
-        await prisma.sKU.createMany({
-          data: cv.skus.map((s) => ({
-            productId: product.id,
-            colorVariantId: created.id,
-            size: s.size,
-            stock: s.stock,
-            itemNumber: s.itemNumber ?? null,
-          })),
+    // Legacy color variants path
+    if (hasColorVariants) {
+      for (let i = 0; i < cvInputs.length; i++) {
+        const cv = cvInputs[i];
+        const created = await prisma.colorVariant.create({
+          data: { productId: product.id, name: cv.name, hex: cv.hex, images: cv.images ?? [], position: cv.position ?? i },
         });
+        if (cv.skus?.length) {
+          await prisma.sKU.createMany({
+            data: cv.skus.map((s) => ({
+              productId: product.id,
+              colorVariantId: created.id,
+              size: s.size,
+              stock: s.stock,
+              itemNumber: s.itemNumber ?? null,
+            })),
+          });
+        }
       }
     }
-  }
 
-  const result = await prisma.product.findUnique({
-    where: { id: product.id },
-    include: {
-      skus: { include: { optionValues: { include: { optionValue: true } } } },
-      category: true,
-      colorVariants: { include: { skus: true }, orderBy: { position: "asc" } },
-      optionGroups: {
-        include: { values: { include: { globalColor: true }, orderBy: { position: "asc" } } },
-        orderBy: { position: "asc" },
+    const result = await prisma.product.findUnique({
+      where: { id: product.id },
+      include: {
+        skus: { include: { optionValues: { include: { optionValue: true } } } },
+        category: true,
+        colorVariants: { include: { skus: true }, orderBy: { position: "asc" } },
+        optionGroups: {
+          include: { values: { include: { globalColor: true }, orderBy: { position: "asc" } } },
+          orderBy: { position: "asc" },
+        },
       },
-    },
-  });
-  return NextResponse.json(result, { status: 201 });
+    });
+    return NextResponse.json(result, { status: 201 });
+  } catch (err) {
+    console.error("POST /api/products error:", err);
+    const message = err instanceof Error ? err.message : "Internal server error";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
