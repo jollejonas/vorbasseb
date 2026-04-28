@@ -9,7 +9,7 @@ import { PakketilbudCard } from "@/components/shop/PakketilbudCard";
 import type { Prisma } from "@prisma/client";
 import { X } from "lucide-react";
 
-export const revalidate = 300; // 5-minute ISR cache per unique URL
+export const revalidate = 1800; // 30-minute ISR cache per unique URL
 
 export const metadata: Metadata = { title: "Butik" };
 

@@ -5,7 +5,7 @@ import { ArrowRight } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { NewsCard } from "@/components/shop/NewsCard";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 export const metadata: Metadata = { title: "Nyheder" };
 
 const PAGE_SIZE = 12;

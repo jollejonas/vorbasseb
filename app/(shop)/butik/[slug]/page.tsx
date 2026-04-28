@@ -9,6 +9,8 @@ import { ProductOptionsSection } from "@/components/shop/ProductOptionsSection";
 import { SimpleAddToCart } from "@/components/shop/SimpleAddToCart";
 import { JerseyDesignerSection } from "@/components/shop/JerseyDesignerSection";
 
+export const revalidate = 300;
+
 type Props = { params: Promise<{ slug: string }> };
 
 const getProduct = cache((slug: string) =>
