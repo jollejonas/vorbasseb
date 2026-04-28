@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { slugify } from "@/lib/utils";
 import type { Product, SKU, Category, ClubRole, ColorVariant, ProductOptionGroup, ProductOptionValue, GlobalColor, OptionGroupTemplate, OptionGroupTemplateValue, DesignerZone, DesignerLogo } from "@prisma/client";
-import { X } from "lucide-react";
+import { X, ChevronDown } from "lucide-react";
 import { TipTapEditor } from "@/components/admin/TipTapEditor";
 import {
   normalizeDesignerZonePlacements,
@@ -827,7 +827,7 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
     <form onSubmit={handleSubmit} className="space-y-8 max-w-3xl">
 
       {/* ── Basic info ─────────────────────────────────────────────────────── */}
-      <section className="space-y-4">
+      <CollapsibleSection title="Grundinfo" defaultOpen={true}>
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -939,11 +939,10 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
           />
         </div>
 
-      </section>
+      </CollapsibleSection>
 
       {/* ── Flags ──────────────────────────────────────────────────────────── */}
-      <section>
-        <p className="text-sm font-medium text-gray-700 mb-3">Indstillinger</p>
+      <CollapsibleSection title="Indstillinger" defaultOpen={false}>
         <div className="flex flex-wrap gap-6">
           {([
             { label: "Udgivet", checked: published, set: setPublished },
@@ -957,12 +956,11 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
             </label>
           ))}
         </div>
-      </section>
+      </CollapsibleSection>
 
       {/* ── Samlebestilling ─────────────────────────────────────────────────── */}
-      <section>
-        <p className="text-sm font-medium text-gray-700 mb-3">Samlebestilling</p>
-        <label className="flex items-center gap-2 cursor-pointer select-none mb-3">
+      <CollapsibleSection title="Samlebestilling" defaultOpen={false}>
+        <label className="flex items-center gap-2 cursor-pointer select-none">
           <input
             type="checkbox"
             checked={isGroupOrder}
@@ -983,11 +981,10 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
             <p className="text-xs text-gray-400 mt-1">Ordrer frigives til behandling efter denne dato.</p>
           </div>
         )}
-      </section>
+      </CollapsibleSection>
 
       {/* ── Main images ─────────────────────────────────────────────────────── */}
-      <section>
-        <p className="text-sm font-medium text-gray-700 mb-2">Billeder</p>
+      <CollapsibleSection title="Billeder" defaultOpen={true}>
         <div className="flex flex-wrap gap-3 mb-2">
           {images.map((url, i) => (
             <div key={i} className="relative w-20 h-20 rounded-lg overflow-hidden border">
@@ -1006,16 +1003,10 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
           </button>
         </div>
         <p className="text-xs text-gray-400">Første billede bruges som thumbnail. Max 5 MB.</p>
-      </section>
+      </CollapsibleSection>
 
       {/* ── Tilvalg (Option groups) ─────────────────────────────────────────── */}
-      <section>
-        <div className="mb-4">
-          <p className="text-sm font-medium text-gray-700">Tilvalg &amp; lager</p>
-          <p className="text-xs text-gray-400 mt-0.5">
-            Brug tilvalgsgrupper til farver, størrelser og tilpasningsmuligheder
-          </p>
-        </div>
+      <CollapsibleSection title="Tilvalg & lager" defaultOpen={true}>
 
         {/* Migration notice for legacy products */}
         {hasLegacyColors && !migratedToOptions && (
@@ -1072,8 +1063,6 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
                 onRemoveValue={(vKey) => removeOptionValue(g._key, vKey, g.type)}
                 onUpdateValue={(vKey, patch) => updateOptionValue(g._key, vKey, patch)}
                 onUpload={(vKey) => openCloudinaryWidget({ type: "colorValue", key: vKey })}
-                designerEnabled={designerEnabled}
-                designerZones={designerZones}
                 gi={gi}
               />
             ))}
@@ -1256,23 +1245,25 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
             onUploadMain={() => openCloudinaryWidget("main")}
           />
         )}
-      </section>
+      </CollapsibleSection>
 
       {/* ── Tryk-designer ────────────────────────────────────────────────────── */}
-      <section className="space-y-4 border rounded-xl p-5">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-gray-700">Tryk-designer</h2>
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
+      <CollapsibleSection
+        title="Tryk-designer"
+        defaultOpen={designerEnabled}
+        forceOpen={designerEnabled}
+        headerExtra={
+          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
             <input
               type="checkbox"
               checked={designerEnabled}
               onChange={(e) => setDesignerEnabled(e.target.checked)}
               className="rounded"
             />
-            Aktivér tryk-designer til dette produkt
+            Aktivér
           </label>
-        </div>
-
+        }
+      >
         {!isEdit && designerEnabled && (
           <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
             Gem produktet for at konfigurere designer-zoner og billeder.
@@ -1678,7 +1669,18 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
               </button>
             </div>
         )}
-      </section>
+      </CollapsibleSection>
+
+      {/* ── Tryk per farve ──────────────────────────────────────────────────── */}
+      {isEdit && designerEnabled && colorGroup && colorGroup.values.some((v) => v.images.length > 0) && (
+        <CollapsibleSection title="Tryk per farve" defaultOpen={false}>
+          <PerColorDesignerSection
+            colorGroup={colorGroup}
+            onUpdateValue={(vKey, patch) => updateOptionValue(colorGroup._key, vKey, patch)}
+            designerZones={designerZones}
+          />
+        </CollapsibleSection>
+      )}
 
       {/* ── Actions ─────────────────────────────────────────────────────────── */}
       <div className="flex gap-3 pt-2 border-t">
@@ -1700,7 +1702,6 @@ export function ProductForm({ product, designerLogos = [] }: { product?: Product
 function OptionGroupEditor({
   group, globalColors, sizePresets,
   onUpdate, onRemove, onAddValue, onRemoveValue, onUpdateValue, onUpload,
-  designerEnabled, designerZones = [],
 }: {
   group: OptionGroupRow;
   globalColors: GlobalColor[];
@@ -1714,11 +1715,8 @@ function OptionGroupEditor({
   onRemoveValue: (key: string) => void;
   onUpdateValue: (key: string, patch: Partial<OptionValueRow>) => void;
   onUpload: (key: string) => void;
-  designerEnabled?: boolean;
-  designerZones?: DesignerZoneRow[];
   gi?: number;
 }) {
-  const [dragEditorSide, setDragEditorSide] = useState<Record<string, "front" | "back">>({});
   const typeLabels: Record<OptionType, string> = {
     COLOR: "Farve", SIZE: "Størrelse", TEXT: "Tryk/navn", SELECT: "Valgliste", CUSTOM: "Tilpasset"
   };
@@ -1844,100 +1842,6 @@ function OptionGroupEditor({
                     </div>
                     <button type="button" onClick={() => onRemoveValue(v._key)} className="text-xs text-red-400 hover:text-red-600">Fjern</button>
                   </div>
-                  {/* Designer per-color settings — only shown when designer is enabled and value has images */}
-                  {designerEnabled && v.images.length > 0 && (
-                    <div className="space-y-2 pt-1 border-t border-dashed border-gray-200">
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        <div>
-                          <label className="block text-[10px] font-medium text-gray-400 mb-1">Designer forside</label>
-                          <select
-                            value={v.designerFrontImageIdx ?? ""}
-                            onChange={(e) => onUpdateValue(v._key, { designerFrontImageIdx: e.target.value === "" ? null : Number(e.target.value) })}
-                            className="w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-secondary"
-                          >
-                            <option value="">— Ikke konfigureret —</option>
-                            {v.images.map((_, i) => (
-                              <option key={i} value={i}>{v.imageLabels?.[i] || `Billede ${i + 1}`}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-medium text-gray-400 mb-1">Designer bagside</label>
-                          <select
-                            value={v.designerBackImageIdx ?? ""}
-                            onChange={(e) => onUpdateValue(v._key, { designerBackImageIdx: e.target.value === "" ? null : Number(e.target.value) })}
-                            className="w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-secondary"
-                          >
-                            <option value="">— Ingen bagside —</option>
-                            {v.images.map((_, i) => (
-                              <option key={i} value={i}>{v.imageLabels?.[i] || `Billede ${i + 1}`}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-medium text-gray-400 mb-1">Tryk-farve</label>
-                          <input
-                            type="color"
-                            value={v.designerPrintColor || "#ffffff"}
-                            onChange={(e) => onUpdateValue(v._key, { designerPrintColor: e.target.value })}
-                            className="w-full h-7 border rounded cursor-pointer p-0.5"
-                            title="Farve på trykket tekst/logo"
-                          />
-                        </div>
-                      </div>
-
-                      {designerZones.length > 0 && (() => {
-                        const frontImage = v.designerFrontImageIdx != null ? v.images[v.designerFrontImageIdx] : v.images[0];
-                        const backImage = v.designerBackImageIdx != null ? v.images[v.designerBackImageIdx] : null;
-                        const editorSide = dragEditorSide[v._key] ?? "front";
-                        const editorImage = editorSide === "back" ? (backImage ?? frontImage) : frontImage;
-                        const hasBackSide = designerZones.some(z => z.side === "back") && backImage;
-                        return (
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <p className="text-[10px] font-medium text-gray-400">Zonekalibrering</p>
-                                {hasBackSide && (
-                                  <div className="flex gap-1">
-                                    {(["front", "back"] as const).map(side => (
-                                      <button
-                                        key={side}
-                                        type="button"
-                                        onClick={() => setDragEditorSide(prev => ({ ...prev, [v._key]: side }))}
-                                        className={`px-1.5 py-0.5 text-[9px] rounded border transition ${editorSide === side ? "bg-secondary text-white border-secondary" : "border-gray-200 text-gray-500 hover:border-gray-400"}`}
-                                      >
-                                        {side === "front" ? "Forside" : "Bagside"}
-                                      </button>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                              {v.designerZonePlacements && (
-                                <button
-                                  type="button"
-                                  onClick={() => onUpdateValue(v._key, { designerZonePlacements: null })}
-                                  className="text-[10px] text-gray-500 hover:text-secondary"
-                                >
-                                  Nulstil alle
-                                </button>
-                              )}
-                            </div>
-                            {editorImage ? (
-                              <DesignerZoneDragEditor
-                                imageUrl={editorImage}
-                                zones={designerZones}
-                                placements={v.designerZonePlacements ?? null}
-                                activeSide={editorSide}
-                                onChange={(newPlacements) => onUpdateValue(v._key, { designerZonePlacements: newPlacements })}
-                              />
-                            ) : (
-                              <p className="text-[10px] text-gray-400">Vælg designer forside-billede for at aktivere zonekalibrering.</p>
-                            )}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
@@ -2024,6 +1928,159 @@ function SelectValueAdder({ onAdd }: { onAdd: (label: string) => void }) {
         className="px-3 py-1.5 text-xs border rounded-lg hover:border-secondary hover:text-secondary transition">
         + Tilføj
       </button>
+    </div>
+  );
+}
+
+// ─── CollapsibleSection ────────────────────────────────────────────────────────
+
+function CollapsibleSection({
+  title, defaultOpen = false, forceOpen, headerExtra, children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  forceOpen?: boolean;
+  headerExtra?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  useEffect(() => { if (forceOpen) setOpen(true); }, [forceOpen]);
+  return (
+    <div className="border rounded-xl overflow-hidden">
+      <div className="flex items-center px-5 py-4 bg-white">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="flex items-center gap-2 flex-1 text-left"
+        >
+          <ChevronDown
+            className={`w-4 h-4 text-gray-400 transition-transform duration-200 flex-shrink-0 ${open ? "" : "-rotate-90"}`}
+          />
+          <span className="font-semibold text-gray-700">{title}</span>
+        </button>
+        {headerExtra && <div className="ml-3">{headerExtra}</div>}
+      </div>
+      {open && <div className="px-5 pb-5 pt-2 border-t space-y-4">{children}</div>}
+    </div>
+  );
+}
+
+// ─── PerColorDesignerSection ───────────────────────────────────────────────────
+
+function PerColorDesignerSection({
+  colorGroup, onUpdateValue, designerZones,
+}: {
+  colorGroup: OptionGroupRow;
+  onUpdateValue: (vKey: string, patch: Partial<OptionValueRow>) => void;
+  designerZones: DesignerZoneRow[];
+}) {
+  const [dragEditorSide, setDragEditorSide] = useState<Record<string, "front" | "back">>({});
+  const colorValues = colorGroup.values.filter((v) => v.images.length > 0);
+  if (colorValues.length === 0) {
+    return (
+      <p className="text-xs text-gray-400 italic">
+        Tilføj billeder til farvevarianterne for at konfigurere tryk per farve.
+      </p>
+    );
+  }
+  return (
+    <div className="space-y-4">
+      {colorValues.map((v) => (
+        <div key={v._key} className="border rounded-lg px-3 py-3 space-y-2">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="w-4 h-4 rounded-full border border-gray-200 flex-shrink-0" style={{ background: v.globalColorHex ?? "#ccc" }} />
+            <span className="text-sm font-medium">{v.label}</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div>
+              <label className="block text-[10px] font-medium text-gray-400 mb-1">Designer forside</label>
+              <select
+                value={v.designerFrontImageIdx ?? ""}
+                onChange={(e) => onUpdateValue(v._key, { designerFrontImageIdx: e.target.value === "" ? null : Number(e.target.value) })}
+                className="w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-secondary"
+              >
+                <option value="">— Ikke konfigureret —</option>
+                {v.images.map((_, i) => (
+                  <option key={i} value={i}>{v.imageLabels?.[i] || `Billede ${i + 1}`}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-medium text-gray-400 mb-1">Designer bagside</label>
+              <select
+                value={v.designerBackImageIdx ?? ""}
+                onChange={(e) => onUpdateValue(v._key, { designerBackImageIdx: e.target.value === "" ? null : Number(e.target.value) })}
+                className="w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-secondary"
+              >
+                <option value="">— Ingen bagside —</option>
+                {v.images.map((_, i) => (
+                  <option key={i} value={i}>{v.imageLabels?.[i] || `Billede ${i + 1}`}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-medium text-gray-400 mb-1">Tryk-farve</label>
+              <input
+                type="color"
+                value={v.designerPrintColor || "#ffffff"}
+                onChange={(e) => onUpdateValue(v._key, { designerPrintColor: e.target.value })}
+                className="w-full h-7 border rounded cursor-pointer p-0.5"
+                title="Farve på trykket tekst/logo"
+              />
+            </div>
+          </div>
+          {designerZones.length > 0 && (() => {
+            const frontImage = v.designerFrontImageIdx != null ? v.images[v.designerFrontImageIdx] : v.images[0];
+            const backImage = v.designerBackImageIdx != null ? v.images[v.designerBackImageIdx] : null;
+            const editorSide = dragEditorSide[v._key] ?? "front";
+            const editorImage = editorSide === "back" ? (backImage ?? frontImage) : frontImage;
+            const hasBackSide = designerZones.some(z => z.side === "back") && backImage;
+            return (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <p className="text-[10px] font-medium text-gray-400">Zonekalibrering</p>
+                    {hasBackSide && (
+                      <div className="flex gap-1">
+                        {(["front", "back"] as const).map(side => (
+                          <button
+                            key={side}
+                            type="button"
+                            onClick={() => setDragEditorSide(prev => ({ ...prev, [v._key]: side }))}
+                            className={`px-1.5 py-0.5 text-[9px] rounded border transition ${editorSide === side ? "bg-secondary text-white border-secondary" : "border-gray-200 text-gray-500 hover:border-gray-400"}`}
+                          >
+                            {side === "front" ? "Forside" : "Bagside"}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {v.designerZonePlacements && (
+                    <button
+                      type="button"
+                      onClick={() => onUpdateValue(v._key, { designerZonePlacements: null })}
+                      className="text-[10px] text-gray-500 hover:text-secondary"
+                    >
+                      Nulstil alle
+                    </button>
+                  )}
+                </div>
+                {editorImage ? (
+                  <DesignerZoneDragEditor
+                    imageUrl={editorImage}
+                    zones={designerZones}
+                    placements={v.designerZonePlacements ?? null}
+                    activeSide={editorSide}
+                    onChange={(newPlacements) => onUpdateValue(v._key, { designerZonePlacements: newPlacements })}
+                  />
+                ) : (
+                  <p className="text-[10px] text-gray-400">Vælg designer forside-billede for at aktivere zonekalibrering.</p>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      ))}
     </div>
   );
 }
