@@ -120,7 +120,7 @@ export async function createPCIssue(gh: {
         goalId: GOAL_ID,
         parentId: PARENT_ID,
         originKind: "github_issue",
-        originId: String(ghIssue.number),
+        originId: String(gh.number),
       }),
     },
     true
