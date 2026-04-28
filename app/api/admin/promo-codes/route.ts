@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
   });
 
   const promoCode = await stripe.promotionCodes.create({
-    promotion: { type: "coupon", coupon: coupon.id },
+    coupon: coupon.id,
     code: String(code).toUpperCase(),
     ...(oneTimePerCustomer
       ? { restrictions: { first_time_transaction: true } }
