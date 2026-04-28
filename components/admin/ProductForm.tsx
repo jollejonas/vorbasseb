@@ -12,6 +12,7 @@ import {
   type DesignerZonePlacementMap,
 } from "@/lib/designerZonePlacements";
 import { useCloudinaryWidgetScript } from "@/lib/useCloudinaryWidgetScript";
+import { DesignerZoneDragEditor } from "@/components/admin/DesignerZoneDragEditor";
 
 // ─── Timezone helpers (Europe/Copenhagen) ────────────────────────────────────
 
@@ -1717,6 +1718,7 @@ function OptionGroupEditor({
   designerZones?: DesignerZoneRow[];
   gi?: number;
 }) {
+  const [dragEditorSide, setDragEditorSide] = useState<Record<string, "front" | "back">>({});
   const typeLabels: Record<OptionType, string> = {
     COLOR: "Farve", SIZE: "Størrelse", TEXT: "Tryk/navn", SELECT: "Valgliste", CUSTOM: "Tilpasset"
   };
@@ -1884,99 +1886,56 @@ function OptionGroupEditor({
                         </div>
                       </div>
 
-                      {designerZones.length > 0 && (
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <p className="text-[10px] font-medium text-gray-400">Zonepositioner for denne farve</p>
-                            {v.designerZonePlacements && (
-                              <button
-                                type="button"
-                                onClick={() => onUpdateValue(v._key, { designerZonePlacements: null })}
-                                className="text-[10px] text-gray-500 hover:text-secondary"
-                              >
-                                Nulstil alle
-                              </button>
-                            )}
-                          </div>
-                          <div className="space-y-1 max-h-64 overflow-auto pr-1">
-                            {designerZones.map((zone, zoneIdx) => {
-                              const placementKey = String(zoneIdx);
-                              const override = v.designerZonePlacements?.[placementKey];
-                              const currentPlacement = override ?? {
-                                previewX: zone.previewX,
-                                previewY: zone.previewY,
-                                previewW: zone.previewW,
-                                previewH: zone.previewH,
-                              };
-                              const patchPlacement = (
-                                field: "previewX" | "previewY" | "previewW" | "previewH",
-                                nextValue: number
-                              ) => {
-                                const nextMap: DesignerZonePlacementMap = {
-                                  ...(v.designerZonePlacements ?? {}),
-                                  [placementKey]: {
-                                    ...currentPlacement,
-                                    [field]: nextValue,
-                                  },
-                                };
-                                onUpdateValue(v._key, {
-                                  designerZonePlacements: normalizeDesignerZonePlacements(nextMap),
-                                });
-                              };
-
-                              return (
-                                <div key={`${v._key}-zone-${zoneIdx}`} className="border rounded p-2 bg-gray-50/70 space-y-1.5">
-                                  <div className="flex items-center justify-between">
-                                    <p className="text-[10px] text-gray-600 font-medium">
-                                      {zone.label || `Zone ${zoneIdx + 1}`} ({zone.side === "front" ? "Forside" : "Bagside"})
-                                    </p>
-                                    {override && (
+                      {designerZones.length > 0 && (() => {
+                        const frontImage = v.designerFrontImageIdx != null ? v.images[v.designerFrontImageIdx] : v.images[0];
+                        const backImage = v.designerBackImageIdx != null ? v.images[v.designerBackImageIdx] : null;
+                        const editorSide = dragEditorSide[v._key] ?? "front";
+                        const editorImage = editorSide === "back" ? (backImage ?? frontImage) : frontImage;
+                        const hasBackSide = designerZones.some(z => z.side === "back") && backImage;
+                        return (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <p className="text-[10px] font-medium text-gray-400">Zonekalibrering</p>
+                                {hasBackSide && (
+                                  <div className="flex gap-1">
+                                    {(["front", "back"] as const).map(side => (
                                       <button
+                                        key={side}
                                         type="button"
-                                        onClick={() => {
-                                          const nextMap = { ...(v.designerZonePlacements ?? {}) };
-                                          delete nextMap[placementKey];
-                                          onUpdateValue(v._key, {
-                                            designerZonePlacements: normalizeDesignerZonePlacements(nextMap),
-                                          });
-                                        }}
-                                        className="text-[10px] text-gray-500 hover:text-secondary"
+                                        onClick={() => setDragEditorSide(prev => ({ ...prev, [v._key]: side }))}
+                                        className={`px-1.5 py-0.5 text-[9px] rounded border transition ${editorSide === side ? "bg-secondary text-white border-secondary" : "border-gray-200 text-gray-500 hover:border-gray-400"}`}
                                       >
-                                        Nulstil
+                                        {side === "front" ? "Forside" : "Bagside"}
                                       </button>
-                                    )}
-                                  </div>
-                                  <div className="grid grid-cols-4 gap-1">
-                                    {([
-                                      { key: "previewX", label: "X", value: currentPlacement.previewX },
-                                      { key: "previewY", label: "Y", value: currentPlacement.previewY },
-                                      { key: "previewW", label: "B", value: currentPlacement.previewW },
-                                      { key: "previewH", label: "H", value: currentPlacement.previewH },
-                                    ] as const).map((fieldDef) => (
-                                      <label key={fieldDef.key} className="text-[10px] text-gray-500">
-                                        {fieldDef.label}
-                                        <input
-                                          type="number"
-                                          min={0}
-                                          max={100}
-                                          step={0.1}
-                                          value={fieldDef.value}
-                                          onChange={(e) => {
-                                            const parsed = Number.parseFloat(e.target.value);
-                                            if (!Number.isFinite(parsed)) return;
-                                            patchPlacement(fieldDef.key, parsed);
-                                          }}
-                                          className="mt-0.5 w-full border rounded px-1 py-0.5 text-[10px] focus:outline-none focus:ring-1 focus:ring-secondary"
-                                        />
-                                      </label>
                                     ))}
                                   </div>
-                                </div>
-                              );
-                            })}
+                                )}
+                              </div>
+                              {v.designerZonePlacements && (
+                                <button
+                                  type="button"
+                                  onClick={() => onUpdateValue(v._key, { designerZonePlacements: null })}
+                                  className="text-[10px] text-gray-500 hover:text-secondary"
+                                >
+                                  Nulstil alle
+                                </button>
+                              )}
+                            </div>
+                            {editorImage ? (
+                              <DesignerZoneDragEditor
+                                imageUrl={editorImage}
+                                zones={designerZones}
+                                placements={v.designerZonePlacements ?? null}
+                                activeSide={editorSide}
+                                onChange={(newPlacements) => onUpdateValue(v._key, { designerZonePlacements: newPlacements })}
+                              />
+                            ) : (
+                              <p className="text-[10px] text-gray-400">Vælg designer forside-billede for at aktivere zonekalibrering.</p>
+                            )}
                           </div>
-                        </div>
-                      )}
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
