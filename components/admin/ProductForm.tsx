@@ -1975,6 +1975,7 @@ function PerColorDesignerSection({
   designerZones: DesignerZoneRow[];
 }) {
   const [dragEditorSide, setDragEditorSide] = useState<Record<string, "front" | "back">>({});
+  const [expandedColors, setExpandedColors] = useState<Record<string, boolean>>({});
   const colorValues = colorGroup.values.filter((v) => v.images.length > 0);
   if (colorValues.length === 0) {
     return (
@@ -1984,101 +1985,112 @@ function PerColorDesignerSection({
     );
   }
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {colorValues.map((v) => (
-        <div key={v._key} className="border rounded-lg px-3 py-3 space-y-2">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="w-4 h-4 rounded-full border border-gray-200 flex-shrink-0" style={{ background: v.globalColorHex ?? "#ccc" }} />
+        <div key={v._key} className="border rounded-lg overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setExpandedColors(prev => ({ ...prev, [v._key]: !prev[v._key] }))}
+            className="w-full flex items-center gap-2 px-3 py-2 bg-white hover:bg-gray-50 transition text-left"
+          >
+            <ChevronDown
+              className={`w-4 h-4 text-gray-400 transition-transform duration-200 flex-shrink-0 ${expandedColors[v._key] ? "" : "-rotate-90"}`}
+            />
+            <span className="w-3 h-3 rounded-full border border-gray-200 flex-shrink-0" style={{ background: v.globalColorHex ?? "#ccc" }} />
             <span className="text-sm font-medium">{v.label}</span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <div>
-              <label className="block text-[10px] font-medium text-gray-400 mb-1">Designer forside</label>
-              <select
-                value={v.designerFrontImageIdx ?? ""}
-                onChange={(e) => onUpdateValue(v._key, { designerFrontImageIdx: e.target.value === "" ? null : Number(e.target.value) })}
-                className="w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-secondary"
-              >
-                <option value="">— Ikke konfigureret —</option>
-                {v.images.map((_, i) => (
-                  <option key={i} value={i}>{v.imageLabels?.[i] || `Billede ${i + 1}`}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-[10px] font-medium text-gray-400 mb-1">Designer bagside</label>
-              <select
-                value={v.designerBackImageIdx ?? ""}
-                onChange={(e) => onUpdateValue(v._key, { designerBackImageIdx: e.target.value === "" ? null : Number(e.target.value) })}
-                className="w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-secondary"
-              >
-                <option value="">— Ingen bagside —</option>
-                {v.images.map((_, i) => (
-                  <option key={i} value={i}>{v.imageLabels?.[i] || `Billede ${i + 1}`}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-[10px] font-medium text-gray-400 mb-1">Tryk-farve</label>
-              <input
-                type="color"
-                value={v.designerPrintColor || "#ffffff"}
-                onChange={(e) => onUpdateValue(v._key, { designerPrintColor: e.target.value })}
-                className="w-full h-7 border rounded cursor-pointer p-0.5"
-                title="Farve på trykket tekst/logo"
-              />
-            </div>
-          </div>
-          {designerZones.length > 0 && (() => {
-            const frontImage = v.designerFrontImageIdx != null ? v.images[v.designerFrontImageIdx] : v.images[0];
-            const backImage = v.designerBackImageIdx != null ? v.images[v.designerBackImageIdx] : null;
-            const editorSide = dragEditorSide[v._key] ?? "front";
-            const editorImage = editorSide === "back" ? (backImage ?? frontImage) : frontImage;
-            const hasBackSide = designerZones.some(z => z.side === "back") && backImage;
-            return (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <p className="text-[10px] font-medium text-gray-400">Zonekalibrering</p>
-                    {hasBackSide && (
-                      <div className="flex gap-1">
-                        {(["front", "back"] as const).map(side => (
-                          <button
-                            key={side}
-                            type="button"
-                            onClick={() => setDragEditorSide(prev => ({ ...prev, [v._key]: side }))}
-                            className={`px-1.5 py-0.5 text-[9px] rounded border transition ${editorSide === side ? "bg-secondary text-white border-secondary" : "border-gray-200 text-gray-500 hover:border-gray-400"}`}
-                          >
-                            {side === "front" ? "Forside" : "Bagside"}
-                          </button>
-                        ))}
+          </button>
+          {expandedColors[v._key] && (
+            <div className="px-3 py-3 space-y-2 border-t bg-gray-50">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-[10px] font-medium text-gray-400 mb-1">Designer forside</label>
+                  <select
+                    value={v.designerFrontImageIdx ?? ""}
+                    onChange={(e) => onUpdateValue(v._key, { designerFrontImageIdx: e.target.value === "" ? null : Number(e.target.value) })}
+                    className="w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-secondary"
+                  >
+                    <option value="">— Ikke konfigureret —</option>
+                    {v.images.map((_, i) => (
+                      <option key={i} value={i}>{v.imageLabels?.[i] || `Billede ${i + 1}`}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-medium text-gray-400 mb-1">Designer bagside</label>
+                  <select
+                    value={v.designerBackImageIdx ?? ""}
+                    onChange={(e) => onUpdateValue(v._key, { designerBackImageIdx: e.target.value === "" ? null : Number(e.target.value) })}
+                    className="w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-secondary"
+                  >
+                    <option value="">— Ingen bagside —</option>
+                    {v.images.map((_, i) => (
+                      <option key={i} value={i}>{v.imageLabels?.[i] || `Billede ${i + 1}`}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-medium text-gray-400 mb-1">Tryk-farve</label>
+                  <input
+                    type="color"
+                    value={v.designerPrintColor || "#ffffff"}
+                    onChange={(e) => onUpdateValue(v._key, { designerPrintColor: e.target.value })}
+                    className="w-full h-7 border rounded cursor-pointer p-0.5"
+                    title="Farve på trykket tekst/logo"
+                  />
+                </div>
+              </div>
+              {designerZones.length > 0 && (() => {
+                const frontImage = v.designerFrontImageIdx != null ? v.images[v.designerFrontImageIdx] : v.images[0];
+                const backImage = v.designerBackImageIdx != null ? v.images[v.designerBackImageIdx] : null;
+                const editorSide = dragEditorSide[v._key] ?? "front";
+                const editorImage = editorSide === "back" ? (backImage ?? frontImage) : frontImage;
+                const hasBackSide = designerZones.some(z => z.side === "back") && backImage;
+                return (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <p className="text-[10px] font-medium text-gray-400">Zonekalibrering</p>
+                        {hasBackSide && (
+                          <div className="flex gap-1">
+                            {(["front", "back"] as const).map(side => (
+                              <button
+                                key={side}
+                                type="button"
+                                onClick={() => setDragEditorSide(prev => ({ ...prev, [v._key]: side }))}
+                                className={`px-1.5 py-0.5 text-[9px] rounded border transition ${editorSide === side ? "bg-secondary text-white border-secondary" : "border-gray-200 text-gray-500 hover:border-gray-400"}`}
+                              >
+                                {side === "front" ? "Forside" : "Bagside"}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
+                      {v.designerZonePlacements && (
+                        <button
+                          type="button"
+                          onClick={() => onUpdateValue(v._key, { designerZonePlacements: null })}
+                          className="text-[10px] text-gray-500 hover:text-secondary"
+                        >
+                          Nulstil alle
+                        </button>
+                      )}
+                    </div>
+                    {editorImage ? (
+                      <DesignerZoneDragEditor
+                        imageUrl={editorImage}
+                        zones={designerZones}
+                        placements={v.designerZonePlacements ?? null}
+                        activeSide={editorSide}
+                        onChange={(newPlacements) => onUpdateValue(v._key, { designerZonePlacements: newPlacements })}
+                      />
+                    ) : (
+                      <p className="text-[10px] text-gray-400">Vælg designer forside-billede for at aktivere zonekalibrering.</p>
                     )}
                   </div>
-                  {v.designerZonePlacements && (
-                    <button
-                      type="button"
-                      onClick={() => onUpdateValue(v._key, { designerZonePlacements: null })}
-                      className="text-[10px] text-gray-500 hover:text-secondary"
-                    >
-                      Nulstil alle
-                    </button>
-                  )}
-                </div>
-                {editorImage ? (
-                  <DesignerZoneDragEditor
-                    imageUrl={editorImage}
-                    zones={designerZones}
-                    placements={v.designerZonePlacements ?? null}
-                    activeSide={editorSide}
-                    onChange={(newPlacements) => onUpdateValue(v._key, { designerZonePlacements: newPlacements })}
-                  />
-                ) : (
-                  <p className="text-[10px] text-gray-400">Vælg designer forside-billede for at aktivere zonekalibrering.</p>
-                )}
-              </div>
-            );
-          })()}
+                );
+              })()}
+            </div>
+          )}
         </div>
       ))}
     </div>
