@@ -1,19 +1,34 @@
-// @ts-check
 /**
- * GitHub <-> Paperclip bidirectional sync script
- * Usage: npm run sync-github
+ * GitHub <-> Paperclip bidirectional sync — agent procedure
+ *
+ * This file is NOT executed via ts-node. It is the authoritative sync procedure
+ * read and executed by the CTO agent (9a615f60) on each routine heartbeat.
+ *
+ * GitHub operations: use GitHub MCP tools (mcp__github__*)
+ * Paperclip operations: use Paperclip HTTP API (pcFetch helpers below)
+ *
+ * Execution order:
+ *   1. Fetch all GH issues (open + closed) via MCP: mcp__github__list_issues
+ *   2. Fetch all PC issues in project via pcFetch (getPCIssues)
+ *   3. Build pcByGH map: GH issue number → best-match PC task (prefer non-cancelled)
+ *   4. Inbound loop (GH → PC):
+ *      a. Open GH, no PC task   → createPCIssue
+ *      b. Open GH, has PC task  → check new GH comments via mcp__github__issue_read (get_comments)
+ *                                  post summary to PC task; re-open PC task if keyword found
+ *      c. Closed GH, PC task not done/cancelled → mark PC task done
+ *   5. Outbound loop (PC → GH):
+ *      PC task done/cancelled, linked GH issue still open
+ *        → post Danish close comment via mcp__github__add_issue_comment
+ *        → close GH issue via mcp__github__issue_write (state: closed)
+ *   6. Post sync summary as comment on the execution issue (VBK-418-equivalent)
+ *
+ * Comment deduplication: before posting a GH comment to PC, check existing PC
+ * comments for the same GH comment id (stored as "GH comment id: N" in body).
+ * Before closing a GH issue outbound, check if it is already closed.
  */
 
-import * as fs from "fs";
-import * as path from "path";
-import { fileURLToPath } from "url";
+// ── Config ───────────────────────────────────────────────────────────────────
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// ── Config ──────────────────────────────────────────────────────────────────
-
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN ?? "";
 const PAPERCLIP_API_KEY = process.env.PAPERCLIP_API_KEY ?? "";
 const PAPERCLIP_API_URL =
   process.env.PAPERCLIP_API_URL ?? "http://127.0.0.1:3100";
@@ -21,56 +36,17 @@ const PAPERCLIP_COMPANY_ID =
   process.env.PAPERCLIP_COMPANY_ID ?? "bea2bf94-3ad0-47d9-ad66-15110e0c24d9";
 const PAPERCLIP_RUN_ID = process.env.PAPERCLIP_RUN_ID ?? "";
 
-const GH_REPO = "jollejonas/vorbasseb";
-const GH_API = "https://api.github.com";
+export const GH_OWNER = "jollejonas";
+export const GH_REPO = "vorbasseb";
 
-// Fixed ids from spec
-const CTO_AGENT_ID = "9a615f60-c40c-4807-a201-212724be20b7";
-const PROJECT_ID = "2dce7dcd-1a41-4740-a1d2-a67bde8ce16f";
-const GOAL_ID = "c3f45c5e-4691-4f24-ba11-9385cf3c4e5d";
-const PARENT_ID = "4977185f-2413-4e98-b2cb-bef7923372ba";
+export const CTO_AGENT_ID = "9a615f60-c40c-4807-a201-212724be20b7";
+export const PROJECT_ID = "2dce7dcd-1a41-4740-a1d2-a67bde8ce16f";
+export const GOAL_ID = "c3f45c5e-4691-4f24-ba11-9385cf3c4e5d";
+export const PARENT_ID = "4977185f-2413-4e98-b2cb-bef7923372ba";
 
-const STATE_FILE = path.join(__dirname, "github-sync-state.json");
+export const REOPEN_KEYWORDS = ["change", "update", "fix", "ret", "opdater"];
 
-const REOPEN_KEYWORDS = ["change", "update", "fix", "ret", "opdater"];
-
-// ── State ────────────────────────────────────────────────────────────────────
-
-interface SyncState {
-  lastSyncAt: string;
-  lastSeenCommentIds: Record<number, number>; // ghIssueNumber -> last seen GH comment id
-}
-
-function loadState(): SyncState {
-  try {
-    return JSON.parse(fs.readFileSync(STATE_FILE, "utf-8"));
-  } catch {
-    return { lastSyncAt: new Date(0).toISOString(), lastSeenCommentIds: {} };
-  }
-}
-
-function saveState(state: SyncState) {
-  fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
-}
-
-// ── HTTP helpers ─────────────────────────────────────────────────────────────
-
-async function ghFetch(path: string, opts: RequestInit = {}): Promise<unknown> {
-  const res = await fetch(`${GH_API}${path}`, {
-    ...opts,
-    headers: {
-      Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${GITHUB_TOKEN}`,
-      "X-GitHub-Api-Version": "2022-11-28",
-      ...(opts.headers as Record<string, string> | undefined),
-    },
-  });
-  if (!res.ok) {
-    throw new Error(`GitHub ${path} → ${res.status} ${await res.text()}`);
-  }
-  if (res.status === 204) return null;
-  return res.json();
-}
+// ── Paperclip HTTP helpers ────────────────────────────────────────────────────
 
 async function pcFetch(
   path: string,
@@ -85,10 +61,7 @@ async function pcFetch(
   if (mutating && PAPERCLIP_RUN_ID) {
     headers["X-Paperclip-Run-Id"] = PAPERCLIP_RUN_ID;
   }
-  const res = await fetch(`${PAPERCLIP_API_URL}${path}`, {
-    ...opts,
-    headers,
-  });
+  const res = await fetch(`${PAPERCLIP_API_URL}${path}`, { ...opts, headers });
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`Paperclip ${path} → ${res.status} ${body}`);
@@ -97,59 +70,9 @@ async function pcFetch(
   return res.json();
 }
 
-// ── GitHub helpers ────────────────────────────────────────────────────────────
+// ── Paperclip issue helpers ───────────────────────────────────────────────────
 
-interface GHIssue {
-  number: number;
-  title: string;
-  state: "open" | "closed";
-  body: string | null;
-  updated_at: string;
-  html_url: string;
-}
-
-interface GHComment {
-  id: number;
-  body: string;
-  created_at: string;
-  user: { login: string };
-}
-
-async function getGHIssues(): Promise<GHIssue[]> {
-  const all: GHIssue[] = [];
-  let page = 1;
-  while (true) {
-    const batch = (await ghFetch(
-      `/repos/${GH_REPO}/issues?state=all&per_page=100&page=${page}`
-    )) as GHIssue[];
-    if (batch.length === 0) break;
-    all.push(...batch);
-    if (batch.length < 100) break;
-    page++;
-  }
-  return all;
-}
-
-async function getGHComments(issueNumber: number): Promise<GHComment[]> {
-  return (await ghFetch(
-    `/repos/${GH_REPO}/issues/${issueNumber}/comments?per_page=100`
-  )) as GHComment[];
-}
-
-async function closeGHIssue(issueNumber: number, comment: string) {
-  await ghFetch(`/repos/${GH_REPO}/issues/${issueNumber}/comments`, {
-    method: "POST",
-    body: JSON.stringify({ body: comment }),
-  });
-  await ghFetch(`/repos/${GH_REPO}/issues/${issueNumber}`, {
-    method: "PATCH",
-    body: JSON.stringify({ state: "closed" }),
-  });
-}
-
-// ── Paperclip helpers ─────────────────────────────────────────────────────────
-
-interface PCIssue {
+export interface PCIssue {
   id: string;
   identifier: string;
   title: string;
@@ -158,31 +81,39 @@ interface PCIssue {
   originId?: string;
 }
 
-interface PCIssueList {
-  issues: PCIssue[];
-}
-
-async function getPCIssues(): Promise<PCIssue[]> {
+export async function getPCIssues(): Promise<PCIssue[]> {
   const res = (await pcFetch(
     `/api/companies/${PAPERCLIP_COMPANY_ID}/issues?projectId=${PROJECT_ID}&limit=200`
-  )) as PCIssueList;
-  return res.issues ?? [];
+  )) as PCIssue[] | { issues: PCIssue[] };
+  return Array.isArray(res) ? res : (res.issues ?? []);
 }
 
-function extractGHNumber(title: string): number | null {
+export function extractGHNumber(title: string): number | null {
   const m = title.match(/\[GH #(\d+)\]/);
   return m ? parseInt(m[1], 10) : null;
 }
 
-async function createPCIssue(ghIssue: GHIssue): Promise<PCIssue> {
-  const title = `[GH #${ghIssue.number}] ${ghIssue.title}`;
+/** Returns the best PC task for a given GH number: prefer done > in_progress > todo over cancelled. */
+export function bestPCIssue(candidates: PCIssue[]): PCIssue | undefined {
+  const order = ["done", "in_progress", "in_review", "blocked", "todo", "cancelled"];
+  return candidates.sort(
+    (a, b) => order.indexOf(a.status) - order.indexOf(b.status)
+  )[0];
+}
+
+export async function createPCIssue(gh: {
+  number: number;
+  title: string;
+  body: string | null;
+}): Promise<PCIssue> {
+  const title = `[GH #${gh.number}] ${gh.title}`;
   return (await pcFetch(
     `/api/companies/${PAPERCLIP_COMPANY_ID}/issues`,
     {
       method: "POST",
       body: JSON.stringify({
         title,
-        description: ghIssue.body ?? "",
+        description: gh.body ?? "",
         status: "todo",
         assigneeAgentId: CTO_AGENT_ID,
         projectId: PROJECT_ID,
@@ -196,36 +127,30 @@ async function createPCIssue(ghIssue: GHIssue): Promise<PCIssue> {
   )) as PCIssue;
 }
 
-async function commentOnPCIssue(issueId: string, body: string) {
+export async function commentOnPCIssue(issueId: string, body: string) {
   await pcFetch(
     `/api/issues/${issueId}/comments`,
-    {
-      method: "POST",
-      body: JSON.stringify({ body }),
-    },
+    { method: "POST", body: JSON.stringify({ body }) },
     true
   );
 }
 
-async function updatePCIssueStatus(
+export async function updatePCIssueStatus(
   issueId: string,
   status: string,
   comment: string
 ) {
   await pcFetch(
     `/api/issues/${issueId}`,
-    {
-      method: "PATCH",
-      body: JSON.stringify({ status, comment }),
-    },
+    { method: "PATCH", body: JSON.stringify({ status, comment }) },
     true
   );
 }
 
-// ── Outbound Danish close comment ─────────────────────────────────────────────
+// ── Danish close comment ──────────────────────────────────────────────────────
 
-function buildDanishCloseComment(pcIssue: PCIssue, ghNumber: number): string {
-  const title = pcIssue.title.replace(/\[GH #\d+\]\s*/, "");
+export function buildDanishCloseComment(pcTitle: string): string {
+  const title = pcTitle.replace(/\[GH #\d+\]\s*/, "");
   return `## Opgave lukket ✅
 
 Hej! Vi har nu afsluttet arbejdet med denne opgave.
@@ -245,186 +170,20 @@ Har du spørgsmål, er du altid velkommen til at åbne en ny sag. 😊
 *Venlig hilsen — Vorbasse BK dev-team*`;
 }
 
-// ── Main ─────────────────────────────────────────────────────────────────────
-
-async function main() {
-  if (!GITHUB_TOKEN) {
-    console.error("GITHUB_TOKEN is required");
-    process.exit(1);
-  }
-  if (!PAPERCLIP_API_KEY) {
-    console.error("PAPERCLIP_API_KEY is required");
-    process.exit(1);
-  }
-
-  const state = loadState();
-
-  console.log(`\n🔄 GitHub ↔ Paperclip sync — ${new Date().toISOString()}`);
-  console.log(`   Last sync: ${state.lastSyncAt}\n`);
-
-  const [ghIssues, pcIssues] = await Promise.all([
-    getGHIssues(),
-    getPCIssues(),
-  ]);
-
-  // Build lookup maps — primary: originKind/originId; fallback: title pattern for legacy issues
-  const pcByGH = new Map<number, PCIssue>();
-  for (const pc of pcIssues) {
-    if (pc.originKind === "github_issue" && pc.originId) {
-      const n = parseInt(pc.originId, 10);
-      if (!isNaN(n)) {
-        pcByGH.set(n, pc);
-        continue;
-      }
-    }
-    // Legacy fallback: issues created before originKind/originId were set
-    const n = extractGHNumber(pc.title);
-    if (n !== null && !pcByGH.has(n)) pcByGH.set(n, pc);
-  }
-
-  const ghByNumber = new Map<number, GHIssue>();
-  for (const gh of ghIssues) ghByNumber.set(gh.number, gh);
-
-  let created = 0;
-  let commented = 0;
-  let closedInbound = 0;
-  let closedOutbound = 0;
-
-  // ── Inbound: GH → Paperclip ────────────────────────────────────────────────
-
-  for (const gh of ghIssues) {
-    const pcIssue = pcByGH.get(gh.number);
-
-    if (gh.state === "open") {
-      if (!pcIssue) {
-        // New open GH issue with no matching PC task → create
-        try {
-          const created_ = await createPCIssue(gh);
-          pcByGH.set(gh.number, created_);
-          console.log(
-            `  ✅ Created PC task ${created_.identifier} for GH #${gh.number}`
-          );
-          created++;
-        } catch (e) {
-          console.error(`  ❌ Failed to create PC task for GH #${gh.number}:`, e);
-        }
-      } else {
-        // Existing open GH issue with matching PC task → check for new comments
-        let ghComments: GHComment[] = [];
-        try {
-          ghComments = await getGHComments(gh.number);
-        } catch {
-          // non-fatal
-        }
-
-        const lastSeen = state.lastSeenCommentIds[gh.number] ?? 0;
-        const newComments = ghComments.filter((c) => c.id > lastSeen);
-
-        if (newComments.length > 0) {
-          const summary = newComments
-            .map(
-              (c) =>
-                `**@${c.user.login}** (${c.created_at.slice(0, 10)}):\n> ${c.body.slice(0, 300)}${c.body.length > 300 ? "…" : ""}`
-            )
-            .join("\n\n");
-
-          const body = `## GitHub sync: nye kommentarer på GH #${gh.number}\n\n${summary}`;
-
-          try {
-            await commentOnPCIssue(pcIssue.id, body);
-            commented++;
-
-            // Re-open if done/cancelled and comment has trigger keywords
-            const hasKeyword = newComments.some((c) =>
-              REOPEN_KEYWORDS.some((kw) => c.body.toLowerCase().includes(kw))
-            );
-            if (
-              hasKeyword &&
-              (pcIssue.status === "done" || pcIssue.status === "cancelled")
-            ) {
-              await updatePCIssueStatus(
-                pcIssue.id,
-                "todo",
-                `GitHub sync: GH #${gh.number} har nye kommentarer med ændringsønsker — genåbnet.`
-              );
-              console.log(
-                `  🔁 Re-opened PC task ${pcIssue.identifier} (keyword in GH comment)`
-              );
-            }
-          } catch (e) {
-            console.error(
-              `  ❌ Failed to comment on PC task ${pcIssue.identifier}:`,
-              e
-            );
-          }
-
-          // Update last seen
-          const maxId = Math.max(...newComments.map((c) => c.id));
-          state.lastSeenCommentIds[gh.number] = maxId;
-        }
-      }
-    } else if (gh.state === "closed" && pcIssue) {
-      // Closed GH issue with matching PC task not already done/cancelled
-      if (pcIssue.status !== "done" && pcIssue.status !== "cancelled") {
-        try {
-          await updatePCIssueStatus(
-            pcIssue.id,
-            "done",
-            `GitHub sync: GitHub issue #${gh.number} was closed.`
-          );
-          console.log(
-            `  🔒 Closed PC task ${pcIssue.identifier} (GH #${gh.number} closed)`
-          );
-          closedInbound++;
-        } catch (e) {
-          console.error(
-            `  ❌ Failed to close PC task ${pcIssue.identifier}:`,
-            e
-          );
-        }
-      }
-    }
-  }
-
-  // ── Outbound: Paperclip → GH ───────────────────────────────────────────────
-
-  for (const pc of pcIssues) {
-    const ghNumber = extractGHNumber(pc.title);
-    if (ghNumber === null) continue;
-
-    if (pc.status !== "done" && pc.status !== "cancelled") continue;
-
-    const gh = ghByNumber.get(ghNumber);
-    if (!gh || gh.state !== "open") continue;
-
-    // PC task done/cancelled but GH issue still open → close it
-    const danishComment = buildDanishCloseComment(pc, ghNumber);
-    try {
-      await closeGHIssue(ghNumber, danishComment);
-      console.log(
-        `  🔒 Closed GH #${ghNumber} (PC task ${pc.identifier} is ${pc.status})`
-      );
-      closedOutbound++;
-    } catch (e) {
-      console.error(`  ❌ Failed to close GH #${ghNumber}:`, e);
-    }
-  }
-
-  // ── Save state & summary ───────────────────────────────────────────────────
-
-  state.lastSyncAt = new Date().toISOString();
-  saveState(state);
-
-  console.log(`
-📊 Sync complete:
-   Created (inbound):         ${created}
-   Commented (inbound):       ${commented}
-   Closed inbound (GH→PC):   ${closedInbound}
-   Closed outbound (PC→GH):  ${closedOutbound}
-`);
-}
-
-main().catch((err) => {
-  console.error("Sync failed:", err);
-  process.exit(1);
-});
+// ── GitHub operations (agent executes these via MCP) ─────────────────────────
+//
+// List all issues (open + closed):
+//   mcp__github__list_issues({ owner: GH_OWNER, repo: GH_REPO, state: "OPEN", perPage: 100 })
+//   mcp__github__list_issues({ owner: GH_OWNER, repo: GH_REPO, state: "CLOSED", perPage: 100 })
+//   Paginate via `after: pageInfo.endCursor` while `pageInfo.hasNextPage`.
+//
+// Get comments for an issue:
+//   mcp__github__issue_read({ method: "get_comments", owner: GH_OWNER, repo: GH_REPO, issue_number: N })
+//
+// Post comment on GH issue:
+//   mcp__github__add_issue_comment({ owner: GH_OWNER, repo: GH_REPO, issue_number: N, body: "..." })
+//
+// Close GH issue:
+//   mcp__github__issue_write({ method: "update", owner: GH_OWNER, repo: GH_REPO, issue_number: N, state: "closed" })
+//
+// ─────────────────────────────────────────────────────────────────────────────

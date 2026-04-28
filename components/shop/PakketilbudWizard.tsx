@@ -129,6 +129,13 @@ function normalizeHex(hex: string | null | undefined): string {
   return withHash;
 }
 
+function toValidHex(value: string | null | undefined): string | null {
+  const normalized = normalizeHex(value);
+  if (!normalized) return null;
+  const clean = normalized.slice(1);
+  return /^[0-9a-f]{3}$|^[0-9a-f]{6}$/i.test(clean) ? normalized : null;
+}
+
 function normalizeLabel(value: string | null | undefined): string {
   return value?.trim().toLowerCase() ?? "";
 }
@@ -200,11 +207,13 @@ function resolveOptionColorFallbackImages(
   sizeGroup: OptionGroupFull | undefined,
 ): string[] {
   if (!selectedColorValue) return [];
+  const selectedColor = selectedColorValue;
 
   const variantsWithImages = colorVariants.filter((cv) => cv.images.length > 0);
   if (variantsWithImages.length === 0) return [];
   const variantById = new Map(variantsWithImages.map((cv) => [cv.id, cv]));
 
+  const selectedColorPosition = null;
   const selectedSizeValueId = sizeGroup ? selectedOptions[sizeGroup.id] : undefined;
   const selectedHex = normalizeHex(selectedColorValue.globalColor?.hex);
   const selectedLabel = selectedColorValue.label;
@@ -287,8 +296,25 @@ function resolveOptionColorFallbackImages(
   if (nameMatches.length > 0) return nameMatches[0].images;
   if (hexMatches.length > 0) return hexMatches[0].images;
 
+  if (selectedColorPosition !== null) {
+    const rankedByPositionDistance = variantsWithImages
+      .map((cv) => ({
+        distance: Math.abs(cv.position - selectedColorPosition),
+        variant: cv,
+      }))
+      .sort((a, b) => a.distance - b.distance);
+    if (rankedByPositionDistance.length > 0) {
+      const best = rankedByPositionDistance[0];
+      const runnerUp = rankedByPositionDistance[1];
+      if (!runnerUp || best.distance !== runnerUp.distance) {
+        return best.variant.images;
+      }
+    }
+  }
+
   return [];
 }
+
 
 function initialStep(product: ProductFull): StepState {
   const selectedOptions: Record<string, string> = {};
@@ -469,6 +495,7 @@ function ItemStep({
   );
 
   const selectedColorValueId = colorGroup ? stepState.selectedOptions[colorGroup.id] : undefined;
+  const selectedSizeValueId = sizeGroup ? stepState.selectedOptions[sizeGroup.id] : undefined;
   const selectedColorValue = colorGroup?.values.find((v) => v.id === selectedColorValueId);
   const effectiveDesignerZones = applyDesignerZonePlacements(
     product.designerZones,
@@ -538,6 +565,7 @@ function ItemStep({
       : product.images;
 
   const displayImages = hasOptionGroups ? activeImages : legacyImages;
+
 
   const legacySkus =
     product.colorVariants.length > 0

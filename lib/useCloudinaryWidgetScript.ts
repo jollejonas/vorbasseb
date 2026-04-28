@@ -25,6 +25,7 @@ function loadCloudinaryWidgetScript(): Promise<void> {
       };
 
       const handleLoad = () => {
+        script.dataset.cloudinaryLoaded = "true";
         cleanup();
         // @ts-expect-error cloudinary global
         if (window.cloudinary?.createUploadWidget) {
@@ -48,8 +49,21 @@ function loadCloudinaryWidgetScript(): Promise<void> {
         script.src = CLOUDINARY_WIDGET_SRC;
         script.async = true;
         document.head.appendChild(script);
+      } else if (existingScript.dataset.cloudinaryLoaded === "true") {
+        // Script already fired load event. If cloudinary is available, resolve.
+        // Otherwise the script loaded but failed to expose the widget (e.g. prior
+        // CSP block). Remove the stale element so the next call loads a fresh copy.
+        cleanup();
+        // @ts-expect-error cloudinary global
+        if (window.cloudinary?.createUploadWidget) {
+          resolve();
+        } else {
+          existingScript.parentNode?.removeChild(existingScript);
+          loadCloudinaryWidgetPromise = null;
+          reject(new Error("Cloudinary script loaded but widget unavailable; stale element removed"));
+        }
       } else {
-        // Existing script might already be loaded before listeners were attached.
+        // Script is in DOM but hasn't fired load yet — listeners above will handle it.
         // @ts-expect-error cloudinary global
         if (window.cloudinary?.createUploadWidget) {
           cleanup();

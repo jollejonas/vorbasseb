@@ -16,8 +16,8 @@ export function SponsorManager({ initialSponsors, initialHeading }: Props) {
   const [saving, setSaving] = useState(false);
   const [heading, setHeading] = useState(initialHeading);
   const [headingSaving, setHeadingSaving] = useState(false);
-  const widgetRef = useRef<{ open: () => void } | null>(null);
   const { scriptReady, scriptError } = useCloudinaryWidgetScript();
+  const widgetRef = useRef<{ open: () => void } | null>(null);
 
   function openCloudinaryWidget() {
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME?.trim();
@@ -32,7 +32,10 @@ export function SponsorManager({ initialSponsors, initialHeading }: Props) {
       return;
     }
 
-    if (!scriptReady) { setError(scriptError ?? "Upload-widget er ikke klar endnu – prøv igen om et øjeblik"); return; }
+    if (!scriptReady) {
+      setError(scriptError ?? "Upload-widget er ikke klar endnu – prøv igen om et øjeblik");
+      return;
+    }
 
     try {
       setError("");

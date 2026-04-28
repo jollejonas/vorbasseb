@@ -3,6 +3,12 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { fetchNewsListing, importArticle } from "@/lib/news-import";
 
+export const runtime = "nodejs";
+
+function toErrorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
 // ── GET: list external articles for a given year ──────────────────────────
 export async function GET(req: NextRequest) {
   try {
@@ -27,8 +33,7 @@ export async function GET(req: NextRequest) {
       articles: articles.map((a) => ({ ...a, exists: existingSlugs.has(a.slug) })),
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: toErrorMessage(err) }, { status: 500 });
   }
 }
 
@@ -52,8 +57,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
-    const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: toErrorMessage(err) }, { status: 500 });
   }
 }
 
