@@ -108,129 +108,133 @@ export async function POST(req: NextRequest) {
     const cvInputs: ColorVariantInput[] = body.colorVariants ?? [];
     const hasColorVariants = !hasOptionGroups && cvInputs.length > 0;
 
-    // Create product (+ global skus if no color variants and no option groups)
-    const product = await prisma.product.create({
-      data: {
-        name: body.name,
-        slug: body.slug,
-        description: body.description,
-        categoryId: body.categoryId ?? null,
-        price: body.price,
-        salePrice: body.salePrice ?? null,
-        salePriceStart: body.salePriceStart ? new Date(body.salePriceStart) : null,
-        salePriceEnd: body.salePriceEnd ? new Date(body.salePriceEnd) : null,
-        modelNumber: body.modelNumber ?? null,
-        membersOnly: body.membersOnly ?? false,
-        membersEarlyAccess: body.membersEarlyAccess ?? false,
-        clubRoleRequired: body.clubRoleRequired ?? null,
-        published: body.published ?? true,
-        featured: body.featured ?? false,
-        images: body.images ?? [],
-        designerEnabled: body.designerEnabled ?? false,
-        isGroupOrder: body.isGroupOrder ?? false,
-        groupOrderDeadline: body.groupOrderDeadline ? new Date(body.groupOrderDeadline) : null,
-        skus: (!hasColorVariants && !hasOptionGroups) ? { create: body.skus ?? [] } : undefined,
-      },
-      include: { skus: true, category: true },
-    });
+    let productId!: string;
 
-    // New option group system
-    if (hasOptionGroups) {
-      const groupInputs = body.optionGroups as OptionGroupInput[];
-      const skuMatrixInputs = (body.skuMatrix ?? []) as SkuMatrixEntry[];
+    await prisma.$transaction(async (tx) => {
+      // Create product (+ global skus if no color variants and no option groups)
+      const product = await tx.product.create({
+        data: {
+          name: body.name,
+          slug: body.slug,
+          description: body.description,
+          categoryId: body.categoryId ?? null,
+          price: body.price,
+          salePrice: body.salePrice ?? null,
+          salePriceStart: body.salePriceStart ? new Date(body.salePriceStart) : null,
+          salePriceEnd: body.salePriceEnd ? new Date(body.salePriceEnd) : null,
+          modelNumber: body.modelNumber ?? null,
+          membersOnly: body.membersOnly ?? false,
+          membersEarlyAccess: body.membersEarlyAccess ?? false,
+          clubRoleRequired: body.clubRoleRequired ?? null,
+          published: body.published ?? true,
+          featured: body.featured ?? false,
+          images: body.images ?? [],
+          designerEnabled: body.designerEnabled ?? false,
+          isGroupOrder: body.isGroupOrder ?? false,
+          groupOrderDeadline: body.groupOrderDeadline ? new Date(body.groupOrderDeadline) : null,
+          skus: (!hasColorVariants && !hasOptionGroups) ? { create: body.skus ?? [] } : undefined,
+        },
+      });
+      productId = product.id;
 
-      const keyToValueId = new Map<string, string>();
-      const valueIdToColorCode = new Map<string, string | null>();
-      const valueIdToSizeLabel = new Map<string, string>();
+      // New option group system
+      if (hasOptionGroups) {
+        const groupInputs = body.optionGroups as OptionGroupInput[];
+        const skuMatrixInputs = (body.skuMatrix ?? []) as SkuMatrixEntry[];
 
-      for (let gi = 0; gi < groupInputs.length; gi++) {
-        const g = groupInputs[gi];
-        const group = await prisma.productOptionGroup.create({
-          data: { productId: product.id, type: g.type, label: g.label, position: gi, required: g.required, fee: g.fee ?? null, costFee: g.costFee ?? null, inputType: g.inputType ?? null },
-        });
+        const keyToValueId = new Map<string, string>();
+        const valueIdToColorCode = new Map<string, string | null>();
+        const valueIdToSizeLabel = new Map<string, string>();
 
-        for (let vi = 0; vi < g.values.length; vi++) {
-          const v = g.values[vi];
-          const created = await prisma.productOptionValue.create({
-            data: {
-              groupId: group.id,
-              label: v.label,
-              position: vi,
-              globalColorId: v.globalColorId ?? null,
-              images: v.images ?? [],
-              imageLabels: v.imageLabels ?? [],
-              price: v.price ?? null,
-              costPrice: v.costPrice ?? null,
-              designerFrontImageIdx: v.designerFrontImageIdx ?? null,
-              designerBackImageIdx: v.designerBackImageIdx ?? null,
-              designerPrintColor: v.designerPrintColor ?? null,
-              designerZonePlacements: normalizeDesignerZonePlacements(v.designerZonePlacements) ?? Prisma.DbNull,
-            },
+        for (let gi = 0; gi < groupInputs.length; gi++) {
+          const g = groupInputs[gi];
+          const group = await tx.productOptionGroup.create({
+            data: { productId: product.id, type: g.type, label: g.label, position: gi, required: g.required, fee: g.fee ?? null, costFee: g.costFee ?? null, inputType: g.inputType ?? null },
           });
-          keyToValueId.set(v._key, created.id);
 
-          if (g.type === "COLOR") {
-            if (v.globalColorId) {
-              const gc = await prisma.globalColor.findUnique({ where: { id: v.globalColorId }, select: { code: true } });
-              valueIdToColorCode.set(created.id, gc?.code ?? null);
-            } else {
-              valueIdToColorCode.set(created.id, null);
+          for (let vi = 0; vi < g.values.length; vi++) {
+            const v = g.values[vi];
+            const created = await tx.productOptionValue.create({
+              data: {
+                groupId: group.id,
+                label: v.label,
+                position: vi,
+                globalColorId: v.globalColorId ?? null,
+                images: v.images ?? [],
+                imageLabels: v.imageLabels ?? [],
+                price: v.price ?? null,
+                costPrice: v.costPrice ?? null,
+                designerFrontImageIdx: v.designerFrontImageIdx ?? null,
+                designerBackImageIdx: v.designerBackImageIdx ?? null,
+                designerPrintColor: v.designerPrintColor ?? null,
+                designerZonePlacements: normalizeDesignerZonePlacements(v.designerZonePlacements) ?? Prisma.DbNull,
+              },
+            });
+            keyToValueId.set(v._key, created.id);
+
+            if (g.type === "COLOR") {
+              if (v.globalColorId) {
+                const gc = await tx.globalColor.findUnique({ where: { id: v.globalColorId }, select: { code: true } });
+                valueIdToColorCode.set(created.id, gc?.code ?? null);
+              } else {
+                valueIdToColorCode.set(created.id, null);
+              }
+            }
+            if (g.type === "SIZE") {
+              valueIdToSizeLabel.set(created.id, v.label);
             }
           }
-          if (g.type === "SIZE") {
-            valueIdToSizeLabel.set(created.id, v.label);
+        }
+
+        for (const entry of skuMatrixInputs) {
+          const colorValueId = entry.colorValueKey ? (keyToValueId.get(entry.colorValueKey) ?? entry.colorValueKey) : null;
+          const sizeValueId = entry.sizeValueKey ? (keyToValueId.get(entry.sizeValueKey) ?? entry.sizeValueKey) : null;
+          const sizeLabel = sizeValueId ? (valueIdToSizeLabel.get(sizeValueId) ?? "") : "";
+
+          let itemNumber = entry.itemNumber ?? null;
+          if (!entry.itemNumberOverride) {
+            const colorCode = colorValueId ? (valueIdToColorCode.get(colorValueId) ?? null) : null;
+            itemNumber = generateItemNumber(body.modelNumber, colorCode, sizeLabel);
+          }
+
+          const sku = await tx.sKU.create({
+            data: { productId: product.id, size: sizeLabel, stock: entry.stock, itemNumber, itemNumberOverride: entry.itemNumberOverride, costPrice: entry.costPrice ?? null },
+          });
+
+          const valueLinks = [
+            colorValueId ? { skuId: sku.id, optionValueId: colorValueId } : null,
+            sizeValueId ? { skuId: sku.id, optionValueId: sizeValueId } : null,
+          ].filter(Boolean) as { skuId: string; optionValueId: string }[];
+
+          if (valueLinks.length > 0) {
+            await tx.sKUOptionValue.createMany({ data: valueLinks });
+          }
+        }
+
+      // Legacy color variants path
+      } else if (hasColorVariants) {
+        for (let i = 0; i < cvInputs.length; i++) {
+          const cv = cvInputs[i];
+          const created = await tx.colorVariant.create({
+            data: { productId: product.id, name: cv.name, hex: cv.hex, images: cv.images ?? [], position: cv.position ?? i },
+          });
+          if (cv.skus?.length) {
+            await tx.sKU.createMany({
+              data: cv.skus.map((s) => ({
+                productId: product.id,
+                colorVariantId: created.id,
+                size: s.size,
+                stock: s.stock,
+                itemNumber: s.itemNumber ?? null,
+              })),
+            });
           }
         }
       }
-
-      for (const entry of skuMatrixInputs) {
-        const colorValueId = entry.colorValueKey ? (keyToValueId.get(entry.colorValueKey) ?? entry.colorValueKey) : null;
-        const sizeValueId = entry.sizeValueKey ? (keyToValueId.get(entry.sizeValueKey) ?? entry.sizeValueKey) : null;
-        const sizeLabel = sizeValueId ? (valueIdToSizeLabel.get(sizeValueId) ?? "") : "";
-
-        let itemNumber = entry.itemNumber ?? null;
-        if (!entry.itemNumberOverride) {
-          const colorCode = colorValueId ? (valueIdToColorCode.get(colorValueId) ?? null) : null;
-          itemNumber = generateItemNumber(body.modelNumber, colorCode, sizeLabel);
-        }
-
-        const sku = await prisma.sKU.create({
-          data: { productId: product.id, size: sizeLabel, stock: entry.stock, itemNumber, itemNumberOverride: entry.itemNumberOverride, costPrice: entry.costPrice ?? null },
-        });
-
-        const valueLinks = [
-          colorValueId ? { skuId: sku.id, optionValueId: colorValueId } : null,
-          sizeValueId ? { skuId: sku.id, optionValueId: sizeValueId } : null,
-        ].filter(Boolean) as { skuId: string; optionValueId: string }[];
-
-        if (valueLinks.length > 0) {
-          await prisma.sKUOptionValue.createMany({ data: valueLinks });
-        }
-      }
-
-    // Legacy color variants path
-    } else if (hasColorVariants) {
-      for (let i = 0; i < cvInputs.length; i++) {
-        const cv = cvInputs[i];
-        const created = await prisma.colorVariant.create({
-          data: { productId: product.id, name: cv.name, hex: cv.hex, images: cv.images ?? [], position: cv.position ?? i },
-        });
-        if (cv.skus?.length) {
-          await prisma.sKU.createMany({
-            data: cv.skus.map((s) => ({
-              productId: product.id,
-              colorVariantId: created.id,
-              size: s.size,
-              stock: s.stock,
-              itemNumber: s.itemNumber ?? null,
-            })),
-          });
-        }
-      }
-    }
+    });
 
     const result = await prisma.product.findUnique({
-      where: { id: product.id },
+      where: { id: productId },
       include: {
         skus: { include: { optionValues: { include: { optionValue: true } } } },
         category: true,
