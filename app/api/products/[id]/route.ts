@@ -266,7 +266,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
         await tx.sKU.deleteMany({ where: { id: { in: existingOptionSkuIds } } });
       }
 
-      // Upsert SKUs from matrix
+      // Upsert SKUs from matrix — resolve all data first, then batch new creates
+      type NewSkuData = { size: string; stock: number; itemNumber: string | null; itemNumberOverride: boolean; costPrice: number | null; colorValueId: string | null; sizeValueId: string | null };
+      const skusToUpdate: Array<{ entry: SkuMatrixEntry; sizeLabel: string; itemNumber: string | null }> = [];
+      const skusToCreate: NewSkuData[] = [];
+
       for (const entry of skuMatrixInputs) {
         const colorValueId = entry.colorValueKey
           ? (entry.colorValueKey.startsWith("val_") || !entry.colorValueKey.startsWith("c")
@@ -279,10 +283,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
               : entry.sizeValueKey)
           : null;
 
-        // Determine size for SKU.size field (denormalized cache)
         const sizeLabel = sizeValueId ? (valueIdToSizeLabel.get(sizeValueId) ?? "") : "";
 
-        // Auto-generate varenummer if not overridden
         let itemNumber = entry.itemNumber ?? null;
         if (!entry.itemNumberOverride) {
           const colorCode = colorValueId ? (valueIdToColorCode.get(colorValueId) ?? null) : null;
@@ -290,33 +292,36 @@ export async function PUT(req: NextRequest, { params }: Params) {
         }
 
         if (entry.id) {
-          // Update existing SKU
-          await tx.sKU.update({
-            where: { id: entry.id },
-            data: { stock: entry.stock, itemNumber, itemNumberOverride: entry.itemNumberOverride, size: sizeLabel, costPrice: entry.costPrice ?? null },
-          });
+          skusToUpdate.push({ entry, sizeLabel, itemNumber });
         } else {
-          // Create new SKU
-          const sku = await tx.sKU.create({
-            data: {
-              productId: id,
-              size: sizeLabel,
-              stock: entry.stock,
-              itemNumber,
-              itemNumberOverride: entry.itemNumberOverride,
-              costPrice: entry.costPrice ?? null,
-            },
-          });
+          skusToCreate.push({ size: sizeLabel, stock: entry.stock, itemNumber, itemNumberOverride: entry.itemNumberOverride, costPrice: entry.costPrice ?? null, colorValueId, sizeValueId });
+        }
+      }
 
-          // Create SKUOptionValue joins
-          const valueLinks = [
+      // Update existing SKUs (one-by-one; typically a small set)
+      for (const { entry, sizeLabel, itemNumber } of skusToUpdate) {
+        await tx.sKU.update({
+          where: { id: entry.id! },
+          data: { stock: entry.stock, itemNumber, itemNumberOverride: entry.itemNumberOverride, size: sizeLabel, costPrice: entry.costPrice ?? null },
+        });
+      }
+
+      // Batch-create new SKUs in two round-trips instead of N×2
+      if (skusToCreate.length > 0) {
+        const createdSkus = await tx.sKU.createManyAndReturn({
+          data: skusToCreate.map(({ colorValueId: _c, sizeValueId: _s, ...d }) => ({ productId: id, ...d })),
+        });
+
+        const allValueLinks = createdSkus.flatMap((sku, i) => {
+          const { colorValueId, sizeValueId } = skusToCreate[i];
+          return [
             colorValueId ? { skuId: sku.id, optionValueId: colorValueId } : null,
             sizeValueId ? { skuId: sku.id, optionValueId: sizeValueId } : null,
           ].filter(Boolean) as { skuId: string; optionValueId: string }[];
+        });
 
-          if (valueLinks.length > 0) {
-            await tx.sKUOptionValue.createMany({ data: valueLinks });
-          }
+        if (allValueLinks.length > 0) {
+          await tx.sKUOptionValue.createMany({ data: allValueLinks });
         }
       }
 
@@ -392,7 +397,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
         ),
       ]);
     }
-  });
+  }, { timeout: 30000 });
 
   const result = await prisma.product.findUnique({
     where: { id },

@@ -186,6 +186,9 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        // Resolve all SKU data first, then batch-create to avoid N×2 round-trips
+        type NewSkuData = { size: string; stock: number; itemNumber: string | null; itemNumberOverride: boolean; costPrice: number | null; colorValueId: string | null; sizeValueId: string | null };
+        const skusToCreate: NewSkuData[] = [];
         for (const entry of skuMatrixInputs) {
           const colorValueId = entry.colorValueKey ? (keyToValueId.get(entry.colorValueKey) ?? entry.colorValueKey) : null;
           const sizeValueId = entry.sizeValueKey ? (keyToValueId.get(entry.sizeValueKey) ?? entry.sizeValueKey) : null;
@@ -196,18 +199,24 @@ export async function POST(req: NextRequest) {
             const colorCode = colorValueId ? (valueIdToColorCode.get(colorValueId) ?? null) : null;
             itemNumber = generateItemNumber(body.modelNumber, colorCode, sizeLabel);
           }
+          skusToCreate.push({ size: sizeLabel, stock: entry.stock, itemNumber, itemNumberOverride: entry.itemNumberOverride, costPrice: entry.costPrice ?? null, colorValueId, sizeValueId });
+        }
 
-          const sku = await tx.sKU.create({
-            data: { productId: product.id, size: sizeLabel, stock: entry.stock, itemNumber, itemNumberOverride: entry.itemNumberOverride, costPrice: entry.costPrice ?? null },
+        if (skusToCreate.length > 0) {
+          const createdSkus = await tx.sKU.createManyAndReturn({
+            data: skusToCreate.map(({ colorValueId: _c, sizeValueId: _s, ...d }) => ({ productId: product.id, ...d })),
           });
 
-          const valueLinks = [
-            colorValueId ? { skuId: sku.id, optionValueId: colorValueId } : null,
-            sizeValueId ? { skuId: sku.id, optionValueId: sizeValueId } : null,
-          ].filter(Boolean) as { skuId: string; optionValueId: string }[];
+          const allValueLinks = createdSkus.flatMap((sku, i) => {
+            const { colorValueId, sizeValueId } = skusToCreate[i];
+            return [
+              colorValueId ? { skuId: sku.id, optionValueId: colorValueId } : null,
+              sizeValueId ? { skuId: sku.id, optionValueId: sizeValueId } : null,
+            ].filter(Boolean) as { skuId: string; optionValueId: string }[];
+          });
 
-          if (valueLinks.length > 0) {
-            await tx.sKUOptionValue.createMany({ data: valueLinks });
+          if (allValueLinks.length > 0) {
+            await tx.sKUOptionValue.createMany({ data: allValueLinks });
           }
         }
 
@@ -231,7 +240,7 @@ export async function POST(req: NextRequest) {
           }
         }
       }
-    });
+    }, { timeout: 30000 });
 
     const result = await prisma.product.findUnique({
       where: { id: productId },
