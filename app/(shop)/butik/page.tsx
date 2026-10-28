@@ -66,7 +66,7 @@ export default async function ButikPage({ searchParams }: Props) {
 
   // Fetch distinct in-stock sizes (scoped to current category if set)
   const sizeWhere: Prisma.SKUWhereInput = {
-    stock: { gt: 0 },
+    OR: [{ stock: { gt: 0 } }, { product: { isGroupOrder: true } }],
     product: {
       published: true,
       clubRoleRequired: null,
@@ -84,9 +84,9 @@ export default async function ButikPage({ searchParams }: Props) {
     published: true,
     clubRoleRequired: null, // role-restricted products only appear on their dedicated page
     ...(categoryIds ? { categoryId: { in: categoryIds } } : {}),
-    ...(size ? { skus: { some: { size, stock: { gt: 0 } } } } : {}),
+    ...(size ? { skus: { some: { size, OR: [{ stock: { gt: 0 } }, { product: { isGroupOrder: true } }] } } } : {}),
     ...(tilgaengelig === "1" && !size
-      ? { skus: { some: { stock: { gt: 0 } } } }
+      ? { skus: { some: { OR: [{ stock: { gt: 0 } }, { product: { isGroupOrder: true } }] } } }
       : {}),
     ...(q
       ? {

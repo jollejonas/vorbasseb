@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
+import { canPurchaseSku } from "@/lib/availability";
 import { useCart } from "./CartProvider";
 import { GroupOrderConfirmDialog } from "./GroupOrderConfirmDialog";
 import { formatPrice, withVat } from "@/lib/utils";
@@ -44,7 +45,7 @@ export function ProductOptionsSection({ product, skus, optionGroups, vatPct = 25
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>(() => {
     if (!colorGroupInit) return {};
     const firstInStock = colorGroupInit.values.find((v) =>
-      skus.some((sku) => sku.optionValues.some((ov) => ov.optionValueId === v.id) && sku.stock > 0)
+      skus.some((sku) => sku.optionValues.some((ov) => ov.optionValueId === v.id) && canPurchaseSku(product, sku))
     );
     return firstInStock ? { [colorGroupInit.id]: firstInStock.id } : {};
   });
@@ -89,13 +90,13 @@ export function ProductOptionsSection({ product, skus, optionGroups, vatPct = 25
       // No color selection needed — find SKU by size alone
       return skus.some((sku) => {
         const skuValueIds = sku.optionValues.map((sv) => sv.optionValueId);
-        return skuValueIds.includes(sizeValue.id) && sku.stock > 0;
+        return skuValueIds.includes(sizeValue.id) && canPurchaseSku(product, sku);
       });
     }
     // Find SKU for this color + size combination
     return skus.some((sku) => {
       const skuValueIds = sku.optionValues.map((sv) => sv.optionValueId);
-      return skuValueIds.includes(colorValueId) && skuValueIds.includes(sizeValue.id) && sku.stock > 0;
+      return skuValueIds.includes(colorValueId) && skuValueIds.includes(sizeValue.id) && canPurchaseSku(product, sku);
     });
   }
 
@@ -130,7 +131,7 @@ export function ProductOptionsSection({ product, skus, optionGroups, vatPct = 25
         return false;
       }
     }
-    if (activeSku && activeSku.stock === 0) {
+    if (activeSku && !canPurchaseSku(product, activeSku)) {
       toast.error("Denne variant er udsolgt");
       return false;
     }
@@ -150,7 +151,7 @@ export function ProductOptionsSection({ product, skus, optionGroups, vatPct = 25
       }));
 
     const skuToUse = activeSku ?? skus[0];
-    if (!skuToUse) {
+    if (!canPurchaseSku(product, skuToUse)) {
       toast.error("Produktet er ikke tilgængeligt");
       return;
     }
@@ -315,7 +316,7 @@ export function ProductOptionsSection({ product, skus, optionGroups, vatPct = 25
                 );
               })}
             </div>
-            {activeSku && activeSku.stock <= 3 && activeSku.stock > 0 && (
+            {!product.isGroupOrder && activeSku && activeSku.stock <= 3 && activeSku.stock > 0 && (
               <p className="text-orange-500 text-xs mt-2">Kun {activeSku.stock} tilbage!</p>
             )}
           </div>
@@ -408,7 +409,7 @@ export function ProductOptionsSection({ product, skus, optionGroups, vatPct = 25
           className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-secondary font-bold py-3 px-6 rounded-xl transition"
         >
           <ShoppingCart size={20} />
-          Læg i kurv
+          {product.isGroupOrder ? "Forudbestil" : "Læg i kurv"}
         </button>
       </div>
     </div>

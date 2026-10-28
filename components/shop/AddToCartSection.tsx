@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
+import { canPurchaseSku } from "@/lib/availability";
 import { useCart } from "./CartProvider";
 import { GroupOrderConfirmDialog } from "./GroupOrderConfirmDialog";
 import { getEffectivePrice } from "@/lib/pricing";
@@ -36,7 +37,7 @@ export function AddToCartSection({
   );
 
   function doAddToCart() {
-    if (!selectedSku) return;
+    if (!canPurchaseSku(product, selectedSku) || !selectedSku) return;
     addItem({
       skuId: selectedSku.id,
       productId: product.id,
@@ -62,7 +63,7 @@ export function AddToCartSection({
       toast.error("Vælg venligst en størrelse");
       return;
     }
-    if (selectedSku.stock === 0) {
+    if (!canPurchaseSku(product, selectedSku)) {
       toast.error("Denne størrelse er udsolgt");
       return;
     }
@@ -94,7 +95,7 @@ export function AddToCartSection({
         </p>
         <div className="flex flex-wrap gap-2">
           {sortedSkus.map((sku) => {
-            const outOfStock = sku.stock === 0;
+            const outOfStock = !canPurchaseSku(product, sku);
             const selected = selectedSku?.id === sku.id;
             return (
               <button
@@ -114,7 +115,7 @@ export function AddToCartSection({
             );
           })}
         </div>
-        {selectedSku && selectedSku.stock <= 3 && selectedSku.stock > 0 && (
+        {!product.isGroupOrder && selectedSku && selectedSku.stock <= 3 && selectedSku.stock > 0 && (
           <p className="text-orange-500 text-xs mt-2">
             Kun {selectedSku.stock} tilbage på lager!
           </p>
@@ -127,7 +128,7 @@ export function AddToCartSection({
         className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-secondary font-bold py-3 px-6 rounded-xl transition"
       >
         <ShoppingCart size={20} />
-        Læg i kurv
+        {product.isGroupOrder ? "Forudbestil" : "Læg i kurv"}
       </button>
     </div>
     </>

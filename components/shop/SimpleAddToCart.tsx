@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { canPurchaseSku } from "@/lib/availability";
 import { useCart } from "./CartProvider";
 import { GroupOrderConfirmDialog } from "./GroupOrderConfirmDialog";
 import { formatPrice, withVat } from "@/lib/utils";
@@ -22,8 +23,8 @@ export function SimpleAddToCart({
   const [showGroupOrderDialog, setShowGroupOrderDialog] = useState(false);
   const { effectivePrice, isOnSale } = getEffectivePrice(product.price, product.salePrice, product.salePriceStart, product.salePriceEnd);
 
-  const availableSku = skus.find((s) => s.stock > 0) ?? skus[0] ?? null;
-  const inStock = availableSku !== null && availableSku.stock > 0;
+  const availableSku = skus.find((s) => canPurchaseSku(product, s)) ?? skus[0] ?? null;
+  const inStock = canPurchaseSku(product, availableSku);
 
   function doAddToCart() {
     if (!availableSku || !inStock) return;
@@ -109,7 +110,7 @@ export function SimpleAddToCart({
             onClick={handleAdd}
             className="w-full bg-primary hover:bg-primary-dark text-secondary font-bold py-3 px-6 rounded-xl transition"
           >
-            {added ? "Lagt i kurv ✓" : "Læg i kurv"}
+            {added ? "Lagt i kurv ✓" : product.isGroupOrder ? "Forudbestil" : "Læg i kurv"}
           </button>
         ) : (
           <button disabled className="w-full bg-gray-100 text-gray-400 font-bold py-3 px-6 rounded-xl cursor-not-allowed">

@@ -4,14 +4,19 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import type { CartItem, OptionSelection, PrintElement } from "@/components/shop/CartProvider";
 import { getEffectivePrice } from "@/lib/pricing";
+import { canPurchaseSku, tracksStock } from "@/lib/availability";
 
 export async function POST(req: NextRequest) {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
   const session = await auth();
   const { items, deliveryMethod = "SHIPPING" }: { items: CartItem[]; deliveryMethod?: "SHIPPING" | "PICKUP" } = await req.json();
 
-  if (!items || items.length === 0) {
+  if (!Array.isArray(items) || items.length === 0) {
     return NextResponse.json({ error: "Tom kurv" }, { status: 400 });
+  }
+
+  if (items.some((item) => !item || !Number.isSafeInteger(item.quantity) || item.quantity <= 0)) {
+    return NextResponse.json({ error: "Ugyldigt antal" }, { status: 400 });
   }
 
   // Flatten SKU IDs — pakketilbud contribute multiple item SKUs
@@ -25,6 +30,7 @@ export async function POST(req: NextRequest) {
     select: {
       id: true,
       productId: true,
+      stock: true,
       product: {
         select: {
           price: true,
@@ -49,6 +55,21 @@ export async function POST(req: NextRequest) {
       },
     },
   });
+  // Use persisted product settings, never the cart's isGroupOrder flag.
+  // Aggregate quantities across lines, including bundle components.
+  const requestedQuantities = new Map<string, number>();
+  for (const item of items) {
+    const ids = item.isPakketilbud ? (item.pakketilbudItems ?? []).map((c) => c.skuId) : [item.skuId];
+    if (ids.length === 0) return NextResponse.json({ error: "Ugyldigt produkt" }, { status: 400 });
+    for (const id of ids) requestedQuantities.set(id, (requestedQuantities.get(id) ?? 0) + item.quantity);
+  }
+  const skuMap = new Map(skusWithProducts.map((sku) => [sku.id, sku]));
+  for (const [id, quantity] of requestedQuantities) {
+    const sku = skuMap.get(id);
+    if (!sku || !canPurchaseSku(sku.product, sku, quantity)) {
+      return NextResponse.json({ error: "En vare er ikke tilgængelig i det ønskede antal. Opdatér din kurv." }, { status: 400 });
+    }
+  }
   for (const sku of skusWithProducts) {
     if (sku.product.clubRoleRequired) {
       // @ts-expect-error custom field
@@ -300,9 +321,11 @@ export async function POST(req: NextRequest) {
       for (const item of items) {
         if (item.isPakketilbud) {
           for (const comp of (item.pakketilbudItems ?? [])) {
+            if (!tracksStock(skuMap.get(comp.skuId)!.product)) continue;
             await tx.sKU.update({ where: { id: comp.skuId }, data: { stock: { decrement: item.quantity } } });
           }
         } else {
+          if (!tracksStock(skuMap.get(item.skuId)!.product)) continue;
           await tx.sKU.update({ where: { id: item.skuId }, data: { stock: { decrement: item.quantity } } });
         }
       }
