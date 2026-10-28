@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { sendOrderConfirmation, sendLowStockAlert } from "@/lib/email";
+import { tracksStock } from "@/lib/availability";
 
 /**
  * Fulfills a Stripe checkout.session.completed event.
@@ -20,7 +21,7 @@ export async function fulfillOrder(session: Stripe.Checkout.Session): Promise<bo
     where: { id: orderId },
     include: {
       items: {
-        include: { sku: { include: { product: { select: { name: true } } } } },
+        include: { sku: { include: { product: { select: { name: true, isGroupOrder: true } } } } },
       },
     },
   });
@@ -82,11 +83,14 @@ export async function fulfillOrder(session: Stripe.Checkout.Session): Promise<bo
       // Decrement stock for each order item
       for (const item of order.items) {
         if (item.skuId) {
+          if (item.sku && !tracksStock(item.sku.product)) continue;
           await tx.sKU.update({ where: { id: item.skuId }, data: { stock: { decrement: item.quantity } } });
         } else {
           // Pakketilbud — sub-item skuIds stored in optionSelections
           const opts = item.optionSelections as { isPakketilbud?: boolean; items?: { skuId: string }[] } | null;
           for (const comp of (opts?.items ?? [])) {
+            const sku = await tx.sKU.findUnique({ where: { id: comp.skuId }, select: { product: { select: { isGroupOrder: true } } } });
+            if (sku && !tracksStock(sku.product)) continue;
             await tx.sKU.update({ where: { id: comp.skuId }, data: { stock: { decrement: item.quantity } } });
           }
         }
@@ -102,9 +106,9 @@ export async function fulfillOrder(session: Stripe.Checkout.Session): Promise<bo
     for (const skuId of skuIdsToCheck) {
       const sku = await prisma.sKU.findUnique({
         where: { id: skuId },
-        include: { product: { select: { name: true } } },
+        include: { product: { select: { name: true, isGroupOrder: true } } },
       });
-      if (sku && sku.stock <= 2) {
+      if (sku && tracksStock(sku.product) && sku.stock <= 2) {
         await sendLowStockAlert(sku.product.name, sku.size, sku.stock).catch(() => {});
       }
     }

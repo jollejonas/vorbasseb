@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useCart, type PrintElement } from "./CartProvider";
 import { formatPrice, withVat } from "@/lib/utils";
+import { canPurchaseSku } from "@/lib/availability";
 import { getEffectivePrice } from "@/lib/pricing";
 import { sanitizeHtml } from "@/lib/sanitizeHtml";
 import { applyDesignerZonePlacements } from "@/lib/designerZonePlacements";
@@ -189,17 +190,17 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
       if (!id) return null;
       required.push(id);
     }
-    if (!required.length) return skus.find((s) => s.stock > 0) ?? skus[0] ?? null;
+    if (!required.length) return skus.find((s) => canPurchaseSku(product, s)) ?? skus[0] ?? null;
     return (
       skus.find((sku) => {
         const ids = sku.optionValues.map((sv) => sv.optionValueId);
-        return required.every((id) => ids.includes(id)) && sku.stock > 0;
+        return required.every((id) => ids.includes(id)) && canPurchaseSku(product, sku);
       }) ?? null
     );
   })();
 
   function doAddToCart() {
-    if (!activeSku) return;
+    if (!canPurchaseSku(product, activeSku) || !activeSku) return;
     const selectedSizeLabel = sizeGroup
       ? (sizeGroup.values.find((v) => v.id === selectedOptions[sizeGroup.id])?.label ?? activeSku.size ?? "One Size")
       : (activeSku.size ?? "One Size");
@@ -252,7 +253,7 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
   }
 
   function handleAddToCart() {
-    if (!activeSku) return;
+    if (!canPurchaseSku(product, activeSku) || !activeSku) return;
     if (product.isGroupOrder) {
       setShowGroupOrderDialog(true);
       return;
@@ -260,7 +261,7 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
     doAddToCart();
   }
 
-  const canAddToCart = activeSku !== null && activeSku.stock > 0;
+  const canAddToCart = canPurchaseSku(product, activeSku);
   const isDisabled =
     !canAddToCart ||
     (!!colorGroup && !selectedOptions[colorGroup.id]) ||
@@ -605,7 +606,7 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
             <div className="flex flex-wrap gap-2">
               {sizeGroup.values.map((v) => {
                 const sizeSkus = skus.filter((s) => s.optionValues.some((sv) => sv.optionValueId === v.id));
-                const inStock = sizeSkus.some((s) => s.stock > 0);
+                const inStock = sizeSkus.some((s) => canPurchaseSku(product, s));
                 return (
                   <button
                     key={v.id}
@@ -717,7 +718,7 @@ export function JerseyDesignerSection({ product, zones, logos, skus, vatPct = 25
             ? "Ikke på lager"
             : added
             ? "Lagt i kurv ✓"
-            : "Læg i kurv"}
+            : product.isGroupOrder ? "Forudbestil" : "Læg i kurv"}
         </button>
       </div>
     </div>

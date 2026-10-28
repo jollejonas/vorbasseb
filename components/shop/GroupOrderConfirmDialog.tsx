@@ -29,7 +29,7 @@ export function GroupOrderConfirmDialog({ open, deadline, onConfirm, onCancel }:
       >
         <div className="flex items-center gap-2 mb-3">
           <span className="text-blue-600 text-xl">📦</span>
-          <h3 className="font-semibold text-gray-900">Samlebestilling</h3>
+          <h3 className="font-semibold text-gray-900">Forudbestilling · Samlebestilling</h3>
         </div>
         <p className="text-sm text-gray-700 mb-2">
           Dette produkt indgår i en <strong>samlebestilling</strong>. Din betaling

@@ -4,11 +4,12 @@ import { Lock } from "lucide-react";
 import { formatPrice, withVat } from "@/lib/utils";
 import { getEffectivePrice } from "@/lib/pricing";
 import type { Product } from "@prisma/client";
+import { canPurchaseSku } from "@/lib/availability";
 
 type ProductWithSkus = Product & { skus: { stock: number }[] };
 
 export function ProductCard({ product, index = 0, vatPct = 25 }: { product: ProductWithSkus; index?: number; vatPct?: number }) {
-  const inStock = product.skus.some((s) => s.stock > 0);
+  const inStock = product.skus.some((s) => canPurchaseSku(product, s));
   const { effectivePrice, isOnSale } = getEffectivePrice(product.price, product.salePrice, product.salePriceStart, product.salePriceEnd);
 
   return (
@@ -41,6 +42,9 @@ export function ProductCard({ product, index = 0, vatPct = 25 }: { product: Prod
           </div>
         )}
 
+        {product.isGroupOrder && inStock && (
+          <span className="absolute bottom-2 left-2 bg-blue-50 text-blue-900 text-xs font-bold px-3 py-1 rounded-full">Forudbestilling</span>
+        )}
         {!inStock && (
           <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
             <span className="bg-white text-gray-800 text-xs font-bold px-3 py-1 rounded-full">
