@@ -3,6 +3,11 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { createHash } from "node:crypto";
+
+function passwordVersion(hash: string | null) {
+  return createHash("sha256").update(hash ?? "").digest("hex");
+}
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -32,6 +37,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: user.email,
           name: user.name,
           role: user.role,
+          passwordVersion: passwordVersion(user.passwordHash),
         };
       },
     }),
@@ -42,6 +48,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id = user.id;
         // @ts-expect-error custom field
         token.role = user.role;
+        token.passwordVersion = (user as typeof user & { passwordVersion: string }).passwordVersion;
       }
       // Always refresh clubRole and subscriptionStatus so changes take effect without re-login
       if (token.id) {
@@ -49,14 +56,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           const [dbUser, subscription] = await Promise.all([
             prisma.user.findUnique({
               where: { id: token.id as string },
-              select: { clubRole: true },
+              select: { clubRole: true, passwordHash: true },
             }),
             prisma.subscription.findUnique({
               where: { userId: token.id as string },
               select: { status: true },
             }),
           ]);
-          token.clubRole = dbUser?.clubRole ?? "NONE";
+          // Password resets revoke previously issued sessions on their next check.
+          if (!dbUser || token.passwordVersion !== passwordVersion(dbUser.passwordHash)) return null;
+          token.clubRole = dbUser.clubRole ?? "NONE";
           token.subscriptionStatus = subscription?.status ?? null;
         } catch {
           // DB temporarily unavailable — keep existing token values

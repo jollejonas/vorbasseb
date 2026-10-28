@@ -35,6 +35,8 @@ function checkRateLimit(ip: string): { limited: boolean; retryAfterSecs: number 
 const RATE_LIMITED_PATHS = new Set([
   "/api/auth/callback/credentials",
   "/api/auth/register",
+  "/api/auth/forgot-password",
+  "/api/auth/reset-password",
 ]);
 
 export default auth((req) => {
@@ -90,5 +92,7 @@ export const config = {
     "/konto/:path*",
     "/api/auth/callback/credentials",
     "/api/auth/register",
+    "/api/auth/forgot-password",
+    "/api/auth/reset-password",
   ],
 };
