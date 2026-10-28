@@ -4,6 +4,7 @@ import { signIn } from "next-auth/react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import Link from "next/link";
 
 export function LoginForm({
   searchParams,
@@ -65,6 +66,10 @@ export function LoginForm({
           className="w-full border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
         />
       </div>
+
+      <Link href="/glemt-kodeord" className="block text-sm text-secondary underline text-right">
+        Glemt kodeord?
+      </Link>
 
       <button
         type="submit"
