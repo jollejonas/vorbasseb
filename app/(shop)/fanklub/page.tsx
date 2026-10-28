@@ -1,4 +1,6 @@
 import { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { FANCLUB_ENABLED } from "@/lib/features";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Star, Check, Clock, Trophy } from "lucide-react";
@@ -68,6 +70,7 @@ const FAQ_ITEMS = [
 ];
 
 export default async function FanklubPage() {
+  if (!FANCLUB_ENABLED) notFound();
   const session = await auth();
 
   let isMember = false;

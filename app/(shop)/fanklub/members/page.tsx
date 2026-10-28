@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { auth } from "@/auth";
-import { redirect } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
+import { FANCLUB_ENABLED } from "@/lib/features";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/utils";
 import { Star } from "lucide-react";
@@ -11,6 +12,7 @@ import { CopyButton } from "@/components/shop/CopyButton";
 export const metadata: Metadata = { title: "Fanklub – Medlemsside" };
 
 export default async function FanklubMembersPage() {
+  if (!FANCLUB_ENABLED) notFound();
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 

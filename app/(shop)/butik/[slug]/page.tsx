@@ -1,4 +1,5 @@
 import { Metadata } from "next";
+import { FANCLUB_ENABLED } from "@/lib/features";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 import { auth } from "@/auth";
@@ -66,7 +67,10 @@ export default async function ProductPage({ params }: Props) {
       const sub = await prisma.subscription.findUnique({ where: { userId: session.user.id } });
       isMember = sub?.status === "ACTIVE";
     }
-    if (!isMember) redirect("/fanklub");
+    if (!isMember) {
+      if (!FANCLUB_ENABLED) notFound();
+      redirect("/fanklub");
+    }
   }
 
   return (
