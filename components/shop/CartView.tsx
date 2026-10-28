@@ -1,5 +1,6 @@
 "use client";
 
+import { FANCLUB_ENABLED } from "@/lib/features";
 import { useState, useEffect } from "react";
 import { Trash2, Package, Truck, Star } from "lucide-react";
 import Image from "next/image";
@@ -325,7 +326,7 @@ export function CartView() {
             {`Du er fanklubsmedlem — ${membership.discountPct}% rabat er inkluderet i totalen ovenfor`}
           </span>
         </div>
-      ) : membership !== null && !membership.isMember ? (
+      ) : FANCLUB_ENABLED && membership !== null && !membership.isMember ? (
         <div className="bg-[#0a0f1e] rounded-xl px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
           <div className="flex-1">
             <p className="text-white text-sm font-semibold flex items-center gap-1.5">

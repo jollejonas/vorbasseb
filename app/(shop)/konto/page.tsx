@@ -1,3 +1,4 @@
+import { FANCLUB_ENABLED } from "@/lib/features";
 import { Metadata } from "next";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -64,7 +65,8 @@ export default async function KontoPage() {
         />
       </div>
 
-      {/* Fanclub card */}
+      {/* Keep existing subscription management available while signups are hidden. */}
+      {(FANCLUB_ENABLED || sub) && (
       <div className="border border-gray-100 rounded-2xl p-6 mb-6">
         <h2 className="text-base font-semibold mb-4">Fanklubsmedlemskab</h2>
 
@@ -109,9 +111,9 @@ export default async function KontoPage() {
             {sub.status === "CANCELED" && (
               <p className="text-sm text-gray-500">
                 Dit medlemskab er annulleret.{" "}
-                <a href="/fanklub" className="text-secondary underline">
+                {FANCLUB_ENABLED && (<a href="/fanklub" className="text-secondary underline">
                   Tilmeld dig igen
-                </a>
+                </a>)}
               </p>
             )}
           </div>
@@ -120,12 +122,12 @@ export default async function KontoPage() {
             <p className="text-sm text-gray-600">
               Du er ikke fanklubsmedlem endnu.
             </p>
-            <a
+            {FANCLUB_ENABLED && (<a
               href="/fanklub"
               className="inline-block bg-primary text-secondary font-bold px-5 py-2 rounded-xl text-sm hover:bg-primary-dark transition"
             >
               Bliv fanklubsmedlem
-            </a>
+            </a>)}
             <p className="text-xs text-gray-400">
               Fanklubsmedlemmer får 10% rabat og adgang til eksklusive produkter.
             </p>
@@ -133,6 +135,7 @@ export default async function KontoPage() {
         )}
       </div>
 
+      )}
       {/* Quick links */}
       <div className="border border-gray-100 rounded-2xl p-6">
         <h2 className="text-base font-semibold mb-4">Genveje</h2>
@@ -151,13 +154,13 @@ export default async function KontoPage() {
             Gå til butikken
             <span className="text-gray-400">→</span>
           </a>
-          <a
+          {FANCLUB_ENABLED && (<a
             href="/fanklub"
             className="flex items-center justify-between text-sm text-gray-700 hover:text-secondary py-1"
           >
             Om fanklubben
             <span className="text-gray-400">→</span>
-          </a>
+          </a>)}
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { FANCLUB_ENABLED } from "@/lib/features";
 import Link from "next/link";
 import Image from "next/image";
 import { ShoppingCart, Menu, X, Star } from "lucide-react";
@@ -13,7 +14,7 @@ const navLinks = [
   { href: "/butik?kategori=traeningtoj", label: "TRÆNINGSTØJ" },
   { href: "/butik?kategori=fritidstoj", label: "FRITIDSTØJ" },
   { href: "/butik?kategori=tilbehor", label: "TILBEHØR" },
-  { href: "/fanklub", label: "FANKLUB" },
+  ...(FANCLUB_ENABLED ? [{ href: "/fanklub", label: "FANKLUB" }] : []),
 ];
 
 export function Header() {

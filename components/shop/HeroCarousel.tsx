@@ -1,5 +1,6 @@
 "use client";
 
+import { FANCLUB_ENABLED, isFanclubLink } from "@/lib/features";
 import { useCallback, useEffect, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import Autoplay from "embla-carousel-autoplay";
@@ -26,12 +27,12 @@ function StaticHeroFallback() {
             >
               Se butikken <ArrowRight size={16} />
             </Link>
-            <Link
+            {FANCLUB_ENABLED && (<Link
               href="/fanklub"
               className="flex items-center gap-2 bg-white/10 text-white font-semibold px-8 py-3 rounded-xl hover:bg-white/20 transition border border-white/20 text-sm"
             >
               <Star size={16} className="text-primary" /> Bliv fanklubsmedlem
-            </Link>
+            </Link>)}
           </div>
         </div>
       </div>
@@ -39,7 +40,8 @@ function StaticHeroFallback() {
   );
 }
 
-export function HeroCarousel({ slides }: Props) {
+export function HeroCarousel({ slides: allSlides }: Props) {
+  const slides = FANCLUB_ENABLED ? allSlides : allSlides.filter((slide) => !isFanclubLink(slide.ctaHref));
   const [emblaRef, emblaApi] = useEmblaCarousel(
     { loop: true },
     [Autoplay({ delay: 5000, stopOnMouseEnter: true, stopOnInteraction: false })]

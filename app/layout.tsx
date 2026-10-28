@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     template: "%s | VBK Shoppen",
   },
   description:
-    "Officiel merchandise-butik for Vorbasse Boldklub. Køb trøjer, træningsudstyr og bliv fanklubsmedlem.",
+    "Officiel merchandise-butik for Vorbasse Boldklub. Køb trøjer og træningsudstyr, og støt klubben.",
 };
 
 export default function RootLayout({

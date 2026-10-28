@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { auth } from "@/auth";
+import { FANCLUB_ENABLED } from "@/lib/features";
 
 export async function POST(req: NextRequest) {
+  if (!FANCLUB_ENABLED) {
+    return NextResponse.json({ error: "Fanklubben er ikke åben for tilmelding." }, { status: 403 });
+  }
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
   const session = await auth();
   if (!session?.user?.id) {

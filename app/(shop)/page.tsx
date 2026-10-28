@@ -1,3 +1,4 @@
+import { FANCLUB_ENABLED } from "@/lib/features";
 import Link from "next/link";
 import Image from "next/image";
 import { prisma } from "@/lib/prisma";
@@ -111,7 +112,7 @@ export default async function HomePage() {
         </section>
       )}
 
-      <section className="max-w-6xl mx-auto px-4 py-16">
+      {FANCLUB_ENABLED && (<section className="max-w-6xl mx-auto px-4 py-16">
         <div className="bg-secondary rounded-2xl p-10 text-white text-center">
           <Image src="/logo.png" alt="Vorbasse Boldklub" width={72} height={72} className="mx-auto mb-4" />
           <h2 className="text-3xl font-bold mb-3">Bliv en del af ForzaHestene</h2>
@@ -126,7 +127,7 @@ export default async function HomePage() {
             <Star size={16} /> Se fanklubsfordele <ArrowRight size={18} />
           </Link>
         </div>
-      </section>
+      </section>)}
     </>
   );
 }
