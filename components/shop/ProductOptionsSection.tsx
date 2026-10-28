@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { canPurchaseSku } from "@/lib/availability";
 import { useCart } from "./CartProvider";
 import { GroupOrderConfirmDialog } from "./GroupOrderConfirmDialog";
+import { ProductImageGallery } from "./ProductImageGallery";
 import { formatPrice, withVat } from "@/lib/utils";
 import { getEffectivePrice } from "@/lib/pricing";
 import { sanitizeHtml } from "@/lib/sanitizeHtml";
@@ -197,35 +198,11 @@ export function ProductOptionsSection({ product, skus, optionGroups, vatPct = 25
     />
     <div className="grid md:grid-cols-2 gap-8">
       {/* Gallery */}
-      <div>
-        {activeImages.length > 0 ? (
-          <div className="space-y-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={activeImages[0]}
-              alt={product.name}
-              className="w-full aspect-square object-contain rounded-2xl"
-            />
-            {activeImages.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {activeImages.slice(1).map((url, i) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={i}
-                    src={url}
-                    alt=""
-                    className="w-20 h-20 object-cover rounded-lg flex-shrink-0"
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="w-full aspect-square bg-gray-100 rounded-2xl flex items-center justify-center text-gray-400">
-            Intet billede
-          </div>
-        )}
-      </div>
+      <ProductImageGallery
+        key={selectedColorValueId ?? "default"}
+        images={activeImages}
+        name={product.name}
+      />
 
       {/* Options + add to cart */}
       <div className="space-y-5">
