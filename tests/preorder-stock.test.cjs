@@ -37,6 +37,7 @@ test('actual size selector enables zero-stock preorders and still disables regul
   const { ProductOptionsSection } = load('components/shop/ProductOptionsSection.tsx', {
     './CartProvider': { useCart: () => ({ addItem() {} }) },
     './GroupOrderConfirmDialog': { GroupOrderConfirmDialog: () => null },
+    './ProductImageGallery': load('components/shop/ProductImageGallery.tsx'),
     '@/lib/sanitizeHtml': { sanitizeHtml: s => s },
   });
   const props = { product, skus: [sku], optionGroups: [{ id: 'sizes', type: 'SIZE', label: 'Størrelse', values: [{ id: 'medium', label: 'M' }] }] };
