@@ -91,7 +91,8 @@ test('fulfillment leaves preorder stock at zero and sends no low-stock alert', a
     const updates = []; const alerts = [];
     const storedSku = { ...sku, product: { ...product, isGroupOrder } };
     const db = {
-      order: { findUnique: async () => ({ id: 'order-1', status: 'PENDING', total: 20000, items: [{ skuId: sku.id, sku: storedSku, quantity: 1, priceAtPurchase: 20000 }] }), update: async () => {} },
+      order: { findUnique: async () => ({ id: 'order-1', status: 'PENDING', total: 20000, items: [{ skuId: sku.id, sku: storedSku, quantity: 1, priceAtPurchase: 20000 }] }), update: async () => {}, updateMany: async () => ({ count: 1 }) },
+      orderNumberCounter: { update: async () => ({ value: 1 }) },
       sKU: { update: async args => updates.push(args), findUnique: async () => storedSku },
       $transaction: async fn => fn(db),
     };
@@ -99,7 +100,7 @@ test('fulfillment leaves preorder stock at zero and sends no low-stock alert', a
       '@/lib/prisma': { prisma: db },
       '@/lib/email': { sendOrderConfirmation: async () => {}, sendLowStockAlert: async (...args) => alerts.push(args) },
     });
-    assert.equal(await fulfillOrder({ mode: 'payment', id: 'session-1', metadata: { orderId: 'order-1' } }), true);
+    assert.equal(await fulfillOrder({ mode: 'payment', status: 'complete', payment_status: 'paid', id: 'session-1', metadata: { orderId: 'order-1' } }), true);
     assert.equal(updates.length, isGroupOrder ? 0 : 1);
     assert.equal(alerts.length, isGroupOrder ? 0 : 1);
   }

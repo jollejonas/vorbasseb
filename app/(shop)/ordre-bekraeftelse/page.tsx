@@ -3,24 +3,44 @@ import Link from "next/link";
 import { CartClearer } from "@/components/shop/CartClearer";
 import Stripe from "stripe";
 import { fulfillOrder } from "@/lib/fulfillOrder";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 
 export default async function OrdrebekraefdelsePage({
   searchParams,
 }: {
-  searchParams: Promise<{ session_id?: string }>;
+  searchParams: Promise<{ session_id?: string; order_id?: string }>;
 }) {
-  const { session_id } = await searchParams;
+  const { session_id, order_id } = await searchParams;
+  let paymentConfirmed = false;
+  if (order_id) {
+    const userSession = await auth();
+    if (userSession?.user?.id) {
+      paymentConfirmed = !!await prisma.order.findFirst({ where: {
+        id: order_id, userId: userSession.user.id, total: 0, status: "PAID", orderNumber: { not: null },
+      } });
+    }
+  }
 
   // Fallback fulfillment — in case the webhook hasn't fired yet
   if (session_id) {
     try {
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
       const session = await stripe.checkout.sessions.retrieve(session_id);
+      paymentConfirmed = session.mode === "payment" && session.status === "complete" && ["paid", "no_payment_required"].includes(session.payment_status);
       await fulfillOrder(session);
     } catch (err) {
       console.error("[ordre-bekraeftelse] fulfillOrder failed:", err);
     }
   }
+
+  if (!paymentConfirmed) return (
+    <div className="max-w-md mx-auto px-4 py-16 text-center space-y-4">
+      <h1 className="text-2xl font-bold">Betalingen er ikke bekræftet endnu</h1>
+      <p>Hvis du netop har betalt, kan du opdatere siden om et øjeblik. Din kurv er bevaret.</p>
+      <Link href="/kurv" className="text-secondary underline">Tilbage til kurven</Link>
+    </div>
+  );
 
   return (
     <div className="min-h-[70vh] flex items-center justify-center px-4">

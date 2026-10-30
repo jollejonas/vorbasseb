@@ -41,6 +41,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   const { id } = await params;
   const { status } = await req.json();
+  const existing = await prisma.order.findUnique({ where: { id }, select: { orderNumber: true, status: true } });
+  if (!existing || existing.orderNumber === null || existing.status === "PENDING") return NextResponse.json({ error: "Ordren er ikke gennemført." }, { status: 409 });
+  if (status === "PENDING") return NextResponse.json({ error: "En gennemført ordre kan ikke ændres til et betalingsforsøg." }, { status: 400 });
 
   const order = await prisma.order.update({ where: { id }, data: { status } });
 
@@ -73,6 +76,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     refunded?: boolean;
     cancelledAt?: string | null;
   } = await req.json();
+  const existing = await prisma.order.findUnique({ where: { id }, select: { orderNumber: true, status: true } });
+  if (!existing || existing.orderNumber === null || existing.status === "PENDING") return NextResponse.json({ error: "Ordren er ikke gennemført." }, { status: 409 });
+  if (body.status === "PENDING") return NextResponse.json({ error: "En gennemført ordre kan ikke ændres til et betalingsforsøg." }, { status: 400 });
 
   const data: Record<string, unknown> = {};
   if (body.status !== undefined) data.status = body.status;

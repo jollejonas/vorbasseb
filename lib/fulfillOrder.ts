@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { sendOrderConfirmation, sendLowStockAlert } from "@/lib/email";
 import { tracksStock } from "@/lib/availability";
+import { allocateOrderNumber } from "@/lib/order-number";
 
 /**
  * Fulfills a Stripe checkout.session.completed event.
@@ -10,7 +11,8 @@ import { tracksStock } from "@/lib/availability";
  * Returns true if the order was fulfilled, false if it was already done.
  */
 export async function fulfillOrder(session: Stripe.Checkout.Session): Promise<boolean> {
-  if (session.mode !== "payment") return false;
+  if (session.mode !== "payment" || session.status !== "complete" ||
+      !["paid", "no_payment_required"].includes(session.payment_status)) return false;
 
   const { orderId, userId, grantIds, vatRate: vatRateMeta } = session.metadata ?? {};
   if (!orderId) return false;
@@ -34,8 +36,16 @@ export async function fulfillOrder(session: Stripe.Checkout.Session): Promise<bo
   const phone = session.customer_details?.phone ?? null;
   const shippingInfo = session.collected_information?.shipping_details;
 
-  await prisma.$transaction(
+  const confirmedNumber = await prisma.$transaction(
     async (tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) => {
+      // Claim the checkout before touching inventory or numbering. Concurrent
+      // webhooks/success-page requests can only confirm this order once.
+      const claimed = await tx.order.updateMany({
+        where: { id: orderId, status: "PENDING", OR: [{ stripeSessionId: session.id }, { stripeSessionId: null }] },
+        data: { status: "PAID" },
+      });
+      if (claimed.count !== 1) return null;
+      const orderNumber = await allocateOrderNumber(tx);
       // Create address record from shipping details (if available)
       let addressId: string | null = null;
       if (shippingInfo?.address && shippingInfo.name) {
@@ -62,6 +72,8 @@ export async function fulfillOrder(session: Stripe.Checkout.Session): Promise<bo
         where: { id: orderId },
         data: {
           status: "PAID",
+          orderNumber,
+          createdAt: new Date(),
           stripeSessionId: session.id,
           stripePaymentId: paymentIntentId,
           total: session.amount_total ?? order.total,
@@ -96,8 +108,10 @@ export async function fulfillOrder(session: Stripe.Checkout.Session): Promise<bo
           }
         }
       }
+      return orderNumber;
     },
   );
+  if (confirmedNumber === null) return false;
 
   // Send low-stock alerts outside the transaction (external service)
   for (const item of order.items) {
@@ -131,7 +145,7 @@ export async function fulfillOrder(session: Stripe.Checkout.Session): Promise<bo
       to: email,
       customerName,
       orderTotal: session.amount_total ?? order.total,
-      orderNumber: order.orderNumber,
+      orderNumber: confirmedNumber,
       deliveryMethod: order.deliveryMethod,
       groupOrderHoldUntil: order.groupOrderHoldUntil,
       items: order.items.map((item) => {

@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
   try {
     switch (event.type) {
       case "checkout.session.completed":
+      case "checkout.session.async_payment_succeeded":
         await handleCheckoutComplete(event.data.object as Stripe.Checkout.Session);
         break;
       case "customer.subscription.created":
@@ -39,8 +40,8 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[stripe webhook] handler error:", message);
-    // Return 200 so Stripe stops retrying; check Vercel logs for the actual error
-    return NextResponse.json({ received: true, handlerError: message });
+    // Retry transient failures rather than silently losing a paid order.
+    return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 });
   }
 
   return NextResponse.json({ received: true });

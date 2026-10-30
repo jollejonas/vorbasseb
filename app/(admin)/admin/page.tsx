@@ -91,16 +91,16 @@ export default async function AdminPage() {
   ] = await Promise.all([
     prisma.order.count({ where: { status: "PAID" } }),
     prisma.order.count({ where: { status: { in: ["PAID", "SHIPPED"] } } }),
-    prisma.order.count({ where: { createdAt: { gte: startOfToday } } }),
-    prisma.order.count({ where: { createdAt: { gte: startOfWeek } } }),
-    prisma.order.count({ where: { createdAt: { gte: startOfMonth } } }),
+    prisma.order.count({ where: { orderNumber: { not: null }, NOT: { status: "PENDING" }, createdAt: { gte: startOfToday } } }),
+    prisma.order.count({ where: { orderNumber: { not: null }, NOT: { status: "PENDING" }, createdAt: { gte: startOfWeek } } }),
+    prisma.order.count({ where: { orderNumber: { not: null }, NOT: { status: "PENDING" }, createdAt: { gte: startOfMonth } } }),
     prisma.subscription.count({ where: { status: "ACTIVE" } }),
     prisma.order.aggregate({
       where: { status: { in: ["PAID", "SHIPPED", "DELIVERED"] } },
       _sum: { total: true },
     }),
     prisma.order.findMany({
-      where: { status: { in: ["PAID", "PENDING"] } },
+      where: { orderNumber: { not: null }, NOT: { status: "PENDING" } },
       orderBy: { createdAt: "desc" },
       take: 5,
       select: {
