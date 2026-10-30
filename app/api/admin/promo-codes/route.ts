@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   if (session?.user?.role !== "ADMIN") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const parsed = promoCodeSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
-  const { code, type, amount, expiryDate, oneTimePerCustomer, maxUses, productId } = parsed.data;
+  const { code, type, amount, expiryDate, oneTimePerCustomer, maxUses, productId, replacesSale } = parsed.data;
   let expires: number | undefined;
   if (expiryDate) {
     try { expires = promoExpiry(expiryDate); } catch { return NextResponse.json({ error: "Ugyldig udløbsdato." }, { status: 400 }); }
@@ -41,13 +41,23 @@ export async function POST(req: NextRequest) {
     stripe = getStripe();
     const product = productId ? await prisma.product.findUnique({ where: { id: productId }, select: { id: true, name: true, images: true } }) : null;
     if (productId && !product) return NextResponse.json({ error: "Det valgte produkt findes ikke længere." }, { status: 400 });
-    const stripeId = product ? await ensureStripeProduct(stripe, product) : undefined;
-    const metadata: Stripe.MetadataParam = product ? { shopProductId: product.id, shopProductName: product.name.slice(0, 500) } : {};
+    // Explicit eligibility lets checkout exclude sale items and shipping while
+    // retaining Stripe's native redemption limits and expiry enforcement.
+    const products = product ? [product] : await prisma.product.findMany({ select: { id: true, name: true, images: true } });
+    const bundles = product ? [] : await prisma.pakketilbud.findMany({ select: { id: true, name: true } });
+    const eligible = [...products, ...bundles.map(p => ({ ...p, id: `bundle_${p.id}` }))];
+    if (!eligible.length) return NextResponse.json({ error: "Opret et produkt først." }, { status: 400 });
+    const stripeIds: string[] = [];
+    for (const p of eligible) stripeIds.push(await ensureStripeProduct(stripe, p));
+    const metadata: Stripe.MetadataParam = {
+      ...(product ? { shopProductId: product.id, shopProductName: product.name.slice(0, 500) } : { shopProductName: "Alle nuværende produkter og pakketilbud" }),
+      replacesSale: String(replacesSale),
+    };
     coupon = await stripe.coupons.create({
       ...(type === "percent" ? { percent_off: amount } : { amount_off: Math.round(amount * 100), currency: "dkk" }),
       duration: "once",
       ...(expires ? { redeem_by: expires } : {}),
-      ...(stripeId ? { applies_to: { products: [stripeId] } } : {}),
+      applies_to: { products: stripeIds },
       metadata,
     });
     const promo = await stripe.promotionCodes.create({
