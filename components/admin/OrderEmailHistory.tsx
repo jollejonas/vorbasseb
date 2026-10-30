@@ -15,8 +15,8 @@ const statuses: Record<string, string> = {
 const kinds: Record<string, string> = { CONFIRMATION: "Ordrebekræftelse", SHIPPING: "Forsendelsesbesked", UPDATE: "Manuel opdatering" };
 const date = (value: string) => new Intl.DateTimeFormat("da-DK", { dateStyle: "short", timeStyle: "medium", timeZone: "Europe/Copenhagen" }).format(new Date(value));
 
-export function OrderEmailHistory({ orderId, orderNumber, recipient, sender, emails }: {
-  orderId: string; orderNumber: number; recipient: string | null; sender: string; emails: EmailEntry[];
+export function OrderEmailHistory({ orderId, orderNumber, recipient, sender, emails, available = true }: {
+  orderId: string; orderNumber: number; recipient: string | null; sender: string; emails: EmailEntry[]; available?: boolean;
 }) {
   const router = useRouter();
   const [subject, setSubject] = useState(`Opdatering om ordre #${orderNumber} – Vorbasse Boldklub`);
@@ -28,7 +28,7 @@ export function OrderEmailHistory({ orderId, orderNumber, recipient, sender, ema
 
   async function send(event: React.FormEvent) {
     event.preventDefault();
-    if (inFlight.current) return;
+    if (inFlight.current || !available) return;
     inFlight.current = true;
     setSending(true);
     setFeedback("");
@@ -65,7 +65,8 @@ export function OrderEmailHistory({ orderId, orderNumber, recipient, sender, ema
     </div>
     <p className="mt-2 text-sm text-gray-500">Historikken omfatter mails sendt fra ordren efter aktivering af funktionen. Afsendt betyder, at mailtjenesten har modtaget mailen — det bekræfter ikke levering eller læsning.</p>
     <div className="my-5 space-y-3">
-      {emails.length === 0 && <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">Ingen registrerede e-mails på denne ordre endnu.</p>}
+      {!available && <p role="alert" className="rounded-lg bg-amber-50 p-4 text-sm text-amber-900">Mailhistorikken er midlertidigt utilgængelig. Resten af ordren kan bruges som normalt. Manuel afsendelse er deaktiveret, indtil historikken er klar. Hvis funktionen netop er udgivet, skal databaseopdateringen gennemføres.</p>}
+      {available && emails.length === 0 && <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">Ingen registrerede e-mails på denne ordre endnu.</p>}
       {emails.map(email => <details key={email.id} className="rounded-lg border p-4">
         <summary className="cursor-pointer">
           <span className="font-semibold">{email.subject}</span>
@@ -91,7 +92,7 @@ export function OrderEmailHistory({ orderId, orderNumber, recipient, sender, ema
       <label className="block text-sm font-medium">Emne<input required maxLength={200} value={subject} disabled={sending} onChange={e => setSubject(e.target.value)} className="mt-1 w-full rounded-lg border p-3" /></label>
       <label className="block text-sm font-medium">Besked<textarea required maxLength={10000} rows={7} value={message} disabled={sending} onChange={e => setMessage(e.target.value)} placeholder="Skriv opdateringen til kunden her…" className="mt-1 w-full rounded-lg border p-3" /></label>
       <p className="text-xs text-gray-500">Beskeden sendes med klubbens navn og ordrenummer. Den ændrer ikke ordrens status.</p>
-      <button disabled={sending || !recipient || !sender || !subject.trim() || !message.trim()} className="rounded-lg bg-secondary px-5 py-3 font-semibold text-white disabled:opacity-50">{sending ? "Sender…" : "Send e-mail til kunden"}</button>
+      <button disabled={!available || sending || !recipient || !sender || !subject.trim() || !message.trim()} className="rounded-lg bg-secondary px-5 py-3 font-semibold text-white disabled:opacity-50">{sending ? "Sender…" : "Send e-mail til kunden"}</button>
       {feedback && <p role="status" className="rounded-lg bg-gray-50 p-3 text-sm">{feedback}</p>}
     </form>
   </section>;

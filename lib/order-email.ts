@@ -21,6 +21,18 @@ export async function sendOrderEmail(input: OrderEmailInput) {
   try {
     log = await prisma.orderEmail.create({ data: input });
   } catch (error) {
+    // Preserve existing automatic notifications during rollout if the new table is absent.
+    // Manual messages still require a durable log; other database errors never bypass logging.
+    const dbError = error as { code?: string; meta?: { table?: string; modelName?: string } };
+    if (input.automatic && dbError.code === "P2021" &&
+        (dbError.meta?.modelName === "OrderEmail" || dbError.meta?.table?.endsWith("OrderEmail"))) {
+      console.error("OrderEmail table missing: automatic notification sent without history");
+      const result = await resend.emails.send({
+        from: input.from, to: input.to, subject: input.subject, html: input.html,
+      }, { idempotencyKey: `order-email-rollout/${input.orderId}/${input.kind}` });
+      if (result.error || !result.data?.id) throw new Error("Automatic order email was not accepted");
+      return { status: "ACCEPTED", providerId: result.data.id };
+    }
     // A double click or network retry must not send a second manual message.
     if (input.requestKey && (error as { code?: string }).code === "P2002") {
       const existing = await prisma.orderEmail.findUnique({ where: { requestKey: input.requestKey } });
