@@ -5,9 +5,11 @@ import { toast } from "sonner";
 
 type Props = {
   onCreated: () => void;
+  products: { id: string; name: string }[];
 };
 
-export function PromoCodeForm({ onCreated }: Props) {
+export function PromoCodeForm({ onCreated, products }: Props) {
+  const [productId, setProductId] = useState("");
   const [code, setCode] = useState("");
   const [type, setType] = useState<"percent" | "fixed">("percent");
   const [amount, setAmount] = useState("");
@@ -19,6 +21,10 @@ export function PromoCodeForm({ onCreated }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!code.trim() || !amount) return;
+    if (!/^[A-Z0-9]+$/.test(code.trim().toUpperCase())) {
+      toast.error("Brug kun A–Z og 0–9. Skriv fx TRAENER i stedet for TRÆNER.");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -28,23 +34,25 @@ export function PromoCodeForm({ onCreated }: Props) {
         body: JSON.stringify({
           code: code.trim().toUpperCase(),
           type,
+          productId: productId || undefined,
           amount: Number(amount),
           expiryDate: expiryDate || undefined,
           oneTimePerCustomer,
           maxUses: maxUses ? Number(maxUses) : undefined,
         }),
       });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Rabatkoden kunne ikke oprettes. Prøv igen.");
       toast.success(`Kode oprettet: ${data.code}`);
       setCode("");
       setAmount("");
       setExpiryDate("");
       setOneTimePerCustomer(false);
       setMaxUses("");
+      setProductId("");
       onCreated();
-    } catch {
-      toast.error("Noget gik galt – tjek Stripe-nøglen");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Der kunne ikke oprettes forbindelse. Prøv igen.");
     } finally {
       setSaving(false);
     }
@@ -65,8 +73,21 @@ export function PromoCodeForm({ onCreated }: Props) {
             onChange={(e) => setCode(e.target.value.toUpperCase())}
             placeholder="SOMMER25"
             required
+            maxLength={100}
             className="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-secondary"
           />
+          <p className="mt-1 text-xs text-gray-500">Brug A–Z og 0–9, fx TRAENERJULESWEATER2026. Ingen Æ, Ø eller Å.</p>
+        </div>
+
+        <div className="sm:col-span-2">
+          <label htmlFor="promo-product" className="block text-xs text-gray-500 mb-1">Gælder for</label>
+          <select id="promo-product" value={productId} onChange={(e) => setProductId(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">Alle produkter</option>
+            {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <p className="mt-1 text-xs text-gray-500">Vælg ét produkt for kun at give rabat på dette produkt i kurven. Gælder alle størrelser og farver, men ikke som del af et pakketilbud.</p>
+          {type === "fixed" && <p className="mt-1 text-xs text-gray-500">Et fast beløb gives én gang pr. ordre, højst værdien af de varer, koden gælder for. Ikke pr. stk.</p>}
+          <p className="mt-1 text-xs text-gray-500">Koden indtastes ved betaling. Kan ikke kombineres med tilbud, fanklubsrabat eller tildelte produkter.</p>
         </div>
 
         {/* Type */}
@@ -150,7 +171,7 @@ export function PromoCodeForm({ onCreated }: Props) {
               onChange={(e) => setOneTimePerCustomer(e.target.checked)}
               className="accent-secondary"
             />
-            Kun én gang per kunde (gælder kun nye kunder i Stripe)
+            Kun nye kunder i Stripe (første køb)
           </label>
         </div>
       </div>

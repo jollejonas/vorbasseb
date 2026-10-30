@@ -6,6 +6,7 @@ import type { CartItem, OptionSelection, PrintElement } from "@/components/shop/
 import { getEffectivePrice } from "@/lib/pricing";
 import { canPurchaseSku, tracksStock } from "@/lib/availability";
 import { allocateOrderNumber } from "@/lib/order-number";
+import { ensureStripeProduct } from "@/lib/stripe-products";
 
 export async function POST(req: NextRequest) {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -34,6 +35,8 @@ export async function POST(req: NextRequest) {
       stock: true,
       product: {
         select: {
+          name: true,
+          images: true,
           price: true,
           membersOnly: true,
           clubRoleRequired: true,
@@ -364,6 +367,20 @@ export async function POST(req: NextRequest) {
   // ── Stripe path ───────────────────────────────────────────────────────────
 
   // Create PENDING order with all items before redirecting to Stripe
+  const stripeProductIds = new Map<string, string>();
+  try {
+    for (const item of items) {
+      if (item.isPakketilbud) continue;
+      const sku = skuMap.get(item.skuId)!;
+      if (!stripeProductIds.has(sku.productId)) {
+        stripeProductIds.set(sku.productId, await ensureStripeProduct(stripe, { id: sku.productId, name: sku.product.name, images: sku.product.images }));
+      }
+    }
+  } catch {
+    console.error("Could not prepare Stripe product identities for checkout");
+    return NextResponse.json({ error: "Betalingen kunne ikke forberedes. Prøv igen om lidt." }, { status: 502 });
+  }
+
   const pendingOrder = await prisma.order.create({
     data: {
       userId: session?.user?.id ?? null,
@@ -400,7 +417,9 @@ export async function POST(req: NextRequest) {
     lineItems.push({
       price_data: {
         currency: "dkk",
-        product_data: { name, images: item.image?.startsWith("https://") ? [item.image] : [] },
+        ...(item.isPakketilbud
+          ? { product_data: { name, images: item.image?.startsWith("https://") ? [item.image] : [] } }
+          : { product: stripeProductIds.get(skuProductMap.get(item.skuId)!)! }),
         unit_amount: unitPriceInclVat,
       },
       quantity: item.quantity,

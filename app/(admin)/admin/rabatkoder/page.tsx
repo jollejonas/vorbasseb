@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { PromoCodeList } from "@/components/admin/PromoCodeList";
 import { Tag } from "lucide-react";
+import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = { title: "Rabatkoder – Admin" };
 
@@ -10,6 +11,7 @@ export default async function AdminRabatkoder() {
   const session = await auth();
   // @ts-expect-error custom field
   if (session?.user?.role !== "ADMIN") redirect("/");
+  const products = await prisma.product.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } });
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10">
@@ -22,7 +24,7 @@ export default async function AdminRabatkoder() {
           Rabatkoder
         </h1>
       </div>
-      <PromoCodeList />
+      <PromoCodeList products={products} />
     </div>
   );
 }
