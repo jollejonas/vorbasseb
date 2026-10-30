@@ -12,7 +12,7 @@ import type { Prisma } from "@prisma/client";
 export const metadata: Metadata = { title: "Ordrer – Admin" };
 
 // Active = not yet in a terminal state
-const ACTIVE_STATUSES = ["PENDING", "PAID", "SHIPPED", "AWAITING_PICKUP", "PICKUP_READY", "DELIVERED"];
+const ACTIVE_STATUSES = ["PAID", "SHIPPED", "AWAITING_PICKUP", "PICKUP_READY", "DELIVERED"];
 
 type Props = {
   searchParams: Promise<{ status?: string; levering?: string; q?: string }>;
@@ -25,7 +25,7 @@ export default async function AdminOrdrerPage({ searchParams }: Props) {
 
   const { status, levering, q } = await searchParams;
 
-  const where: Prisma.OrderWhereInput = {};
+  const where: Prisma.OrderWhereInput = { orderNumber: { not: null }, NOT: { status: "PENDING" } };
 
   if (status === "active") {
     where.status = { in: ACTIVE_STATUSES as Prisma.EnumOrderStatusFilter["in"] };

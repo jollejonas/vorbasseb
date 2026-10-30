@@ -335,7 +335,7 @@ model SKU {
 
 model Order {
   id              String         @id @default(cuid())
-  orderNumber     Int            @default(autoincrement())
+  orderNumber     Int?           @unique
   userId          String?
   user            User?          @relation(fields: [userId], references: [id])
   guestEmail      String?
@@ -657,4 +657,9 @@ model OrderEmail {
   sentAt         DateTime?
 
   @@index([orderId, createdAt])
+}
+
+model OrderNumberCounter {
+  id String @id
+  value Int
 }

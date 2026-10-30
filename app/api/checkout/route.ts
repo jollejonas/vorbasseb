@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import type { CartItem, OptionSelection, PrintElement } from "@/components/shop/CartProvider";
 import { getEffectivePrice } from "@/lib/pricing";
 import { canPurchaseSku, tracksStock } from "@/lib/availability";
+import { allocateOrderNumber } from "@/lib/order-number";
 import { ensureStripeProduct } from "@/lib/stripe-products";
 
 export async function POST(req: NextRequest) {
@@ -319,7 +320,7 @@ export async function POST(req: NextRequest) {
 
   // ── Zero-total path: skip Stripe, create PAID order directly ─────────────
   if (finalTotal <= 0 && appliedGrantIds.length > 0) {
-    await prisma.$transaction(async (tx) => {
+    const confirmedOrderId = await prisma.$transaction(async (tx) => {
       // Decrement stock
       for (const item of items) {
         if (item.isPakketilbud) {
@@ -335,6 +336,7 @@ export async function POST(req: NextRequest) {
 
       const created = await tx.order.create({
         data: {
+          orderNumber: await allocateOrderNumber(tx),
           userId: session?.user?.id ?? null,
           customerName: session?.user?.name ?? null,
           status: "PAID",
@@ -356,9 +358,10 @@ export async function POST(req: NextRequest) {
       if (result.count !== appliedGrantIds.length) {
         throw new Error("En eller flere tildelinger er allerede brugt — prøv igen.");
       }
+      return created.id;
     });
 
-    return NextResponse.json({ redirect: "/ordre-bekraeftelse" });
+    return NextResponse.json({ redirect: `/ordre-bekraeftelse?order_id=${encodeURIComponent(confirmedOrderId)}` });
   }
 
   // ── Stripe path ───────────────────────────────────────────────────────────

@@ -57,7 +57,7 @@ export default async function AdminOrderDetailPage({ params }: Params) {
     },
   });
 
-  if (!order) notFound();
+  if (!order || order.orderNumber === null || order.status === "PENDING") notFound();
 
   const emailHistory = await loadOrderEmailHistory(order.id);
 

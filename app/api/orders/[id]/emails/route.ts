@@ -18,7 +18,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!input.success) return NextResponse.json({ error: "Udfyld et emne og en besked (maks. 10.000 tegn)." }, { status: 400 });
   const { id } = await params;
   const order = await prisma.order.findUnique({ where: { id }, include: { user: { select: { email: true } } } });
-  if (!order) return NextResponse.json({ error: "Ordren findes ikke." }, { status: 404 });
+  if (!order || order.orderNumber === null || order.status === "PENDING") return NextResponse.json({ error: "Ordren findes ikke." }, { status: 404 });
   const to = order.guestEmail || order.user?.email;
   if (!to || !z.string().email().safeParse(to).success) return NextResponse.json({ error: "Ordren mangler en gyldig e-mailadresse." }, { status: 400 });
   const from = process.env.RESEND_FROM_EMAIL;

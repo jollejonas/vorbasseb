@@ -53,7 +53,7 @@ export default async function OrderDetailPage({ params }: Params) {
   ] as const);
 
   // Security: order must exist and belong to this user
-  if (!order || order.userId !== session.user.id) notFound();
+  if (!order || order.userId !== session.user.id || order.orderNumber === null || order.status === "PENDING") notFound();
 
   const vatPct = parseInt(cfg.find((s) => s.key === "vat_rate")?.value ?? "25");
   const contactEmail = cfg.find((s) => s.key === "footer_email")?.value ?? "info@vorbassebk.dk";

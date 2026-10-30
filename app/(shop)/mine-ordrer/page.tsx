@@ -1,4 +1,5 @@
 import { Metadata } from "next";
+import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
@@ -12,7 +13,7 @@ export default async function MineOrdrerPage() {
 
   const [orders, cfg] = await Promise.all([
     prisma.order.findMany({
-      where: { userId: session.user.id },
+      where: { userId: session.user.id, orderNumber: { not: null }, NOT: { status: "PENDING" } },
       include: {
         items: {
           include: { sku: { include: { product: { select: { name: true } } } } },
@@ -32,9 +33,9 @@ export default async function MineOrdrerPage() {
       {orders.length === 0 ? (
         <div className="text-center py-20">
           <p className="text-gray-500 mb-4">Du har endnu ingen ordrer.</p>
-          <a href="/butik" className="text-secondary underline hover:text-secondary-dark">
+          <Link href="/butik" className="text-secondary underline hover:text-secondary-dark">
             Gå til butikken
-          </a>
+          </Link>
         </div>
       ) : (
         <OrderList orders={orders} vatPct={vatPct} />
