@@ -12,7 +12,7 @@ npx prisma migrate deploy
 
 Generate the Prisma client as part of the normal build. The existing `RESEND_API_KEY` and `RESEND_FROM_EMAIL` are required for sends. No live database migration or email send was performed during development.
 
-The new `OrderEmail` table is needed for both the order detail page and outgoing order mail. Logging fails closed: if the initial record cannot be saved, no email is sent. Do not deploy application code before the migration.
+The new `OrderEmail` table is needed for history and manual updates. History is loaded separately: any history read failure shows an unavailable notice and disables the manual send button without blocking the rest of the order. Manual sending requires a saved log. Automatic confirmation/shipping messages temporarily use their previous sending behavior only when Prisma explicitly reports that the OrderEmail table is missing; these fallback sends have provider idempotency keys and cannot appear in the database history. Other write failures still prevent sending. Apply the migration before deploying whenever possible.
 
 ## Status semantics
 

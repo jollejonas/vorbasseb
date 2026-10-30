@@ -63,7 +63,8 @@ test('admin print view renders ordinary and package product photos and pickup de
     { id: 'b', quantity: 1, priceAtPurchase: 20000, optionSelections: { isPakketilbud: true, pakketilbudName: 'Pakke', items: [{ skuId: 'sku', productName: 'Trøje', size: 'M' }] } },
   ] };
   const Page = load('app/(admin)/admin/ordrer/[id]/page.tsx', {
-    '@/components/admin/OrderEmailHistory': { OrderEmailHistory: () => null },
+    '@/lib/order-email-history': { loadOrderEmailHistory: async () => ({ emails: [], available: false }) },
+    '@/components/admin/OrderEmailHistory': { OrderEmailHistory: ({ available }) => React.createElement('p', null, available ? 'Historik klar' : 'Historik utilgængelig') },
     '@/lib/order-image': load('lib/order-image.ts'),
     '@/auth': { auth: async () => ({ user: { role: 'ADMIN' } }) },
     '@/lib/prisma': { prisma: { order: { findUnique: async () => order }, sKU: { findMany: async () => [sku] } } },
@@ -80,4 +81,5 @@ test('admin print view renders ordinary and package product photos and pickup de
   assert.match(html, /Afhentning ved klubben/);
   assert.doesNotMatch(html, /Ingen adresse gemt/);
   assert.match(html, /ekskl. moms/);
+  assert.match(html, /Historik utilgængelig/);
 });

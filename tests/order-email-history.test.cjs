@@ -79,3 +79,32 @@ test('manual endpoint requires admin, validates input and uses stored recipient 
   assert.equal(sent.automatic, false);
   assert.match(sent.triggeredBy, /admin@example.com/);
 });
+
+test('missing history table and other history read failures leave the order readable', async () => {
+  for (const error of [{ code: 'P2021' }, { code: 'P1001' }]) {
+    const { loadOrderEmailHistory } = load('lib/order-email-history.ts', {
+      '@/lib/prisma': { prisma: { orderEmail: { findMany: async () => { throw error; } } } },
+    });
+    const result = await loadOrderEmailHistory('order');
+    assert.equal(result.available, false);
+    assert.equal(result.emails.length, 0);
+  }
+});
+test('missing table preserves automatic email delivery but never sends unlogged manual mail', async () => {
+  const calls = [];
+  let failure = { code: 'P2021', meta: { modelName: 'OrderEmail', table: 'public.OrderEmail' } };
+  const { sendOrderEmail } = load('lib/order-email.ts', {
+    '@/lib/prisma': { prisma: { orderEmail: { create: async () => { throw failure; } } } },
+    resend: { Resend: class { emails = { send: async (...args) => { calls.push(args); return { data: { id: 'accepted' } }; } }; } },
+  });
+  const result = await sendOrderEmail({ ...input, automatic: true, kind: 'CONFIRMATION' });
+  assert.equal(result.status, 'ACCEPTED');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][1].idempotencyKey, 'order-email-rollout/order/CONFIRMATION');
+  await assert.rejects(sendOrderEmail(input));
+  failure = { code: 'P1001' };
+  await assert.rejects(sendOrderEmail({ ...input, automatic: true }));
+  failure = { code: 'P2021', meta: { table: 'public.Unrelated' } };
+  await assert.rejects(sendOrderEmail({ ...input, automatic: true }));
+  assert.equal(calls.length, 1);
+});

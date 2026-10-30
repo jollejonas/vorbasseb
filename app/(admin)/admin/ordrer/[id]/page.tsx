@@ -1,3 +1,4 @@
+import { loadOrderEmailHistory } from "@/lib/order-email-history";
 import { OrderEmailHistory } from "@/components/admin/OrderEmailHistory";
 import { orderImage } from "@/lib/order-image";
 import { Fragment } from "react";
@@ -51,13 +52,14 @@ export default async function AdminOrderDetailPage({ params }: Params) {
             },
           },
       },
-      emails: { orderBy: { createdAt: "desc" } },
       shippingAddress: true,
       user: { select: { name: true, email: true, customerNumber: true } },
     },
   });
 
   if (!order) notFound();
+
+  const emailHistory = await loadOrderEmailHistory(order.id);
 
   // Collect skuIds from pakketilbud sub-items to look up item numbers
   const pakkeSkuIds = order.items.flatMap((item) => {
@@ -333,7 +335,8 @@ export default async function AdminOrderDetailPage({ params }: Params) {
         orderNumber={order.orderNumber}
         recipient={order.guestEmail || order.user?.email || null}
         sender={process.env.RESEND_FROM_EMAIL || ""}
-        emails={order.emails.map(email => ({ ...email, createdAt: email.createdAt.toISOString(), sentAt: email.sentAt?.toISOString() ?? null }))}
+        available={emailHistory.available}
+        emails={emailHistory.emails.map(email => ({ ...email, createdAt: email.createdAt.toISOString(), sentAt: email.sentAt?.toISOString() ?? null }))}
       />
 
       {/* Actions */}
