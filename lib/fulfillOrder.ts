@@ -1,3 +1,4 @@
+import { orderImage } from "@/lib/order-image";
 import Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { sendOrderConfirmation, sendLowStockAlert } from "@/lib/email";
@@ -21,7 +22,7 @@ export async function fulfillOrder(session: Stripe.Checkout.Session): Promise<bo
     where: { id: orderId },
     include: {
       items: {
-        include: { sku: { include: { product: { select: { name: true, isGroupOrder: true } } } } },
+        include: { sku: { include: { colorVariant: true, optionValues: { include: { optionValue: true } }, product: { select: { name: true, images: true, isGroupOrder: true } } } } },
       },
     },
   });
@@ -116,25 +117,39 @@ export async function fulfillOrder(session: Stripe.Checkout.Session): Promise<bo
 
   const email = session.customer_details?.email;
   if (email) {
+    const componentIds = order.items.flatMap(item => {
+      const meta = item.optionSelections as { items?: { skuId?: string }[] } | null;
+      return (meta?.items ?? []).flatMap(c => c.skuId ? [c.skuId] : []);
+    });
+    const componentSkus = componentIds.length ? await prisma.sKU.findMany({
+      where: { id: { in: componentIds } },
+      include: { colorVariant: true, optionValues: { include: { optionValue: true } }, product: true },
+    }) : [];
+    const componentImages = new Map(componentSkus.map(sku => [sku.id, orderImage(sku)]));
     await sendOrderConfirmation({
       to: email,
       customerName,
       orderTotal: session.amount_total ?? order.total,
+      orderNumber: order.orderNumber,
+      deliveryMethod: order.deliveryMethod,
+      groupOrderHoldUntil: order.groupOrderHoldUntil,
       items: order.items.map((item) => {
         const priceInclVat = Math.round(item.priceAtPurchase * (1 + vatRate / 100));
         if (!item.skuId) {
-          const opts = item.optionSelections as { pakketilbudName?: string; items?: { label?: string; productName?: string; size?: string; colorName?: string }[] } | null;
+          const opts = item.optionSelections as { pakketilbudName?: string; items?: { skuId?: string; customName?: string; customNumber?: string; label?: string; productName?: string; size?: string; colorName?: string }[] } | null;
           const compNames = (opts?.items ?? [])
             .map((c) => `${c.label || c.productName || ""} (${c.size ?? ""}${c.colorName ? ` / ${c.colorName}` : ""})`)
             .join(", ");
           return {
             productName: opts?.pakketilbudName ?? "Pakketilbud",
             size: compNames,
+            photos: (opts?.items ?? []).map(c => ({ url: componentImages.get(c.skuId ?? ""), name: c.label || c.productName || "Produkt" })),
             quantity: item.quantity,
             price: priceInclVat,
           };
         }
         return {
+          imageUrl: orderImage(item.sku),
           productName: item.sku?.product.name ?? "",
           size: item.sku?.size ?? "",
           colorName: item.colorName ?? undefined,
