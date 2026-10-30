@@ -58,7 +58,7 @@ function checkoutFixture(isGroupOrder, stock = 0) {
     '@/lib/prisma': { prisma: {
       sKU: { findMany: async () => [persisted] },
       siteSetting: { findMany: async () => [] },
-      order: { create: async args => { orders.push(args); return { id: 'order-1' }; }, update: async () => {} },
+      order: { aggregate: async () => ({ _max: { orderNumber: 68 } }), create: async args => { orders.push(args); return { id: 'order-1' }; }, update: async () => {} },
     } },
     stripe: class { checkout = { sessions: { create: async args => { stripeCalls.push(args); return { id: 'session-1', url: 'https://checkout.example/test' }; } } }; },
   });
@@ -92,8 +92,9 @@ test('fulfillment leaves preorder stock at zero and sends no low-stock alert', a
     const updates = []; const alerts = []; const orderUpdates = [];
     const storedSku = { ...sku, product: { ...product, isGroupOrder } };
     const db = {
-      order: { findUnique: async () => ({ id: 'order-1', status: 'PENDING', total: 20000, items: [{ skuId: sku.id, sku: storedSku, quantity: 1, priceAtPurchase: 20000 }] }), update: async args => orderUpdates.push(args), updateMany: async () => ({ count: 1 }) },
-      orderNumberCounter: { update: async () => ({ value: 1 }) },
+    $queryRaw: async () => [{ counter: "OrderNumberCounter", legacy: false }],
+      order: { aggregate: async () => ({ _max: { orderNumber: 68 } }), findUnique: async () => ({ id: 'order-1', status: 'PENDING', total: 20000, items: [{ skuId: sku.id, sku: storedSku, quantity: 1, priceAtPurchase: 20000 }] }), update: async args => orderUpdates.push(args), updateMany: async () => ({ count: 1 }) },
+      orderNumberCounter: { upsert: async () => ({ value: 1 }) },
       sKU: { update: async args => updates.push(args), findUnique: async () => storedSku },
       $transaction: async fn => fn(db),
     };
