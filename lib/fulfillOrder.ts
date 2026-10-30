@@ -65,6 +65,7 @@ export async function fulfillOrder(session: Stripe.Checkout.Session): Promise<bo
           stripeSessionId: session.id,
           stripePaymentId: paymentIntentId,
           total: session.amount_total ?? order.total,
+          discountApplied: session.total_details?.amount_discount ?? order.discountApplied,
           customerName,
           phone,
           guestEmail: session.customer_details?.email ?? null,
