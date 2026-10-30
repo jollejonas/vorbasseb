@@ -53,6 +53,7 @@ function checkoutFixture(isGroupOrder, stock = 0) {
   const orders = [];
   const persisted = { ...sku, stock, product: { ...product, isGroupOrder, optionGroups: [] } };
   const { POST } = load('app/api/checkout/route.ts', {
+    '@/lib/stripe-products': { ensureStripeProduct: async (_stripe, p) => `vbk_${p.id}` },
     '@/auth': { auth: async () => null },
     '@/lib/prisma': { prisma: {
       sKU: { findMany: async () => [persisted] },
@@ -88,10 +89,10 @@ test('checkout sums quantities across cart lines and rejects missing SKUs', asyn
 
 test('fulfillment leaves preorder stock at zero and sends no low-stock alert', async () => {
   for (const isGroupOrder of [true, false]) {
-    const updates = []; const alerts = [];
+    const updates = []; const alerts = []; const orderUpdates = [];
     const storedSku = { ...sku, product: { ...product, isGroupOrder } };
     const db = {
-      order: { findUnique: async () => ({ id: 'order-1', status: 'PENDING', total: 20000, items: [{ skuId: sku.id, sku: storedSku, quantity: 1, priceAtPurchase: 20000 }] }), update: async () => {} },
+      order: { findUnique: async () => ({ id: 'order-1', status: 'PENDING', total: 20000, items: [{ skuId: sku.id, sku: storedSku, quantity: 1, priceAtPurchase: 20000 }] }), update: async args => orderUpdates.push(args) },
       sKU: { update: async args => updates.push(args), findUnique: async () => storedSku },
       $transaction: async fn => fn(db),
     };
@@ -99,7 +100,9 @@ test('fulfillment leaves preorder stock at zero and sends no low-stock alert', a
       '@/lib/prisma': { prisma: db },
       '@/lib/email': { sendOrderConfirmation: async () => {}, sendLowStockAlert: async (...args) => alerts.push(args) },
     });
-    assert.equal(await fulfillOrder({ mode: 'payment', id: 'session-1', metadata: { orderId: 'order-1' } }), true);
+    assert.equal(await fulfillOrder({ mode: 'payment', id: 'session-1', metadata: { orderId: 'order-1' }, total_details: { amount_discount: 1000 }, amount_total: 19000 }), true);
+    assert.equal(orderUpdates[0].data.discountApplied, 1000);
+    assert.equal(orderUpdates[0].data.total, 19000);
     assert.equal(updates.length, isGroupOrder ? 0 : 1);
     assert.equal(alerts.length, isGroupOrder ? 0 : 1);
   }
