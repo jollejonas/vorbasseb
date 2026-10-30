@@ -34,7 +34,8 @@ async function resolveEmailAndItems(order: { guestEmail: string | null; userId: 
 }
 
 export async function PUT(req: NextRequest, { params }: Params) {
-  if (!(await requireAdmin())) {
+  const admin = await requireAdmin();
+  if (!admin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -47,6 +48,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const { email, items } = await resolveEmailAndItems(order, id);
     if (email) {
       await sendShippingNotification({
+        triggeredBy: admin.user?.email ?? admin.user?.name ?? "Administrator",
         to: email,
         customerName: order.customerName,
         orderId: order.id,
@@ -59,7 +61,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
 }
 
 export async function PATCH(req: NextRequest, { params }: Params) {
-  if (!(await requireAdmin())) {
+  const admin = await requireAdmin();
+  if (!admin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -84,6 +87,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const { email, items } = await resolveEmailAndItems(order, id);
     if (email) {
       await sendShippingNotification({
+        triggeredBy: admin.user?.email ?? admin.user?.name ?? "Administrator",
         to: email,
         customerName: order.customerName,
         orderId: order.id,

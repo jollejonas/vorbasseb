@@ -352,6 +352,7 @@ model Order {
   refunded        Boolean        @default(false)
   cancelledAt     DateTime?
   groupOrderHoldUntil DateTime?  // hold order until this date (group order snapshot)
+  emails          OrderEmail[]
   items           OrderItem[]
   usedGrants      TrainerGrant[]
   addressId       String?
@@ -634,4 +635,26 @@ model Sponsor {
   position   Int     @default(0)
 
   @@index([position])
+}
+
+// Immutable content snapshot for each order-related send attempt.
+model OrderEmail {
+  id             String   @id @default(cuid())
+  orderId        String
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  requestKey     String?  @unique
+  kind           String
+  automatic      Boolean
+  triggeredBy    String?
+  from           String
+  to             String
+  subject        String
+  html           String   @db.Text
+  status         String   @default("PENDING")
+  providerId     String?
+  error          String?
+  createdAt      DateTime @default(now())
+  sentAt         DateTime?
+
+  @@index([orderId, createdAt])
 }

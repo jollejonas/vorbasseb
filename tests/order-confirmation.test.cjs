@@ -20,11 +20,12 @@ test('image uses purchased option, legacy colour, then product fallback', () => 
 test('confirmation renders safe photos, quantities, pickup and Copenhagen deadline; retains custom templates', async () => {
   let sent;
   let template;
-  const { sendOrderConfirmation } = load('lib/email.ts', {
-    resend: { Resend: class { emails = { send: async value => { sent = value; } }; } },
+  const { sendOrderConfirmation, sendShippingNotification } = load('lib/email.ts', {
+    resend: { Resend: class {} },
+    '@/lib/order-email': { sendOrderEmail: async value => { sent = value; } },
     '@/lib/prisma': { prisma: { siteSetting: { findUnique: async ({ where }) => where.key === 'email_order_body' && template ? { value: template } : null } } },
   });
-  const data = { to: 'preview@example.com', customerName: 'Test <kunde>', orderNumber: 54, orderTotal: 52500, deliveryMethod: 'PICKUP', groupOrderHoldUntil: new Date('2026-11-10T22:59:00Z'), items: [
+  const data = { orderId: 'order-54', to: 'preview@example.com', customerName: 'Test <kunde>', orderNumber: 54, orderTotal: 52500, deliveryMethod: 'PICKUP', groupOrderHoldUntil: new Date('2026-11-10T22:59:00Z'), items: [
     { productName: 'Trøje <blå>', size: 'M', imageUrl: '/product.jpg', quantity: 2, price: 25000 },
     { productName: 'Pakketilbud', photos: [{ url: 'https://example.com/shirt.jpg', name: 'Trøje' }, { url: 'javascript:alert(1)', name: 'Unsafe' }], quantity: 1, price: 2500 },
   ] };
@@ -38,21 +39,31 @@ test('confirmation renders safe photos, quantities, pickup and Copenhagen deadli
   assert.match(sent.html, /Afhentning ved klubben/);
   assert.match(sent.html, /23[.:]59/);
   assert.match(sent.html, /#54/);
+  assert.equal(sent.orderId, 'order-54');
+  assert.equal(sent.automatic, true);
+  assert.equal(sent.kind, 'CONFIRMATION');
   template = '<h2>Klubbens egen tekst</h2>{{items}} {{total}}';
   await sendOrderConfirmation(data);
   assert.match(sent.html, /Klubbens egen tekst/);
   assert.match(sent.html, /product.jpg/);
+  await sendShippingNotification({ to: data.to, orderId: data.orderId, triggeredBy: 'admin@example.com', trackingNumber: 'TRACK-123' });
+  assert.equal(sent.orderId, 'order-54');
+  assert.equal(sent.kind, 'SHIPPING');
+  assert.equal(sent.automatic, true);
+  assert.equal(sent.triggeredBy, 'admin@example.com');
+  assert.match(sent.html, /TRACK-123/);
 });
 
 test('admin print view renders ordinary and package product photos and pickup details', async () => {
   const React = require('react');
   const { renderToStaticMarkup } = require('react-dom/server');
   const sku = { id: 'sku', size: 'M', itemNumber: 'VBK-M', product: { name: 'Trøje', images: ['https://example.com/base.jpg'] }, colorVariant: { images: ['https://example.com/blue.jpg'] } };
-  const order = { id: 'order', orderNumber: 54, status: 'PAID', deliveryMethod: 'PICKUP', createdAt: new Date(), shippingFee: 0, total: 52500, discountApplied: 0, items: [
+  const order = { emails: [], id: 'order', orderNumber: 54, status: 'PAID', deliveryMethod: 'PICKUP', createdAt: new Date(), shippingFee: 0, total: 52500, discountApplied: 0, items: [
     { id: 'a', sku, quantity: 1, priceAtPurchase: 22000, optionSelections: [] },
     { id: 'b', quantity: 1, priceAtPurchase: 20000, optionSelections: { isPakketilbud: true, pakketilbudName: 'Pakke', items: [{ skuId: 'sku', productName: 'Trøje', size: 'M' }] } },
   ] };
   const Page = load('app/(admin)/admin/ordrer/[id]/page.tsx', {
+    '@/components/admin/OrderEmailHistory': { OrderEmailHistory: () => null },
     '@/lib/order-image': load('lib/order-image.ts'),
     '@/auth': { auth: async () => ({ user: { role: 'ADMIN' } }) },
     '@/lib/prisma': { prisma: { order: { findUnique: async () => order }, sKU: { findMany: async () => [sku] } } },
