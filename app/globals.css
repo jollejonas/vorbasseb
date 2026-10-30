@@ -130,3 +130,11 @@ h4 {
   .order-document .overflow-x-auto { overflow: visible; }
   .order-document img { print-color-adjust: exact; }
 }
+
+@media print {
+  .purchase-export { max-width: none; padding: 0; font-family: Arial, sans-serif; }
+  .purchase-export tr { break-inside: avoid; }
+  .purchase-export thead { display: table-header-group; }
+  .purchase-export tfoot { display: table-row-group; }
+  .purchase-export th, .purchase-export td { padding: 6px; overflow-wrap: anywhere; }
+}

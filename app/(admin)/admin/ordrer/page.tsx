@@ -66,6 +66,7 @@ export default async function AdminOrdrerPage({ searchParams }: Props) {
           ← Admin
         </a>
         <h1 className="text-3xl font-bold">Ordrer</h1>
+        <Link href="/admin/ordrer/bestillingsliste" className="ml-auto rounded-lg bg-secondary px-4 py-2 text-sm font-semibold text-white">Samlet bestillingsliste / eksport</Link>
       </div>
 
       <ReconcileOrder />
