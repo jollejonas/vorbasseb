@@ -13,10 +13,11 @@ export default async function OrdrebekraefdelsePage({
 }) {
   const { session_id, order_id } = await searchParams;
   let paymentConfirmed = false;
+  let orderConfirmed = false;
   if (order_id) {
     const userSession = await auth();
     if (userSession?.user?.id) {
-      paymentConfirmed = !!await prisma.order.findFirst({ where: {
+      orderConfirmed = paymentConfirmed = !!await prisma.order.findFirst({ where: {
         id: order_id, userId: userSession.user.id, total: 0, status: "PAID", orderNumber: { not: null },
       } });
     }
@@ -29,6 +30,12 @@ export default async function OrdrebekraefdelsePage({
       const session = await stripe.checkout.sessions.retrieve(session_id);
       paymentConfirmed = session.mode === "payment" && session.status === "complete" && ["paid", "no_payment_required"].includes(session.payment_status);
       await fulfillOrder(session);
+      if (paymentConfirmed && session.metadata?.orderId) {
+        orderConfirmed = !!await prisma.order.findFirst({ where: {
+          id: session.metadata.orderId, stripeSessionId: session.id,
+          status: { not: "PENDING" }, orderNumber: { not: null },
+        } });
+      }
     } catch (err) {
       console.error("[ordre-bekraeftelse] fulfillOrder failed:", err);
     }
@@ -39,6 +46,13 @@ export default async function OrdrebekraefdelsePage({
       <h1 className="text-2xl font-bold">Betalingen er ikke bekræftet endnu</h1>
       <p>Hvis du netop har betalt, kan du opdatere siden om et øjeblik. Din kurv er bevaret.</p>
       <Link href="/kurv" className="text-secondary underline">Tilbage til kurven</Link>
+    </div>
+  );
+
+  if (!orderConfirmed) return (
+    <div className="max-w-md mx-auto px-4 py-16 text-center space-y-4">
+      <h1 className="text-2xl font-bold">Betalingen er registreret</h1>
+      <p>Vi mangler at færdigbehandle din ordre. Du skal ikke betale igen. Opdatér denne side om et øjeblik, eller kontakt klubben, hvis beskeden bliver ved med at vises.</p>
     </div>
   );
 

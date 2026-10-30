@@ -45,7 +45,7 @@ export async function fulfillOrder(session: Stripe.Checkout.Session): Promise<bo
         data: { status: "PAID" },
       });
       if (claimed.count !== 1) return null;
-      const orderNumber = await allocateOrderNumber(tx);
+      const orderNumber = await allocateOrderNumber(tx, order.orderNumber);
       // Create address record from shipping details (if available)
       let addressId: string | null = null;
       if (shippingInfo?.address && shippingInfo.name) {

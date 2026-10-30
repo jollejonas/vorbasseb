@@ -1,3 +1,4 @@
+import { ReconcileOrder } from "@/components/admin/ReconcileOrder";
 import { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -66,6 +67,8 @@ export default async function AdminOrdrerPage({ searchParams }: Props) {
         </a>
         <h1 className="text-3xl font-bold">Ordrer</h1>
       </div>
+
+      <ReconcileOrder />
 
       <Suspense>
         <OrderFilters total={orders.length} />

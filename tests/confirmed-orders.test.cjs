@@ -22,7 +22,8 @@ function fixture() {
   const emails = [];
   let counter = 68;
   const db = {
-    order: {
+    $queryRaw: async () => [{ counter: "OrderNumberCounter", legacy: false }],
+    order: { aggregate: async () => ({ _max: { orderNumber: 68 } }),
       findUnique: async ({ where }) => ({ ...records.get(where.id) }),
       updateMany: async ({ where }) => {
         const row = records.get(where.id);
@@ -31,7 +32,7 @@ function fixture() {
       },
       update: async ({ where, data }) => Object.assign(records.get(where.id), data),
     },
-    orderNumberCounter: { update: async () => ({ value: ++counter }) },
+    orderNumberCounter: { upsert: async () => ({ value: ++counter }) },
     $transaction: async fn => fn(db),
   };
   const { fulfillOrder } = load('lib/fulfillOrder.ts', {
@@ -78,12 +79,13 @@ test('a different Stripe session cannot confirm an existing checkout', async () 
 test('a fully granted free order gets a number and a verifiable confirmation link', async () => {
   let created;
   const db = {
+    $queryRaw: async () => [{ counter: "OrderNumberCounter", legacy: false }],
     sKU: { findMany: async () => [{ id: 'sku', productId: 'product', stock: 2, product: { price: 10000, optionGroups: [] } }], update: async () => {} },
     siteSetting: { findMany: async () => [] },
     subscription: { findUnique: async () => null },
     trainerGrant: { findMany: async () => [{ id: 'grant', productId: 'product' }], updateMany: async () => ({ count: 1 }) },
-    orderNumberCounter: { update: async () => ({ value: 69 }) },
-    order: { create: async ({ data }) => { created = data; return { id: 'free-order' }; } },
+    orderNumberCounter: { upsert: async () => ({ value: 69 }) },
+    order: { aggregate: async () => ({ _max: { orderNumber: 68 } }), create: async ({ data }) => { created = data; return { id: 'free-order' }; } },
     $transaction: async fn => fn(db),
   };
   const { POST } = load('app/api/checkout/route.ts', {
