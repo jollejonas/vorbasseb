@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { PromoOrderHistory } from "./PromoOrderHistory";
 import { PromoCodeForm } from "./PromoCodeForm";
 
 type StripePromoCode = {
@@ -109,6 +110,7 @@ export function PromoCodeList({ products }: { products: { id: string; name: stri
                   <td className="py-2.5 pr-4 text-gray-500">
                     {c.times_redeemed}
                     {c.max_redemptions ? ` / ${c.max_redemptions}` : ""}
+                    <PromoOrderHistory promoId={c.id} code={c.code} redeemed={c.times_redeemed} />
                   </td>
                   <td className="py-2.5 pr-4 text-gray-500">
                     {c.expires_at
