@@ -10,6 +10,7 @@ type Props = {
 
 export function PromoCodeForm({ onCreated, products }: Props) {
   const [productId, setProductId] = useState("");
+  const [replacesSale, setReplacesSale] = useState(false);
   const [code, setCode] = useState("");
   const [type, setType] = useState<"percent" | "fixed">("percent");
   const [amount, setAmount] = useState("");
@@ -38,6 +39,7 @@ export function PromoCodeForm({ onCreated, products }: Props) {
           amount: Number(amount),
           expiryDate: expiryDate || undefined,
           oneTimePerCustomer,
+          replacesSale,
           maxUses: maxUses ? Number(maxUses) : undefined,
         }),
       });
@@ -50,6 +52,7 @@ export function PromoCodeForm({ onCreated, products }: Props) {
       setOneTimePerCustomer(false);
       setMaxUses("");
       setProductId("");
+      setReplacesSale(false);
       onCreated();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Der kunne ikke oprettes forbindelse. Prøv igen.");
@@ -82,12 +85,20 @@ export function PromoCodeForm({ onCreated, products }: Props) {
         <div className="sm:col-span-2">
           <label htmlFor="promo-product" className="block text-xs text-gray-500 mb-1">Gælder for</label>
           <select id="promo-product" value={productId} onChange={(e) => setProductId(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
-            <option value="">Alle produkter</option>
+            <option value="">Alle nuværende produkter og pakketilbud</option>
             {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
           <p className="mt-1 text-xs text-gray-500">Vælg ét produkt for kun at give rabat på dette produkt i kurven. Gælder alle størrelser og farver, men ikke som del af et pakketilbud.</p>
           {type === "fixed" && <p className="mt-1 text-xs text-gray-500">Et fast beløb gives én gang pr. ordre, højst værdien af de varer, koden gælder for. Ikke pr. stk.</p>}
-          <p className="mt-1 text-xs text-gray-500">Koden indtastes ved betaling. Kan ikke kombineres med tilbud, fanklubsrabat eller tildelte produkter.</p>
+          <p className="mt-1 text-xs text-gray-500">Koden indtastes i kurven. Den erstatter fanklubsrabat og kan ikke kombineres med tildelte produkter. Nye produkter tilføjes ikke automatisk til eksisterende koder.</p>
+        </div>
+
+        <div className="sm:col-span-2">
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="checkbox" checked={replacesSale} onChange={e => setReplacesSale(e.target.checked)} className="accent-secondary" />
+            Erstat eksisterende tilbud
+          </label>
+          <p className="mt-1 text-xs text-gray-500">Når feltet er valgt, beregnes kodens rabat fra normalprisen på de valgte varer. Ellers beholder tilbudsvarer deres tilbudspris og får ingen rabat fra koden.</p>
         </div>
 
         {/* Type */}

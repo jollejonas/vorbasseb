@@ -9,12 +9,21 @@ import { useCart } from "./CartProvider";
 import { formatPrice, calcShipping, withVat, vatAmount } from "@/lib/utils";
 
 type DeliveryMethod = "SHIPPING" | "PICKUP";
+type PromoQuote = {
+  subtotal: number; shipping: number; discount: number; total: number;
+  code: string; replacesSale: boolean;
+  lines: { unitPrice: number; replacesSale: boolean }[];
+};
 
 export function CartView() {
   const { items, removeItem, updateQty, subtotal, clearCart, vatPct } = useCart();
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>("SHIPPING");
   const [membership, setMembership] = useState<{ isMember: boolean; discountPct: number } | null>(null);
   const [grants, setGrants] = useState<{ id: string; productId: string }[]>([]);
+  const [promoCode, setPromoCode] = useState("");
+  const [quote, setQuote] = useState<{ key: string; data: PromoQuote } | null>(null);
+  const [promoError, setPromoError] = useState("");
+  const [checkingCode, setCheckingCode] = useState(false);
   useEffect(() => {
     fetch("/api/membership")
       .then((r) => r.json())
@@ -54,7 +63,6 @@ export function CartView() {
 
   // Trainer detection
   const hasTrainerItems = items.some((i) => i.clubRoleRequired === "TRAINER");
-  const hasGrantItems = grants.length > 0;
 
   // Group order detection
   const groupOrderItems = items.filter((i) => i.isGroupOrder);
@@ -68,18 +76,32 @@ export function CartView() {
 
   // Force PICKUP if any trainer item in cart
   const effectiveDelivery: DeliveryMethod = hasTrainerItems ? "PICKUP" : deliveryMethod;
+  const quoteKey = JSON.stringify({ items, deliveryMethod: effectiveDelivery, promoCode: promoCode.trim().toUpperCase() });
+  const activeQuote = promoCode.trim() && quote?.key === quoteKey ? quote.data : null;
+  async function applyCode() {
+    setCheckingCode(true);
+    setPromoError("");
+    setQuote(null);
+    try {
+      const res = await fetch("/api/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items, deliveryMethod: effectiveDelivery, promoCode: promoCode.trim(), preview: true }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Koden kunne ikke kontrolleres.");
+      setQuote({ key: quoteKey, data });
+    } catch (error) {
+      setPromoError(error instanceof Error ? error.message : "Forbindelsen blev afbrudt. Prøv igen.");
+    } finally { setCheckingCode(false); }
+  }
   const shipping = effectiveDelivery === "PICKUP" ? 0 : calcShipping(effectiveSubtotal);
 
   const memberDiscount = (membership?.isMember && !anyItemOnSale)
     ? Math.round(effectiveSubtotal * (membership.discountPct / 100))
     : 0;
-  const finalTotal = effectiveSubtotal + shipping - memberDiscount;
 
   return (
     <div className="space-y-6">
       {/* Item list */}
       <ul className="divide-y divide-gray-100">
-        {items.map((item) => {
+        {items.map((item, index) => {
           const isGranted = grantedProductIds.has(item.productId);
           return (
             <li
@@ -141,7 +163,8 @@ export function CartView() {
                   <p className="text-sm font-bold text-green-600 mt-1">Gratis (tildelt af klub)</p>
                 ) : (
                   <p className="text-sm font-bold text-secondary mt-1">
-                    {formatPrice(withVat(item.price + (item.customizationFee ?? 0), vatPct) * item.quantity)}
+                    {formatPrice((activeQuote?.lines[index]?.unitPrice ?? withVat(item.price + (item.customizationFee ?? 0), vatPct)) * item.quantity)}
+                    {activeQuote?.lines[index]?.replacesSale && <span className="block text-xs font-normal text-gray-500">Normalpris før rabatkode — erstatter tilbud</span>}
                   </p>
                 )}
               </div>
@@ -267,8 +290,26 @@ export function CartView() {
         </div>
       )}
 
-      {/* Summary */}
       <div className="bg-surface rounded-xl p-5 space-y-3">
+        <label htmlFor="cart-promo" className="block text-sm font-semibold">Rabatkode</label>
+        <div className="flex gap-2">
+          <input id="cart-promo" maxLength={100} value={promoCode} onChange={e => { setPromoCode(e.target.value.toUpperCase()); setPromoError(""); }} className="min-w-0 flex-1 border rounded-lg px-3 py-2" autoComplete="off" />
+          <button type="button" onClick={applyCode} disabled={checkingCode || !promoCode.trim()} className="bg-secondary text-white px-4 py-2 rounded-lg disabled:opacity-50">{checkingCode ? "Kontrollerer…" : "Anvend"}</button>
+          {promoCode && <button type="button" onClick={() => { setPromoCode(""); setQuote(null); setPromoError(""); }} className="text-sm underline">Fjern</button>}
+        </div>
+        {promoError && <p role="alert" className="text-sm text-red-700">{promoError}</p>}
+        {activeQuote ? <p role="status" className="text-sm text-green-700">Koden {activeQuote.code} er anvendt. {activeQuote.replacesSale ? "Rabatten beregnes fra normalprisen på de omfattede varer og erstatter deres tilbud." : "Tilbudsvarer beholder tilbudsprisen og får ingen ekstra rabat."}</p>
+          : promoCode.trim() && <p className="text-sm text-gray-600">Tryk Anvend for at beregne totalen. Ved ændringer i kurven skal koden anvendes igen.</p>}
+      </div>
+
+      {/* All quote amounts come from the same server calculation as checkout. */}
+      {activeQuote ? <div className="bg-surface rounded-xl p-5 space-y-3">
+        <div className="flex justify-between text-sm"><span>Varer før rabatkode (inkl. moms)</span><span>{formatPrice(activeQuote.subtotal)}</span></div>
+        <div className="flex justify-between text-sm text-green-700"><span>Rabatkode: {activeQuote.code}</span><span>−{formatPrice(activeQuote.discount)}</span></div>
+        <div className="flex justify-between text-sm"><span>Fragt</span><span>{activeQuote.shipping ? formatPrice(activeQuote.shipping) : "Gratis"}</span></div>
+        <div className="flex justify-between font-bold text-lg border-t pt-3"><span>Total (inkl. moms)</span><span>{formatPrice(activeQuote.total)}</span></div>
+        <p className="text-xs text-gray-500">Kodens gyldighed kontrolleres igen ved betaling. Rabatkoden erstatter eventuel fanklubsrabat.</p>
+      </div> : <div className="bg-surface rounded-xl p-5 space-y-3">
         <div className="flex justify-between text-sm">
           <span>Subtotal (ekskl. moms)</span>
           <span>{formatPrice(effectiveSubtotal)}</span>
@@ -282,7 +323,7 @@ export function CartView() {
         {anyItemOnSale && (
           <div className="flex justify-between text-sm text-red-600 font-medium">
             <span>Tilbudspris aktiv</span>
-            <span>Rabatter gælder ikke</span>
+            <span>Tilbudspris er medregnet</span>
           </div>
         )}
         {!anyItemOnSale && membership?.isMember && memberDiscount > 0 && (
@@ -308,18 +349,18 @@ export function CartView() {
         {!anyItemOnSale && membership?.isMember && memberDiscount > 0 && (
           <p className="text-xs text-gray-400">* Den endelige rabat beregnes af Stripe ved betaling</p>
         )}
-      </div>
+      </div>}
 
       {/* Sale price notice */}
-      {anyItemOnSale && (
+      {anyItemOnSale && !activeQuote && (
         <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
           <span className="font-bold shrink-0">Tilbud!</span>
-          <span>Én eller flere varer er på tilbud — fanklubsrabat og rabatkoder gælder ikke i denne ordre.</span>
+          <span>Tilbudsvarer beholder tilbudsprisen, medmindre din rabatkode erstatter tilbuddet. Andre varer kan stadig få rabat. Fanklubsrabat kombineres ikke med tilbud.</span>
         </div>
       )}
 
       {/* Member discount notice / CTA */}
-      {membership?.isMember && !anyItemOnSale ? (
+      {membership?.isMember && !anyItemOnSale && !activeQuote ? (
         <div className="flex flex-wrap items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-700 font-medium">
           <Star size={16} className="shrink-0 text-green-500" />
           <span className="flex-1">
@@ -352,41 +393,41 @@ export function CartView() {
         >
           Ryd kurv
         </button>
-        <CheckoutButton deliveryMethod={effectiveDelivery} />
+        <CheckoutButton deliveryMethod={effectiveDelivery} promoCode={activeQuote?.code} disabled={checkingCode || (!!promoCode.trim() && !activeQuote)} />
       </div>
     </div>
   );
 }
 
-function CheckoutButton({ deliveryMethod }: { deliveryMethod: DeliveryMethod }) {
+function CheckoutButton({ deliveryMethod, promoCode, disabled }: { deliveryMethod: DeliveryMethod; promoCode?: string; disabled?: boolean }) {
   const { items } = useCart();
   const [loading, setLoading] = useState(false);
 
   async function handleCheckout() {
     setLoading(true);
 
-    const res = await fetch("/api/checkout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items, deliveryMethod }),
-    });
-
-    setLoading(false);
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      alert(data.error ?? "Noget gik galt. Prøv igen.");
-      return;
-    }
-
-    const data = await res.json();
-    window.location.href = data.redirect ?? data.url;
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items, deliveryMethod, promoCode }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error ?? "Noget gik galt. Prøv igen.");
+        return;
+      }
+      const data = await res.json();
+      window.location.href = data.redirect ?? data.url;
+    } catch {
+      alert("Forbindelsen blev afbrudt. Prøv igen.");
+    } finally { setLoading(false); }
   }
 
   return (
     <button
       onClick={handleCheckout}
-      disabled={loading}
+      disabled={loading || disabled}
       className="flex-1 bg-primary hover:bg-primary-dark text-secondary font-bold py-3 px-6 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {loading ? "Behandler…" : "Gå til kasse →"}

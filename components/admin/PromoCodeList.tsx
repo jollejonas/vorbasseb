@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { PromoCodeForm } from "./PromoCodeForm";
 
@@ -10,7 +10,7 @@ type StripePromoCode = {
   times_redeemed: number;
   max_redemptions: number | null;
   expires_at: number | null;
-  metadata?: { shopProductName?: string };
+  metadata?: { shopProductName?: string; replacesSale?: string };
   promotion: {
     coupon: {
       percent_off: number | null;
@@ -21,29 +21,39 @@ type StripePromoCode = {
   } | null;
 };
 
+async function loadPromoCodes(): Promise<StripePromoCode[]> {
+  const res = await fetch("/api/admin/promo-codes");
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Kunne ikke hente rabatkoder");
+  return data;
+}
+
 export function PromoCodeList({ products }: { products: { id: string; name: string }[] }) {
   const [codes, setCodes] = useState<StripePromoCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
-  const fetchCodes = useCallback(async () => {
+  async function fetchCodes() {
     setLoading(true);
-    setLoadError("");
     try {
-      const res = await fetch("/api/admin/promo-codes");
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Kunne ikke hente rabatkoder");
+      const data = await loadPromoCodes();
+      setLoadError("");
       setCodes(data);
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "Kunne ikke hente rabatkoder");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }
 
   useEffect(() => {
-    fetchCodes();
-  }, [fetchCodes]);
+    let active = true;
+    loadPromoCodes()
+      .then(data => { if (active) setCodes(data); })
+      .catch(error => { if (active) setLoadError(error instanceof Error ? error.message : "Kunne ikke hente rabatkoder"); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
 
   async function handleDeactivate(id: string) {
     if (!confirm("Deaktivér denne kode?")) return;
@@ -94,7 +104,7 @@ export function PromoCodeList({ products }: { products: { id: string; name: stri
               {codes.map((c) => (
                 <tr key={c.id}>
                   <td className="py-2.5 pr-4 font-mono font-medium">{c.code}</td>
-                  <td className="py-2.5 pr-4">{formatDiscount(c.promotion)}</td>
+                  <td className="py-2.5 pr-4">{formatDiscount(c.promotion)}<p className="text-xs text-gray-500">{c.metadata?.replacesSale === "true" ? "Erstatter tilbud · fra normalpris" : "Gælder ikke tilbudsvarer"}</p></td>
                   <td className="py-2.5 pr-4">{c.metadata?.shopProductName || (typeof c.promotion?.coupon === "object" && c.promotion?.coupon?.applies_to?.products.length ? "Udvalgte produkter i Stripe" : "Alle produkter")}</td>
                   <td className="py-2.5 pr-4 text-gray-500">
                     {c.times_redeemed}

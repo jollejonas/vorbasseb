@@ -5,6 +5,7 @@ export const promoCodeSchema = z.object({
   type: z.enum(["percent", "fixed"]),
   amount: z.number().finite().positive(),
   productId: z.string().min(1).optional(),
+  replacesSale: z.boolean().default(false),
   expiryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   oneTimePerCustomer: z.boolean().optional(),
   maxUses: z.number().int().positive().optional(),

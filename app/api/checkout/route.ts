@@ -6,12 +6,13 @@ import type { CartItem, OptionSelection, PrintElement } from "@/components/shop/
 import { getEffectivePrice } from "@/lib/pricing";
 import { canPurchaseSku, tracksStock } from "@/lib/availability";
 import { allocateOrderNumber } from "@/lib/order-number";
-import { ensureStripeProduct } from "@/lib/stripe-products";
+import { stripeProductId, ensureStripeProduct } from "@/lib/stripe-products";
+import { resolveCheckoutPromo, promoApplies, promoDiscount, type CheckoutPromo } from "@/lib/checkout-promo";
 
 export async function POST(req: NextRequest) {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
   const session = await auth();
-  const { items, deliveryMethod = "SHIPPING" }: { items: CartItem[]; deliveryMethod?: "SHIPPING" | "PICKUP" } = await req.json();
+  const { items, deliveryMethod = "SHIPPING", promoCode, preview = false }: { items: CartItem[]; deliveryMethod?: "SHIPPING" | "PICKUP"; promoCode?: string; preview?: boolean } = await req.json();
 
   if (!Array.isArray(items) || items.length === 0) {
     return NextResponse.json({ error: "Tom kurv" }, { status: 400 });
@@ -19,6 +20,15 @@ export async function POST(req: NextRequest) {
 
   if (items.some((item) => !item || !Number.isSafeInteger(item.quantity) || item.quantity <= 0)) {
     return NextResponse.json({ error: "Ugyldigt antal" }, { status: 400 });
+  }
+
+  let selectedPromo: CheckoutPromo | undefined;
+  if (promoCode !== undefined && (typeof promoCode !== "string" || promoCode.length > 100)) {
+    return NextResponse.json({ error: "Ugyldig rabatkode." }, { status: 400 });
+  }
+  if (promoCode?.trim()) {
+    try { selectedPromo = await resolveCheckoutPromo(stripe, promoCode.trim().toUpperCase()); }
+    catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Rabatkoden kunne ikke kontrolleres." }, { status: 400 }); }
   }
 
   // Flatten SKU IDs — pakketilbud contribute multiple item SKUs
@@ -118,6 +128,7 @@ export async function POST(req: NextRequest) {
   const pakketilbudIds = items.filter((i) => i.isPakketilbud && i.pakketilbudId).map((i) => i.pakketilbudId!);
   const pakketilbudSaleMap = new Map<string, boolean>();
   const pakkeServerPriceMap = new Map<string, number>();
+  const pakkeNormalPriceMap = new Map<string, number>();
   if (pakketilbudIds.length > 0) {
     const pakkeSaleData = await prisma.pakketilbud.findMany({
       where: { id: { in: pakketilbudIds } },
@@ -127,6 +138,7 @@ export async function POST(req: NextRequest) {
       const { effectivePrice, isOnSale } = getEffectivePrice(p.price, p.salePrice, p.salePriceStart, p.salePriceEnd, now);
       pakketilbudSaleMap.set(p.id, isOnSale);
       pakkeServerPriceMap.set(p.id, effectivePrice);
+      pakkeNormalPriceMap.set(p.id, p.price);
     }
   }
 
@@ -152,6 +164,20 @@ export async function POST(req: NextRequest) {
     if (item.isPakketilbud && item.pakketilbudId) return pakketilbudSaleMap.get(item.pakketilbudId) ?? false;
     return skuOnSaleMap.get(item.skuId) ?? false;
   });
+
+  function itemStripeId(item: CartItem) {
+    return stripeProductId(item.isPakketilbud ? `bundle_${item.pakketilbudId}` : skuProductMap.get(item.skuId)!);
+  }
+  function itemOnSale(item: CartItem) {
+    return item.isPakketilbud ? pakketilbudSaleMap.get(item.pakketilbudId!) ?? false : skuOnSaleMap.get(item.skuId) ?? false;
+  }
+  function eligibleForPromo(item: CartItem) {
+    return !!selectedPromo && promoApplies(selectedPromo, itemStripeId(item), itemOnSale(item));
+  }
+  // Legacy unrestricted coupons cannot exclude individual sale lines in Stripe.
+  if (selectedPromo && !selectedPromo.coupon.applies_to?.products && anyItemOnSale && !selectedPromo.replacesSale) {
+    return NextResponse.json({ error: "Denne ældre rabatkode kan ikke bruges sammen med tilbudsvarer. Kontakt klubben for en ny kode." }, { status: 400 });
+  }
 
   // ── Server-side price helpers (never trust client-supplied prices) ──────────
 
@@ -180,6 +206,9 @@ export async function POST(req: NextRequest) {
 
   /** Returns server-verified effective product price (excl. VAT, in øre). */
   function getServerItemPrice(item: CartItem): number {
+    if (selectedPromo?.replacesSale && eligibleForPromo(item)) {
+      return item.isPakketilbud ? pakkeNormalPriceMap.get(item.pakketilbudId!) ?? 0 : skuMap.get(item.skuId)!.product.price;
+    }
     if (item.isPakketilbud && item.pakketilbudId) {
       return pakkeServerPriceMap.get(item.pakketilbudId) ?? 0;
     }
@@ -236,6 +265,9 @@ export async function POST(req: NextRequest) {
       })
     : [];
 
+  if (selectedPromo && pendingGrants.some(g => items.some(i => !i.isPakketilbud && skuProductMap.get(i.skuId) === g.productId))) {
+    return NextResponse.json({ error: "Rabatkoder kan ikke kombineres med tildelte produkter. Fjern koden for at bruge din tildeling." }, { status: 400 });
+  }
   const grantPool = new Map<string, string[]>();
   for (const g of pendingGrants) {
     if (!grantPool.has(g.productId)) grantPool.set(g.productId, []);
@@ -274,9 +306,21 @@ export async function POST(req: NextRequest) {
   }, 0);
   const effectiveSubtotal = originalSubtotal - grantDiscountTotal;
   const shipping = isPickup ? 0 : effectiveSubtotal >= freeOre ? 0 : flatOre;
-  const memberDiscount = (isMember && !anyItemOnSale) ? Math.round(effectiveSubtotal * discountPct / 100) : 0;
-  const totalDiscountOre = grantDiscountTotal + memberDiscount;
-  const finalTotal = effectiveSubtotal + shipping - memberDiscount;
+  const memberDiscount = (isMember && !anyItemOnSale && !selectedPromo) ? Math.round(effectiveSubtotal * discountPct / 100) : 0;
+  const eligibleTotals = items.filter(eligibleForPromo).map(i => Math.round((getServerItemPrice(i) + getServerItemCustomizationFee(i)) * (1 + vatRate / 100)) * i.quantity);
+  const codeDiscount = selectedPromo ? promoDiscount(selectedPromo, eligibleTotals) : 0;
+  if (selectedPromo && codeDiscount <= 0) return NextResponse.json({ error: "Koden gælder ikke for varerne i kurven. Tilbudsvarer kræver en kode, der erstatter tilbud." }, { status: 400 });
+  const minimum = selectedPromo?.promo.restrictions.minimum_amount;
+  if (minimum && (selectedPromo?.promo.restrictions.minimum_amount_currency !== "dkk" || originalSubtotal < minimum)) {
+    return NextResponse.json({ error: "Kurven opfylder ikke kodens minimumsbeløb." }, { status: 400 });
+  }
+  const totalDiscountOre = grantDiscountTotal + memberDiscount + codeDiscount;
+  const finalTotal = effectiveSubtotal + shipping - memberDiscount - codeDiscount;
+  if (preview) return NextResponse.json({
+    subtotal: effectiveSubtotal, shipping, discount: memberDiscount + codeDiscount, total: finalTotal,
+    code: selectedPromo?.promo.code ?? null, replacesSale: selectedPromo?.replacesSale ?? false,
+    lines: items.map(i => ({ unitPrice: Math.round((getServerItemPrice(i) + getServerItemCustomizationFee(i)) * (1 + vatRate / 100)), replacesSale: !!selectedPromo?.replacesSale && eligibleForPromo(i) && itemOnSale(i) })),
+  });
 
   // Build order items (used in both zero-total and Stripe paths)
   const orderItemsData = items.map((item) => {
@@ -370,7 +414,11 @@ export async function POST(req: NextRequest) {
   const stripeProductIds = new Map<string, string>();
   try {
     for (const item of items) {
-      if (item.isPakketilbud) continue;
+      if (item.isPakketilbud) {
+        const id = `bundle_${item.pakketilbudId}`;
+        stripeProductIds.set(id, await ensureStripeProduct(stripe, { id, name: item.productName }));
+        continue;
+      }
       const sku = skuMap.get(item.skuId)!;
       if (!stripeProductIds.has(sku.productId)) {
         stripeProductIds.set(sku.productId, await ensureStripeProduct(stripe, { id: sku.productId, name: sku.product.name, images: sku.product.images }));
@@ -417,31 +465,20 @@ export async function POST(req: NextRequest) {
     lineItems.push({
       price_data: {
         currency: "dkk",
-        ...(item.isPakketilbud
+        ...(selectedPromo && !eligibleForPromo(item)
           ? { product_data: { name, images: item.image?.startsWith("https://") ? [item.image] : [] } }
-          : { product: stripeProductIds.get(skuProductMap.get(item.skuId)!)! }),
+          : { product: stripeProductIds.get(item.isPakketilbud ? `bundle_${item.pakketilbudId}` : skuProductMap.get(item.skuId)!)! }),
         unit_amount: unitPriceInclVat,
       },
       quantity: item.quantity,
     });
   }
 
-  if (shipping > 0) {
-    lineItems.push({
-      price_data: {
-        currency: "dkk",
-        product_data: { name: "Fragt (Danmark)" },
-        unit_amount: shipping,
-      },
-      quantity: 1,
-    });
-  }
-
   // Discount / promo code logic
   let discounts: Stripe.Checkout.SessionCreateParams["discounts"] = undefined;
-  let allowPromoCodes = false;
-
-  if (appliedGrantIds.length > 0) {
+  if (selectedPromo) {
+    discounts = [{ promotion_code: selectedPromo.promo.id }];
+  } else if (appliedGrantIds.length > 0) {
     if (totalDiscountOre > 0) {
       const couponName =
         grantDiscountTotal > 0 && memberDiscount > 0
@@ -467,8 +504,6 @@ export async function POST(req: NextRequest) {
       });
       discounts = [{ coupon: coupon.id }];
     }
-  } else if (!isMember && !anyItemOnSale) {
-    allowPromoCodes = true;
   }
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -480,7 +515,8 @@ export async function POST(req: NextRequest) {
       mode: "payment",
       line_items: lineItems,
       discounts,
-      ...(allowPromoCodes ? { allow_promotion_codes: true } : {}),
+      // Resolve codes before choosing normal/sale prices; prohibit late changes.
+      ...(shipping > 0 ? { shipping_options: [{ shipping_rate_data: { type: "fixed_amount" as const, fixed_amount: { amount: shipping, currency: "dkk" }, display_name: "Fragt (Danmark)" } }] } : {}),
       customer_email: session?.user?.email ?? undefined,
       metadata: {
         orderId: pendingOrder.id,
