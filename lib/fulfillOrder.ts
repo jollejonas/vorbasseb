@@ -127,6 +127,7 @@ export async function fulfillOrder(session: Stripe.Checkout.Session): Promise<bo
     }) : [];
     const componentImages = new Map(componentSkus.map(sku => [sku.id, orderImage(sku)]));
     await sendOrderConfirmation({
+      orderId: order.id,
       to: email,
       customerName,
       orderTotal: session.amount_total ?? order.total,

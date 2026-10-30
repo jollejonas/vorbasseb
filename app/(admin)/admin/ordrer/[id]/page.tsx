@@ -1,3 +1,4 @@
+import { OrderEmailHistory } from "@/components/admin/OrderEmailHistory";
 import { orderImage } from "@/lib/order-image";
 import { Fragment } from "react";
 import { Metadata } from "next";
@@ -50,6 +51,7 @@ export default async function AdminOrderDetailPage({ params }: Params) {
             },
           },
       },
+      emails: { orderBy: { createdAt: "desc" } },
       shippingAddress: true,
       user: { select: { name: true, email: true, customerNumber: true } },
     },
@@ -325,6 +327,14 @@ export default async function AdminOrderDetailPage({ params }: Params) {
           <span>{formatPrice(order.total)}</span>
         </div>
       </section>
+
+      <OrderEmailHistory
+        orderId={order.id}
+        orderNumber={order.orderNumber}
+        recipient={order.guestEmail || order.user?.email || null}
+        sender={process.env.RESEND_FROM_EMAIL || ""}
+        emails={order.emails.map(email => ({ ...email, createdAt: email.createdAt.toISOString(), sentAt: email.sentAt?.toISOString() ?? null }))}
+      />
 
       {/* Actions */}
       <section className="border rounded-xl p-5 print:hidden">

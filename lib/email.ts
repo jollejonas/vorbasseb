@@ -1,3 +1,4 @@
+import { sendOrderEmail } from "@/lib/order-email";
 import { Resend } from "resend";
 import { prisma } from "@/lib/prisma";
 
@@ -95,6 +96,7 @@ export async function sendOrderConfirmation({
   to,
   customerName,
   orderTotal,
+  orderId,
   orderNumber,
   deliveryMethod,
   groupOrderHoldUntil,
@@ -103,6 +105,7 @@ export async function sendOrderConfirmation({
   to: string;
   customerName?: string | null;
   orderTotal: number;
+  orderId: string;
   orderNumber?: number;
   deliveryMethod?: string;
   groupOrderHoldUntil?: Date | null;
@@ -131,7 +134,8 @@ export async function sendOrderConfirmation({
   const hold = groupOrderHoldUntil ? `<p>Samlebestilling: Behandles efter ${new Intl.DateTimeFormat("da-DK", { dateStyle: "long", timeStyle: "short", timeZone: "Europe/Copenhagen" }).format(groupOrderHoldUntil)}.</p>` : "";
 
   const vars = { customerName: escapeHtml(customerName ?? ""), items: itemsHtml, total: formatDKK(orderTotal) };
-  await resend.emails.send({
+  await sendOrderEmail({
+    orderId, kind: "CONFIRMATION", automatic: true,
     from: FROM,
     to,
     subject: renderTemplate(subject, vars),
@@ -150,12 +154,14 @@ export async function sendShippingNotification({
   to,
   customerName,
   orderId,
+  triggeredBy,
   trackingNumber,
   items,
 }: {
   to: string;
   customerName?: string | null;
   orderId: string;
+  triggeredBy?: string;
   trackingNumber?: string | null;
   items?: { productName: string; size?: string; quantity: number }[];
 }) {
@@ -176,7 +182,8 @@ export async function sendShippingNotification({
     trackingNumber: trackingHtml,
     items: itemsHtml,
   };
-  await resend.emails.send({
+  await sendOrderEmail({
+    orderId, kind: "SHIPPING", automatic: true, triggeredBy,
     from: FROM,
     to,
     subject: renderTemplate(subject, vars),
