@@ -58,7 +58,7 @@ function wrapHtml(body: string): string {
 const DEFAULT_ORDER_SUBJECT = "Ordrebekræftelse – Vorbasse Boldklub";
 const DEFAULT_ORDER_BODY = `<h2>Tak for din ordre! 💛💙</h2>
 <p>Kære {{customerName}},</p>
-<p>Vi har modtaget din bestilling og sender den snarest.</p>
+<p>Vi har modtaget din bestilling. Du får besked, når den er klar til afhentning eller afsendt.</p>
 <h3>Ordresammenfatning</h3>
 {{items}}
 <p><strong>Total betalt: {{total}}</strong></p>
@@ -79,6 +79,8 @@ const DEFAULT_SHIPPING_BODY = `<h2>Din ordre er på vej! 🚚</h2>
 // ─── Email functions ──────────────────────────────────────────────────────────
 
 type OrderItem = {
+  photos?: { url?: string; name: string }[];
+  imageUrl?: string;
   productName: string;
   size?: string;
   colorName?: string;
@@ -93,33 +95,54 @@ export async function sendOrderConfirmation({
   to,
   customerName,
   orderTotal,
+  orderNumber,
+  deliveryMethod,
+  groupOrderHoldUntil,
   items,
 }: {
   to: string;
   customerName?: string | null;
   orderTotal: number;
+  orderNumber?: number;
+  deliveryMethod?: string;
+  groupOrderHoldUntil?: Date | null;
   items: OrderItem[];
 }) {
   const subject = await loadTemplate("email_order_subject", DEFAULT_ORDER_SUBJECT);
   const bodyTemplate = await loadTemplate("email_order_body", DEFAULT_ORDER_BODY);
 
-  const itemsHtml = `<ul>${items.map((i) => {
-    const details = [
-      i.size,
-      i.colorName,
-      i.customName ? `Tryk: ${escapeHtml(i.customName)}` : null,
-      i.customNumber ? `#${escapeHtml(i.customNumber)}` : null,
-    ].filter(Boolean).join(", ");
-    const fee = (i.customizationFee ?? 0) > 0 ? ` + ${formatDKK(i.customizationFee!)} tryk` : "";
-    return `<li>${i.quantity}× <strong>${escapeHtml(i.productName)}</strong>${details ? ` (${escapeHtml(details)})` : ""} — ${formatDKK(i.price)}${fee}</li>`;
-  }).join("")}</ul>`;
+  const itemsHtml = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin:20px 0">${items.map((i) => {
+    const details = [i.size, i.colorName, i.customName ? `Tryk: ${i.customName}` : null, i.customNumber ? `#${i.customNumber}` : null].filter(Boolean).join(" · ");
+    const photos = (i.photos ?? [{ url: i.imageUrl, name: i.productName }]).map(photo => {
+    let imageUrl = "";
+    try {
+      const url = new URL(photo.url ?? "", "https://shop.vorbasseboldklub.dk");
+      if (photo.url && ["https:", "http:"].includes(url.protocol)) imageUrl = url.href;
+    } catch { /* Missing or invalid photo: preserve the product details. */ }
+    return imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(photo.name)}" width="72" style="display:block;width:72px;height:auto;margin-bottom:6px;border:1px solid #e5e7eb;border-radius:6px" />` : '<span style="font-size:11px;color:#64748b">Intet billede</span>';
+    }).join("");
+    return `<tr>
+      <td width="80" style="padding:16px 12px 16px 0;border-bottom:1px solid #e5e7eb;vertical-align:top">${photos}</td>
+      <td style="padding:16px 8px 16px 0;border-bottom:1px solid #e5e7eb;vertical-align:top"><strong>${escapeHtml(i.productName)}</strong><br /><span style="font-size:13px;color:#64748b;line-height:1.6">${escapeHtml(details)}<br />Antal: ${i.quantity} · ${formatDKK(i.price)} pr. stk.</span></td>
+      <td align="right" style="padding:16px 0;border-bottom:1px solid #e5e7eb;vertical-align:top;font-weight:bold;white-space:nowrap">${formatDKK((i.price + (i.customizationFee ?? 0)) * i.quantity)}</td>
+    </tr>`;
+  }).join("")}</table>`;
+  const delivery = deliveryMethod === "PICKUP" ? "Afhentning ved klubben. Du får besked, når ordren er klar." : "Du får besked, når ordren er afsendt.";
+  const hold = groupOrderHoldUntil ? `<p>Samlebestilling: Behandles efter ${new Intl.DateTimeFormat("da-DK", { dateStyle: "long", timeStyle: "short", timeZone: "Europe/Copenhagen" }).format(groupOrderHoldUntil)}.</p>` : "";
 
   const vars = { customerName: escapeHtml(customerName ?? ""), items: itemsHtml, total: formatDKK(orderTotal) };
   await resend.emails.send({
     from: FROM,
     to,
     subject: renderTemplate(subject, vars),
-    html: wrapHtml(renderTemplate(bodyTemplate, vars)),
+    html: `<!DOCTYPE html><html lang="da"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /></head>
+<body style="margin:0;background:#f1f5f9;font-family:Arial,sans-serif;color:#172033;line-height:1.6">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border:1px solid #e2e8f0">
+<tr><td style="padding:24px;background:#142e57;color:#ffffff;border-bottom:4px solid #f4cd35"><strong style="font-size:22px">Vorbasse Boldklub</strong><br /><span style="font-size:13px">SHOP · ORDREBEKRÆFTELSE${orderNumber ? ` · #${orderNumber}` : ""}</span></td></tr>
+<tr><td style="padding:24px">${renderTemplate(bodyTemplate, vars)}<div style="padding:16px;background:#f8fafc;border-top:1px solid #e2e8f0"><strong>Levering</strong><p>${delivery}</p>${hold}</div><p style="font-size:12px;color:#64748b">Alle beløb er inkl. moms.</p></td></tr>
+<tr><td style="padding:20px 24px;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b">Tak fordi du støtter klubben.<br /><a href="https://shop.vorbasseboldklub.dk" style="color:#142e57">shop.vorbasseboldklub.dk</a></td></tr>
+</table></td></tr></table></body></html>`,
   });
 }
 

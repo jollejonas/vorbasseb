@@ -1,3 +1,4 @@
+import { orderImage } from "@/lib/order-image";
 import { Fragment } from "react";
 import { Metadata } from "next";
 import Link from "next/link";
@@ -38,6 +39,8 @@ export default async function AdminOrderDetailPage({ params }: Params) {
         include: {
             sku: {
               include: {
+                colorVariant: true,
+                optionValues: { include: { optionValue: true } },
                 product: {
                   include: {
                     designerZones: { include: { fixedLogo: true }, orderBy: { positionOrd: "asc" } },
@@ -68,6 +71,8 @@ export default async function AdminOrderDetailPage({ params }: Params) {
         select: {
           id: true,
           itemNumber: true,
+          colorVariant: true,
+          optionValues: { include: { optionValue: true } },
           product: {
             select: {
               images: true,
@@ -83,7 +88,12 @@ export default async function AdminOrderDetailPage({ params }: Params) {
   const pakkeSkuMap = new Map(pakkeSkus.map((s) => [s.id, s]));
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-10">
+    <div className="order-document max-w-6xl mx-auto px-4 py-10">
+      <div className="mb-6 border-b-4 border-blue-900 pb-5">
+        <p className="text-xs font-bold uppercase tracking-widest text-blue-900">Vorbasse Boldklub · Shop</p>
+        <h2 className="mt-2 text-3xl font-bold">Ordreoversigt</h2>
+        <p className="mt-2 text-sm text-gray-500">{new Intl.DateTimeFormat("da-DK", { dateStyle: "long", timeZone: "Europe/Copenhagen" }).format(order.createdAt)} · shop.vorbasseboldklub.dk</p>
+      </div>
       <div className="flex items-center gap-4 mb-8">
         <Link href="/admin/ordrer" className="text-sm text-gray-500 hover:text-secondary print:hidden">
           ← Ordrer
@@ -111,7 +121,7 @@ export default async function AdminOrderDetailPage({ params }: Params) {
         </div>
       )}
 
-      <div className="grid md:grid-cols-2 gap-6 mb-8">
+      <div className="order-contact grid md:grid-cols-2 gap-6 mb-8">
         {/* Customer info */}
         <section className="border rounded-xl p-5 space-y-2">
           <h2 className="font-semibold text-gray-700 mb-3">Kunde</h2>
@@ -141,8 +151,10 @@ export default async function AdminOrderDetailPage({ params }: Params) {
 
         {/* Shipping address */}
         <section className="border rounded-xl p-5 space-y-2">
-          <h2 className="font-semibold text-gray-700 mb-3">Leveringsadresse</h2>
-          {order.shippingAddress ? (
+          <h2 className="font-semibold text-gray-700 mb-3">{order.deliveryMethod === "PICKUP" ? "Afhentning" : "Leveringsadresse"}</h2>
+          {order.deliveryMethod === "PICKUP" ? (
+            <p className="text-sm text-gray-600">Afhentning ved klubben. Du får besked, når ordren er klar.</p>
+          ) : order.shippingAddress ? (
             <>
               <p className="text-sm">{order.shippingAddress.name}</p>
               <p className="text-sm">{order.shippingAddress.line1}</p>
@@ -165,7 +177,7 @@ export default async function AdminOrderDetailPage({ params }: Params) {
         <div className="px-5 py-3 bg-gray-50 border-b">
           <h2 className="font-semibold text-gray-700">Produkter</h2>
         </div>
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead>
             <tr className="border-b text-left text-gray-500">
               <th className="px-5 py-2 font-medium">Produkt</th>
@@ -174,7 +186,7 @@ export default async function AdminOrderDetailPage({ params }: Params) {
               <th className="px-5 py-2 font-medium">Farve</th>
               <th className="px-5 py-2 font-medium">Tryk</th>
               <th className="px-5 py-2 font-medium text-right">Antal</th>
-              <th className="px-5 py-2 font-medium text-right">Pris</th>
+              <th className="px-5 py-2 font-medium text-right">Beløb*</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -212,7 +224,7 @@ export default async function AdminOrderDetailPage({ params }: Params) {
                       ].join(" · ");
                       return (
                         <tr key={ci} className="text-sm">
-                          <td className="px-5 py-1.5 pl-8 text-gray-700">↳ {c.label || c.productName}</td>
+                          <td className="px-5 py-3 text-gray-700"><ProductPhoto src={orderImage(pakkeSkuMap.get(c.skuId))} name={c.label || c.productName} /></td>
                           <td className="px-5 py-1.5 font-mono text-xs text-gray-500">
                             {pakkeSkuMap.get(c.skuId)?.itemNumber ?? "–"}
                           </td>
@@ -261,7 +273,7 @@ export default async function AdminOrderDetailPage({ params }: Params) {
 
               return (
               <tr key={item.id}>
-                <td className="px-5 py-3">{item.sku?.product.name ?? "–"}</td>
+                <td className="px-5 py-3"><ProductPhoto src={orderImage(item.sku)} name={item.sku?.product.name ?? "Produkt ikke tilgængeligt"} /></td>
                 <td className="px-5 py-3 font-mono text-xs text-gray-500">{item.sku?.itemNumber ?? "–"}</td>
                 <td className="px-5 py-3">{item.sku?.size ?? "–"}</td>
                 <td className="px-5 py-3 text-gray-500">{item.colorName ?? "–"}</td>
@@ -291,8 +303,10 @@ export default async function AdminOrderDetailPage({ params }: Params) {
               );
             })}
           </tbody>
-        </table>
+        </table></div>
       </section>
+
+      <p className="text-xs text-gray-500 mb-5">* Varebeløb er ekskl. moms. Ordrens total er inkl. moms.</p>
 
       {/* Totals */}
       <section className="border rounded-xl p-5 mb-8 space-y-2 max-w-xs ml-auto">
@@ -325,4 +339,15 @@ export default async function AdminOrderDetailPage({ params }: Params) {
       </section>
     </div>
   );
+}
+
+function ProductPhoto({ src, name }: { src?: string; name: string }) {
+  return <div className="flex items-center gap-3 min-w-48">
+    {src ? (
+      // Native images also render in the browser's print document.
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={src} alt={name} width={64} height={80} className="h-20 w-16 shrink-0 rounded-lg border border-gray-100 bg-white object-contain" />
+    ) : <div className="flex h-20 w-16 shrink-0 items-center justify-center rounded-lg bg-gray-50 text-center text-[10px] text-gray-400">Intet billede</div>}
+    <span className="font-medium">{name}</span>
+  </div>;
 }

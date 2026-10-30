@@ -120,3 +120,13 @@ h4 {
   color: var(--color-secondary);
   text-decoration: underline;
 }
+
+@media print {
+  .order-document { font-family: Arial, sans-serif; font-size: 10pt; padding: 0; max-width: none; color: #172033; }
+  .order-document .order-contact { grid-template-columns: 1fr 1fr; gap: 16px; }
+  .order-document th, .order-document td { padding: 8px; }
+  .order-document tr, .order-document section { break-inside: avoid; }
+  .order-document thead { display: table-header-group; }
+  .order-document .overflow-x-auto { overflow: visible; }
+  .order-document img { print-color-adjust: exact; }
+}

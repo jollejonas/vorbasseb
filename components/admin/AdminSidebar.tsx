@@ -242,7 +242,7 @@ export function AdminSidebar({ attentionCount }: { attentionCount: number }) {
       {/* Mobile toggle button */}
       <button
         onClick={() => setMobileOpen(true)}
-        className="fixed top-4 left-4 z-40 md:hidden bg-secondary text-white p-2 rounded-lg shadow-lg"
+        className="print:hidden fixed top-4 left-4 z-40 md:hidden bg-secondary text-white p-2 rounded-lg shadow-lg"
         aria-label="Åbn menu"
       >
         <Menu size={20} />
@@ -251,14 +251,14 @@ export function AdminSidebar({ attentionCount }: { attentionCount: number }) {
       {/* Mobile overlay */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          className="print:hidden fixed inset-0 z-40 bg-black/50 md:hidden"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
       {/* Mobile sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-56 bg-secondary flex flex-col transform transition-transform duration-200 md:hidden ${
+        className={`print:hidden fixed inset-y-0 left-0 z-50 w-56 bg-secondary flex flex-col transform transition-transform duration-200 md:hidden ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -270,7 +270,7 @@ export function AdminSidebar({ attentionCount }: { attentionCount: number }) {
       </aside>
 
       {/* Desktop sidebar */}
-      <aside className="hidden md:flex flex-col w-56 shrink-0 bg-secondary min-h-screen sticky top-0 h-screen">
+      <aside className="hidden md:flex print:hidden flex-col w-56 shrink-0 bg-secondary min-h-screen sticky top-0 h-screen">
         <SidebarContent groups={groups} pathname={pathname} />
       </aside>
     </>
