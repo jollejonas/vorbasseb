@@ -1,4 +1,5 @@
 import { ReconcileOrder } from "@/components/admin/ReconcileOrder";
+import { BookkeepingExport } from "@/components/admin/BookkeepingExport";
 import { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -70,6 +71,7 @@ export default async function AdminOrdrerPage({ searchParams }: Props) {
       </div>
 
       <ReconcileOrder />
+      <BookkeepingExport />
 
       <Suspense>
         <OrderFilters total={orders.length} />
