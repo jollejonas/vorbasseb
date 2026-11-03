@@ -1,3 +1,4 @@
+import { shippingPrice } from "@/lib/shipping-price";
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { auth } from "@/auth";
@@ -231,12 +232,10 @@ export async function POST(req: NextRequest) {
   // Read settings
   const cfg = await prisma.siteSetting
     .findMany({
-      where: { key: { in: ["shipping_flat_ore", "shipping_free_ore", "member_discount_pct", "vat_rate"] } },
+      where: { key: { in: ["member_discount_pct", "vat_rate"] } },
       select: { key: true, value: true },
     })
     .catch(() => []);
-  const flatOre = parseInt(cfg.find((s) => s.key === "shipping_flat_ore")?.value ?? "4900");
-  const freeOre = parseInt(cfg.find((s) => s.key === "shipping_free_ore")?.value ?? "49900");
   const discountPct = parseInt(cfg.find((s) => s.key === "member_discount_pct")?.value ?? "10");
   const vatRate = parseInt(cfg.find((s) => s.key === "vat_rate")?.value ?? "25");
 
@@ -305,7 +304,7 @@ export async function POST(req: NextRequest) {
     return s + Math.round((serverPrice + serverFee) * (1 + vatRate / 100)) * i.quantity;
   }, 0);
   const effectiveSubtotal = originalSubtotal - grantDiscountTotal;
-  const shipping = isPickup ? 0 : effectiveSubtotal >= freeOre ? 0 : flatOre;
+  const shipping = shippingPrice(effectiveDelivery);
   const memberDiscount = (isMember && !anyItemOnSale && !selectedPromo) ? Math.round(effectiveSubtotal * discountPct / 100) : 0;
   const eligibleTotals = items.filter(eligibleForPromo).map(i => Math.round((getServerItemPrice(i) + getServerItemCustomizationFee(i)) * (1 + vatRate / 100)) * i.quantity);
   const codeDiscount = selectedPromo ? promoDiscount(selectedPromo, eligibleTotals) : 0;

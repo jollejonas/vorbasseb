@@ -21,8 +21,6 @@ const SETTING_LABELS: Record<string, string> = {
   vat_rate: "Momssats (%)",
   footer_phone: "Telefon (footer)",
   footer_email: "E-mail (footer)",
-  shipping_flat_ore: "Fast fragtgebyr (øre)",
-  shipping_free_ore: "Gratis fragt fra (øre)",
   member_discount_pct: "Fanklubsrabat (%)",
   delivery_banner: "Leveringsbanner tekst (tom = skjult)",
 };

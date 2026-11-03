@@ -24,11 +24,6 @@ export function vatAmount(ore: number, vatPct: number): number {
   return Math.round(ore * (vatPct / 100));
 }
 
-/** Shipping logic: 49 kr flat, free ≥ 499 kr */
-export function calcShipping(subtotalOre: number): number {
-  return subtotalOre >= 49900 ? 0 : 4900;
-}
-
 export function slugify(str: string): string {
   return str
     .toLowerCase()

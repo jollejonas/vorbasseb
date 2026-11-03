@@ -1,12 +1,13 @@
 "use client";
 
+import { shippingPrice } from "@/lib/shipping-price";
 import { FANCLUB_ENABLED } from "@/lib/features";
 import { useState, useEffect } from "react";
 import { Trash2, Package, Truck, Star } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useCart } from "./CartProvider";
-import { formatPrice, calcShipping, withVat, vatAmount } from "@/lib/utils";
+import { formatPrice, withVat, vatAmount } from "@/lib/utils";
 
 type DeliveryMethod = "SHIPPING" | "PICKUP";
 type PromoQuote = {
@@ -91,7 +92,7 @@ export function CartView() {
       setPromoError(error instanceof Error ? error.message : "Forbindelsen blev afbrudt. Prøv igen.");
     } finally { setCheckingCode(false); }
   }
-  const shipping = effectiveDelivery === "PICKUP" ? 0 : calcShipping(effectiveSubtotal);
+  const shipping = shippingPrice(effectiveDelivery);
 
   const memberDiscount = (membership?.isMember && !anyItemOnSale)
     ? Math.round(effectiveSubtotal * (membership.discountPct / 100))
@@ -251,14 +252,9 @@ export function CartView() {
               <div className="flex-1">
                 <p className="text-sm font-medium">Levering til din adresse</p>
                 <p className="text-xs text-gray-500">
-                  {calcShipping(effectiveSubtotal) === 0
-                    ? "Gratis fragt (over 499 kr)"
-                    : `${formatPrice(calcShipping(effectiveSubtotal))} — gratis ved køb over 499 kr`}
+                  {formatPrice(shippingPrice("SHIPPING"))} pr. ordre
                 </p>
               </div>
-              {calcShipping(effectiveSubtotal) === 0 && (
-                <span className="text-xs text-green-600 font-semibold">Gratis</span>
-              )}
             </label>
 
             <label className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition ${deliveryMethod === "PICKUP" ? "border-secondary bg-white" : "border-gray-200 bg-white hover:border-gray-300"}`}>
