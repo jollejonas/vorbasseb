@@ -6,7 +6,12 @@ const ts = require('typescript');
 function load(file, mocks = {}) {
   const exports = {};
   const source = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
-  vm.runInNewContext(source, { exports, process, URL, require(name) { return mocks[name] ?? require(name); } });
+  vm.runInNewContext(source, { exports, process, URL, require(name) {
+    if (name in mocks) return mocks[name];
+    if (name.startsWith('@/lib/')) return load(name.replace('@/', '') + '.ts', mocks);
+    if (name.startsWith('@/components/shop/')) return load(name.replace('@/', '') + '.tsx', mocks);
+    return require(name);
+  } });
   return exports;
 }
 test('image uses purchased option, legacy colour, then product fallback', () => {

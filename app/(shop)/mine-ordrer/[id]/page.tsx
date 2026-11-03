@@ -1,3 +1,5 @@
+import { loadOrderDelivery } from "@/lib/order-delivery";
+import { OrderDeliveryDetails } from "@/components/shop/OrderDeliveryDetails";
 import { Metadata } from "next";
 import Link from "next/link";
 import { auth } from "@/auth";
@@ -63,6 +65,8 @@ export default async function OrderDetailPage({ params }: Params) {
     month: "long",
     year: "numeric",
   }).format(new Date(order.createdAt));
+
+  const delivery = order.deliveryMethod === "SHIPPING" ? await loadOrderDelivery(order.id) : null;
 
   const isPickup = order.deliveryMethod === "PICKUP";
 
@@ -196,10 +200,12 @@ export default async function OrderDetailPage({ params }: Params) {
         </div>
       </section>
 
+      {delivery && <OrderDeliveryDetails delivery={delivery} />}
+
       {/* Delivery */}
       <section className="border border-gray-200 rounded-xl p-5 space-y-3">
         <p className="text-sm font-semibold text-gray-700">Levering</p>
-        <p className="text-sm text-gray-600">{isPickup ? "Afhentning" : "Forsendelse (Danmark)"}</p>
+        <p className="text-sm text-gray-600">{isPickup ? "Afhentning" : delivery ? "Levering til den valgte pakkeshop ovenfor" : "Forsendelse (Danmark)"}</p>
         {order.shippingAddress && (
           <address className="not-italic text-sm text-gray-600 leading-relaxed">
             <p className="font-medium">{order.shippingAddress.name}</p>

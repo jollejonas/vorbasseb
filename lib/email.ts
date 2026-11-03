@@ -1,3 +1,4 @@
+import { carrierLabel, type DeliverySnapshot } from "@/lib/delivery";
 import { sendOrderEmail } from "@/lib/order-email";
 import { Resend } from "resend";
 import { prisma } from "@/lib/prisma";
@@ -99,6 +100,7 @@ export async function sendOrderConfirmation({
   orderId,
   orderNumber,
   deliveryMethod,
+  delivery: pointDelivery,
   groupOrderHoldUntil,
   items,
 }: {
@@ -108,6 +110,7 @@ export async function sendOrderConfirmation({
   orderId: string;
   orderNumber?: number;
   deliveryMethod?: string;
+  delivery?: DeliverySnapshot | null;
   groupOrderHoldUntil?: Date | null;
   items: OrderItem[];
 }) {
@@ -130,7 +133,7 @@ export async function sendOrderConfirmation({
       <td align="right" style="padding:16px 0;border-bottom:1px solid #e5e7eb;vertical-align:top;font-weight:bold;white-space:nowrap">${formatDKK((i.price + (i.customizationFee ?? 0)) * i.quantity)}</td>
     </tr>`;
   }).join("")}</table>`;
-  const delivery = deliveryMethod === "PICKUP" ? "Afhentning ved klubben. Du får besked, når ordren er klar." : "Du får besked, når ordren er afsendt.";
+  const delivery = deliveryMethod === "PICKUP" ? "Afhentning ved klubben. Du får besked, når ordren er klar." : pointDelivery ? `${escapeHtml(carrierLabel(pointDelivery.carrier))}<br />${escapeHtml(pointDelivery.name)}<br />${escapeHtml(pointDelivery.address)}<br />${escapeHtml(pointDelivery.postcode)} ${escapeHtml(pointDelivery.city)}<br />Du får besked, når ordren er afsendt.` : "Du får besked, når ordren er afsendt.";
   const hold = groupOrderHoldUntil ? `<p>Samlebestilling: Behandles efter ${new Intl.DateTimeFormat("da-DK", { dateStyle: "long", timeStyle: "short", timeZone: "Europe/Copenhagen" }).format(groupOrderHoldUntil)}.</p>` : "";
 
   const vars = { customerName: escapeHtml(customerName ?? ""), items: itemsHtml, total: formatDKK(orderTotal) };

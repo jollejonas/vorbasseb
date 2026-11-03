@@ -98,6 +98,7 @@ test('mixed checkout uses distinct server product IDs; shipping has no eligible 
     product: { name: id, price: 10000, optionGroups: [], isGroupOrder: id === 'sweater' },
   }));
   const { POST } = load('app/api/checkout/route.ts', {
+    '@/lib/shipmondo': { validateDelivery: async () => ({ carrier: 'gls', productCode: 'GLSDK_SD', pointId: '96280', name: 'Shop', address: 'Vestergade 11', postcode: '6623', city: 'Vorbasse', country: 'DK' }) },
     '@/auth': { auth: async () => null },
     '@/lib/prisma': { prisma: {
       sKU: { findMany: async () => products }, siteSetting: { findMany: async () => [] },
@@ -108,7 +109,7 @@ test('mixed checkout uses distinct server product IDs; shipping has no eligible 
       checkout = { sessions: { create: async args => { sessions.push(args); return { id: 'cs-1', url: 'https://checkout.example/test' }; } } };
     },
   });
-  const result = await POST({ json: async () => ({ items: products.map(sku => ({
+  const result = await POST({ json: async () => ({ deliverySelection: { carrier: 'gls', postcode: '6623', pointId: '96280' }, items: products.map(sku => ({
     skuId: sku.id, productId: 'forged-client-id', productName: sku.product.name, size: 'M', quantity: 1,
   })) }) });
   assert.equal(result.status, 200);
@@ -138,6 +139,7 @@ function saleFixture({ replacesSale = false, fixed, scoped = ['vbk_sweater'], me
     restrictions: {}, metadata: { replacesSale: String(replacesSale) },
     promotion: { coupon: { id: 'coupon-original', valid: true, amount_off: fixed ?? null, percent_off: fixed === undefined ? 25 : null, currency: 'dkk', ...(scoped ? { applies_to: { products: scoped } } : {}), ...couponOverrides } }, ...promoOverrides };
   const { POST } = load('app/api/checkout/route.ts', {
+    '@/lib/shipmondo': { validateDelivery: async () => ({ carrier: 'gls', productCode: 'GLSDK_SD', pointId: '96280', name: 'Shop', address: 'Vestergade 11', postcode: '6623', city: 'Vorbasse', country: 'DK' }) },
     '@/auth': { auth: async () => member || grants.length ? { user: { id: 'user-1' } } : null },
     '@/lib/prisma': { prisma: {
       sKU: { findMany: async () => products }, siteSetting: { findMany: async () => [] },
@@ -152,7 +154,7 @@ function saleFixture({ replacesSale = false, fixed, scoped = ['vbk_sweater'], me
     },
   });
   const items = products.map(sku => ({ skuId: sku.id, productId: 'forged', productName: sku.product.name, size: 'M', quantity: 1, price: 1, isOnSale: false, replacesSale: true }));
-  return { sessions, orders, items, call: (changes = {}) => POST({ json: async () => ({ items, deliveryMethod: 'PICKUP', promoCode: 'TEST', ...changes }) }) };
+  return { sessions, orders, items, call: (changes = {}) => POST({ json: async () => ({ items, deliveryMethod: 'PICKUP', deliverySelection: { carrier: 'gls', postcode: '6623', pointId: '96280' }, promoCode: 'TEST', ...changes }) }) };
 }
 
 test('replacement uses authoritative normal price, only for the selected product', async () => {

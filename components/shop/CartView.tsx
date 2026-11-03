@@ -1,5 +1,7 @@
 "use client";
 
+import { ServicePointPicker } from "./ServicePointPicker";
+import type { DeliverySelection } from "@/lib/delivery";
 import { shippingPrice } from "@/lib/shipping-price";
 import { FANCLUB_ENABLED } from "@/lib/features";
 import { useState, useEffect } from "react";
@@ -19,6 +21,7 @@ type PromoQuote = {
 export function CartView() {
   const { items, removeItem, updateQty, subtotal, clearCart, vatPct } = useCart();
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>("SHIPPING");
+  const [deliverySelection, setDeliverySelection] = useState<DeliverySelection | null>(null);
   const [membership, setMembership] = useState<{ isMember: boolean; discountPct: number } | null>(null);
   const [grants, setGrants] = useState<{ id: string; productId: string }[]>([]);
   const [promoCode, setPromoCode] = useState("");
@@ -250,7 +253,7 @@ export function CartView() {
               />
               <Truck size={18} className="text-secondary shrink-0" />
               <div className="flex-1">
-                <p className="text-sm font-medium">Levering til din adresse</p>
+                <p className="text-sm font-medium">Levering til pakkeshop</p>
                 <p className="text-xs text-gray-500">
                   {formatPrice(shippingPrice("SHIPPING"))} pr. ordre
                 </p>
@@ -263,7 +266,7 @@ export function CartView() {
                 name="delivery"
                 value="PICKUP"
                 checked={deliveryMethod === "PICKUP"}
-                onChange={() => setDeliveryMethod("PICKUP")}
+                onChange={() => { setDeliveryMethod("PICKUP"); setDeliverySelection(null); }}
                 className="accent-secondary"
               />
               <Package size={18} className="text-secondary shrink-0" />
@@ -274,6 +277,7 @@ export function CartView() {
               <span className="text-xs text-green-600 font-semibold">Gratis</span>
             </label>
           </div>
+          {effectiveDelivery === "SHIPPING" && <ServicePointPicker onChange={setDeliverySelection} />}
         </div>
       ) : (
         <div className="flex items-center gap-3 bg-surface rounded-xl p-4">
@@ -389,13 +393,13 @@ export function CartView() {
         >
           Ryd kurv
         </button>
-        <CheckoutButton deliveryMethod={effectiveDelivery} promoCode={activeQuote?.code} disabled={checkingCode || (!!promoCode.trim() && !activeQuote)} />
+        <CheckoutButton deliverySelection={effectiveDelivery === "SHIPPING" ? deliverySelection : null} deliveryMethod={effectiveDelivery} promoCode={activeQuote?.code} disabled={(effectiveDelivery === "SHIPPING" && !deliverySelection) || checkingCode || (!!promoCode.trim() && !activeQuote)} />
       </div>
     </div>
   );
 }
 
-function CheckoutButton({ deliveryMethod, promoCode, disabled }: { deliveryMethod: DeliveryMethod; promoCode?: string; disabled?: boolean }) {
+function CheckoutButton({ deliveryMethod, deliverySelection, promoCode, disabled }: { deliveryMethod: DeliveryMethod; deliverySelection: DeliverySelection | null; promoCode?: string; disabled?: boolean }) {
   const { items } = useCart();
   const [loading, setLoading] = useState(false);
 
@@ -406,7 +410,7 @@ function CheckoutButton({ deliveryMethod, promoCode, disabled }: { deliveryMetho
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items, deliveryMethod, promoCode }),
+        body: JSON.stringify({ items, deliveryMethod, deliverySelection, promoCode }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));

@@ -1,3 +1,4 @@
+import { loadOrderDelivery } from "@/lib/order-delivery";
 import { orderImage } from "@/lib/order-image";
 import Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
@@ -34,7 +35,11 @@ export async function fulfillOrder(session: Stripe.Checkout.Session): Promise<bo
 
   const customerName = session.customer_details?.name ?? null;
   const phone = session.customer_details?.phone ?? null;
-  const shippingInfo = session.collected_information?.shipping_details;
+  // A service point is the parcel destination; billing remains the customer's address.
+  // Legacy home-delivery sessions still use their original shipping details.
+  const shippingInfo = session.metadata?.servicePointId
+    ? { name: customerName, address: session.customer_details?.address }
+    : session.collected_information?.shipping_details;
 
   const confirmedNumber = await prisma.$transaction(
     async (tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) => {
@@ -148,6 +153,7 @@ export async function fulfillOrder(session: Stripe.Checkout.Session): Promise<bo
       orderTotal: session.amount_total ?? order.total,
       orderNumber: confirmedNumber,
       deliveryMethod: order.deliveryMethod,
+      delivery: order.deliveryMethod === "SHIPPING" ? await loadOrderDelivery(order.id) : null,
       groupOrderHoldUntil: order.groupOrderHoldUntil,
       items: order.items.map((item) => {
         const priceInclVat = Math.round(item.priceAtPurchase * (1 + vatRate / 100));

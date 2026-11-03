@@ -352,6 +352,7 @@ model Order {
   refunded        Boolean        @default(false)
   cancelledAt     DateTime?
   groupOrderHoldUntil DateTime?  // hold order until this date (group order snapshot)
+  delivery        OrderDelivery?
   emails          OrderEmail[]
   items           OrderItem[]
   usedGrants      TrainerGrant[]
@@ -662,4 +663,18 @@ model OrderEmail {
 model OrderNumberCounter {
   id String @id
   value Int
+}
+
+// Immutable snapshot chosen before payment; separate from customer/billing address.
+model OrderDelivery {
+  orderId     String @id
+  order       Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  carrier     String
+  productCode String
+  pointId     String
+  name        String
+  address     String
+  postcode    String
+  city        String
+  country     String
 }

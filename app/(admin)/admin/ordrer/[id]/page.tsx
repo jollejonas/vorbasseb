@@ -1,3 +1,5 @@
+import { loadOrderDelivery } from "@/lib/order-delivery";
+import { OrderDeliveryDetails } from "@/components/shop/OrderDeliveryDetails";
 import { loadOrderEmailHistory } from "@/lib/order-email-history";
 import { OrderEmailHistory } from "@/components/admin/OrderEmailHistory";
 import { orderImage } from "@/lib/order-image";
@@ -58,6 +60,8 @@ export default async function AdminOrderDetailPage({ params }: Params) {
   });
 
   if (!order || order.orderNumber === null || order.status === "PENDING") notFound();
+
+  const delivery = order.deliveryMethod === "SHIPPING" ? await loadOrderDelivery(order.id) : null;
 
   const emailHistory = await loadOrderEmailHistory(order.id);
 
@@ -155,7 +159,7 @@ export default async function AdminOrderDetailPage({ params }: Params) {
 
         {/* Shipping address */}
         <section className="border rounded-xl p-5 space-y-2">
-          <h2 className="font-semibold text-gray-700 mb-3">{order.deliveryMethod === "PICKUP" ? "Afhentning" : "Leveringsadresse"}</h2>
+          <h2 className="font-semibold text-gray-700 mb-3">{order.deliveryMethod === "PICKUP" ? "Afhentning" : delivery ? "Kundeadresse" : "Leveringsadresse"}</h2>
           {order.deliveryMethod === "PICKUP" ? (
             <p className="text-sm text-gray-600">Afhentning ved klubben. Du får besked, når ordren er klar.</p>
           ) : order.shippingAddress ? (
@@ -171,10 +175,12 @@ export default async function AdminOrderDetailPage({ params }: Params) {
               <p className="text-sm">{order.shippingAddress.country}</p>
             </>
           ) : (
-            <p className="text-sm text-gray-400 italic">Ingen adresse gemt</p>
+            <p className="text-sm text-gray-400 italic">{delivery ? "Kundens faktureringsadresse er registreret ved betalingen. Levering sker til pakkeshoppen nedenfor." : "Ingen adresse gemt"}</p>
           )}
         </section>
       </div>
+
+      {delivery && <OrderDeliveryDetails delivery={delivery} admin />}
 
       {/* Order items */}
       <section className="border rounded-xl overflow-hidden mb-8">

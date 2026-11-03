@@ -1,3 +1,5 @@
+import { parseDeliverySelection, carrierLabel, type DeliverySnapshot } from "@/lib/delivery";
+import { validateDelivery } from "@/lib/shipmondo";
 import { shippingPrice } from "@/lib/shipping-price";
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
@@ -13,7 +15,9 @@ import { resolveCheckoutPromo, promoApplies, promoDiscount, type CheckoutPromo }
 export async function POST(req: NextRequest) {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
   const session = await auth();
-  const { items, deliveryMethod = "SHIPPING", promoCode, preview = false }: { items: CartItem[]; deliveryMethod?: "SHIPPING" | "PICKUP"; promoCode?: string; preview?: boolean } = await req.json();
+  const { items, deliveryMethod = "SHIPPING", promoCode, deliverySelection, preview = false }: { items: CartItem[]; deliveryMethod?: "SHIPPING" | "PICKUP"; promoCode?: string; deliverySelection?: unknown; preview?: boolean } = await req.json();
+
+  if (deliveryMethod !== "SHIPPING" && deliveryMethod !== "PICKUP") return NextResponse.json({ error: "Ugyldig leveringsmetode." }, { status: 400 });
 
   if (!Array.isArray(items) || items.length === 0) {
     return NextResponse.json({ error: "Tom kurv" }, { status: 400 });
@@ -98,7 +102,6 @@ export async function POST(req: NextRequest) {
   // Force PICKUP if any item requires a club role
   const hasTrainerItem = skusWithProducts.some((s) => s.product.clubRoleRequired === "TRAINER");
   const effectiveDelivery: "SHIPPING" | "PICKUP" = hasTrainerItem ? "PICKUP" : deliveryMethod;
-  const isPickup = effectiveDelivery === "PICKUP";
 
   const skuProductMap = new Map(skusWithProducts.map((s) => [s.id, s.productId]));
 
@@ -321,6 +324,18 @@ export async function POST(req: NextRequest) {
     lines: items.map(i => ({ unitPrice: Math.round((getServerItemPrice(i) + getServerItemCustomizationFee(i)) * (1 + vatRate / 100)), replacesSale: !!selectedPromo?.replacesSale && eligibleForPromo(i) && itemOnSale(i) })),
   });
 
+  let deliverySnapshot: DeliverySnapshot | null = null;
+  if (effectiveDelivery === "SHIPPING") {
+    const selection = parseDeliverySelection(deliverySelection);
+    if (!selection) return NextResponse.json({ error: "Vælg en GLS- eller dao-pakkeshop i kurven." }, { status: 400 });
+    try {
+      deliverySnapshot = await validateDelivery(selection);
+      if (!deliverySnapshot) return NextResponse.json({ error: "Pakkeshoppen er ikke længere tilgængelig. Vælg en pakkeshop igen." }, { status: 400 });
+    } catch {
+      return NextResponse.json({ error: "Pakkeshoppen kan ikke bekræftes lige nu. Prøv igen, eller vælg afhentning ved klubben." }, { status: 503 });
+    }
+  }
+
   // Build order items (used in both zero-total and Stripe paths)
   const orderItemsData = items.map((item) => {
     const serverPrice = getServerItemPrice(item);
@@ -428,19 +443,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Betalingen kunne ikke forberedes. Prøv igen om lidt." }, { status: 502 });
   }
 
-  const pendingOrder = await prisma.order.create({
-    data: {
-      userId: session?.user?.id ?? null,
-      status: "PENDING",
-      deliveryMethod: effectiveDelivery,
-      total: finalTotal,
-      shippingFee: shipping,
-      discountApplied: totalDiscountOre,
-      groupOrderHoldUntil,
-      items: { create: orderItemsData },
-    },
-    select: { id: true },
-  });
+  let pendingOrder: { id: string };
+  try {
+    pendingOrder = await prisma.order.create({
+      data: {
+        userId: session?.user?.id ?? null,
+        status: "PENDING",
+        deliveryMethod: effectiveDelivery,
+        ...(deliverySnapshot ? { delivery: { create: deliverySnapshot } } : {}),
+        total: finalTotal,
+        shippingFee: shipping,
+        discountApplied: totalDiscountOre,
+        groupOrderHoldUntil,
+        items: { create: orderItemsData },
+      },
+      select: { id: true },
+    });
+
+  } catch {
+    console.error("Could not save pending order and delivery snapshot");
+    return NextResponse.json({ error: "Ordren kunne ikke gemmes. Betaling er ikke startet. Prøv igen om lidt." }, { status: 503 });
+  }
 
   // Build Stripe line items using server-derived prices
   const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
@@ -515,19 +538,21 @@ export async function POST(req: NextRequest) {
       line_items: lineItems,
       discounts,
       // Resolve codes before choosing normal/sale prices; prohibit late changes.
-      ...(shipping > 0 ? { shipping_options: [{ shipping_rate_data: { type: "fixed_amount" as const, fixed_amount: { amount: shipping, currency: "dkk" }, display_name: "Fragt (Danmark)" } }] } : {}),
+      ...(shipping > 0 ? { shipping_options: [{ shipping_rate_data: { type: "fixed_amount" as const, fixed_amount: { amount: shipping, currency: "dkk" }, display_name: deliverySnapshot ? carrierLabel(deliverySnapshot.carrier) : "Fragt (Danmark)" } }] } : {}),
+      ...(deliverySnapshot ? { custom_text: { submit: { message: `Levering med ${carrierLabel(deliverySnapshot.carrier)} til ${deliverySnapshot.name}, ${deliverySnapshot.address}, ${deliverySnapshot.postcode} ${deliverySnapshot.city}.`.slice(0, 1200) } } } : {}),
       customer_email: session?.user?.email ?? undefined,
       metadata: {
         orderId: pendingOrder.id,
         userId: session?.user?.id ?? "",
         grantIds: JSON.stringify(appliedGrantIds),
         vatRate: String(vatRate),
+        ...(deliverySnapshot ? { shippingCarrier: deliverySnapshot.carrier, servicePointId: deliverySnapshot.pointId } : {}),
       },
       success_url: `${baseUrl}/ordre-bekraeftelse?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/kurv`,
       phone_number_collection: { enabled: true },
       billing_address_collection: "required",
-      ...(isPickup ? {} : { shipping_address_collection: { allowed_countries: ["DK"] } }),
+      // Service point is already validated and saved. Stripe collects billing only.
       locale: "da",
     });
   } catch (err) {

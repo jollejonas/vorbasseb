@@ -17,11 +17,14 @@ function load(file, mocks) {
   return exports;
 }
 
-function fixture() {
+function fixture({ delivery = null } = {}) {
   const records = new Map(['one', 'two'].map(id => [id, { id, status: 'PENDING', stripeSessionId: `cs-${id}`, orderNumber: null, total: 100, items: [] }]));
   const emails = [];
+  const addresses = [];
   let counter = 68;
   const db = {
+    orderDelivery: { findUnique: async () => delivery },
+    address: { create: async ({ data }) => { addresses.push(data); return { id: "customer-address" }; } },
     $queryRaw: async () => [{ counter: "OrderNumberCounter", legacy: false }],
     order: { aggregate: async () => ({ _max: { orderNumber: 68 } }),
       findUnique: async ({ where }) => ({ ...records.get(where.id) }),
@@ -39,8 +42,9 @@ function fixture() {
     '@/lib/prisma': { prisma: db },
     '@/lib/email': { sendOrderConfirmation: async args => emails.push(args), sendLowStockAlert: async () => {} },
   });
+  if (delivery) records.get("one").deliveryMethod = "SHIPPING";
   const session = id => ({ id: `cs-${id}`, mode: 'payment', status: 'complete', payment_status: 'paid', metadata: { orderId: id }, customer_details: { email: 'test@example.com' } });
-  return { fulfillOrder, records, emails, session, counter: () => counter };
+  return { fulfillOrder, records, emails, addresses, session, counter: () => counter };
 }
 
 test('open, expired and unpaid checkouts consume no order number', async () => {
@@ -98,4 +102,19 @@ test('a fully granted free order gets a number and a verifiable confirmation lin
   assert.equal(created.status, 'PAID');
   assert.equal(created.orderNumber, 69);
   assert.equal((await response.json()).redirect, '/ordre-bekraeftelse?order_id=free-order');
+});
+
+
+test('service point order preserves snapshot and stores customer billing separately, once on webhook retries', async () => {
+  const delivery = { carrier: 'dao', productCode: 'DAO_STS', pointId: '41384', name: 'SuperBrugsen', address: 'Vestergade 11', postcode: '6623', city: 'Vorbasse', country: 'DK' };
+  const f = fixture({ delivery });
+  const session = { ...f.session('one'), metadata: { orderId: 'one', servicePointId: '41384' }, customer_details: { name: 'Test Kunde', email: 'test@example.com', phone: '+4512345678', address: { line1: 'Kundevej 1', city: 'Billund', postal_code: '7190', country: 'DK' } } };
+  assert.equal(await f.fulfillOrder(session), true);
+  assert.equal(await f.fulfillOrder(session), false);
+  assert.equal(f.addresses.length, 1);
+  assert.equal(f.addresses[0].line1, 'Kundevej 1');
+  assert.equal(f.records.get('one').addressId, 'customer-address');
+  assert.equal(f.emails.length, 1);
+  assert.equal(f.emails[0].delivery.pointId, '41384');
+  assert.equal(f.emails[0].delivery.address, 'Vestergade 11');
 });

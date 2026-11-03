@@ -1,3 +1,5 @@
+import { loadOrderDelivery } from "@/lib/order-delivery";
+import { OrderDeliveryDetails } from "@/components/shop/OrderDeliveryDetails";
 import { CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { CartClearer } from "@/components/shop/CartClearer";
@@ -14,6 +16,7 @@ export default async function OrdrebekraefdelsePage({
   const { session_id, order_id } = await searchParams;
   let paymentConfirmed = false;
   let orderConfirmed = false;
+  let confirmedOrderId: string | null = null;
   if (order_id) {
     const userSession = await auth();
     if (userSession?.user?.id) {
@@ -35,6 +38,7 @@ export default async function OrdrebekraefdelsePage({
           id: session.metadata.orderId, stripeSessionId: session.id,
           status: { not: "PENDING" }, orderNumber: { not: null },
         } });
+        if (orderConfirmed) confirmedOrderId = session.metadata.orderId;
       }
     } catch (err) {
       console.error("[ordre-bekraeftelse] fulfillOrder failed:", err);
@@ -56,6 +60,8 @@ export default async function OrdrebekraefdelsePage({
     </div>
   );
 
+  const delivery = confirmedOrderId ? await loadOrderDelivery(confirmedOrderId) : null;
+
   return (
     <div className="min-h-[70vh] flex items-center justify-center px-4">
       <CartClearer />
@@ -65,6 +71,7 @@ export default async function OrdrebekraefdelsePage({
         <p className="text-gray-500 mb-8">
           Du modtager snart en bekræftelse på e-mail. Vi sender din ordre hurtigst muligt.
         </p>
+        {delivery && <OrderDeliveryDetails delivery={delivery} />}
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link
             href="/mine-ordrer"
