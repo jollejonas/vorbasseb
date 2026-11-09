@@ -6,7 +6,7 @@ const ts = require('typescript');
 function load(file, mocks = {}) {
   const exports = {};
   const source = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
-  vm.runInNewContext(source, { exports, process, URL, require(name) { return mocks[name] ?? require(name); } });
+  vm.runInNewContext(source, { exports, process, URL, require(name) { return mocks[name] ?? (name.startsWith('@/lib/') ? load(name.replace('@/', '') + '.ts', mocks) : require(name)); } });
   return exports;
 }
 test('image uses purchased option, legacy colour, then product fallback', () => {
@@ -16,6 +16,18 @@ test('image uses purchased option, legacy colour, then product fallback', () => 
   assert.equal(orderImage({ ...sku, optionValues: [] }), 'blue');
   assert.equal(orderImage({ product: sku.product }), 'base');
   assert.equal(orderImage(null), undefined);
+});
+
+test('VAT splits final discounted totals including shipping with exact øre reconciliation', () => {
+  const { orderVat } = load('lib/order-vat.ts');
+  for (const [gross, net, vat] of [[20900, 16720, 4180], [4057020, 3245616, 811404], [0, 0, 0], [1, 1, 0], [32400, 25920, 6480]]) {
+    const result = orderVat(gross, 25);
+    assert.equal(result.net, net); assert.equal(result.vat, vat);
+    assert.equal(result.net + result.vat, gross);
+  }
+  assert.equal(orderVat(11000, 10).vat, 1000);
+  assert.equal(orderVat(20900, 0).net, 20900);
+  for (const [total, rate] of [[NaN, 25], [-1, 25], [100, NaN], [100, -25]]) assert.throws(() => orderVat(total, rate));
 });
 test('confirmation renders safe photos, quantities, pickup and Copenhagen deadline; retains custom templates', async () => {
   let sent;
@@ -36,6 +48,10 @@ test('confirmation renders safe photos, quantities, pickup and Copenhagen deadli
   assert.match(sent.html, /Trøje &lt;blå&gt;/);
   assert.match(sent.html, /500,00/);
   assert.match(sent.html, /525,00/);
+  assert.match(sent.html, /I alt ekskl. moms/);
+  assert.match(sent.html, /25% moms/);
+  assert.match(sent.html, /420,00/);
+  assert.match(sent.html, /105,00/);
   assert.match(sent.html, /Afhentning ved klubben/);
   assert.match(sent.html, /23[.:]59/);
   assert.match(sent.html, /#54/);
@@ -45,6 +61,7 @@ test('confirmation renders safe photos, quantities, pickup and Copenhagen deadli
   template = '<h2>Klubbens egen tekst</h2>{{items}} {{total}}';
   await sendOrderConfirmation(data);
   assert.match(sent.html, /Klubbens egen tekst/);
+  assert.match(sent.html, /25% moms/);
   assert.match(sent.html, /product.jpg/);
   await sendShippingNotification({ to: data.to, orderId: data.orderId, triggeredBy: 'admin@example.com', trackingNumber: 'TRACK-123' });
   assert.equal(sent.orderId, 'order-54');
@@ -81,5 +98,8 @@ test('admin print view renders ordinary and package product photos and pickup de
   assert.match(html, /Afhentning ved klubben/);
   assert.doesNotMatch(html, /Ingen adresse gemt/);
   assert.match(html, /ekskl. moms/);
+  assert.match(html, /25% moms/);
+  assert.match(html, /420/);
+  assert.match(html, /105/);
   assert.match(html, /Historik utilgængelig/);
 });

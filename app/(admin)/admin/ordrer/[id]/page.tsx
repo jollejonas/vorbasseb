@@ -8,6 +8,7 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/utils";
+import { orderVat } from "@/lib/order-vat";
 import { AdminOrderActions } from "@/components/admin/AdminOrderActions";
 import { PrintPreviewModal } from "@/components/admin/PrintPreviewModal";
 import { PrintButton } from "@/components/admin/PrintButton";
@@ -58,6 +59,7 @@ export default async function AdminOrderDetailPage({ params }: Params) {
   });
 
   if (!order || order.orderNumber === null || order.status === "PENDING") notFound();
+  const amounts = orderVat(order.total, order.vatRate);
 
   const emailHistory = await loadOrderEmailHistory(order.id);
 
@@ -324,8 +326,10 @@ export default async function AdminOrderDetailPage({ params }: Params) {
             <span>−{formatPrice(order.discountApplied)}</span>
           </div>
         )}
+        <div className="flex justify-between text-sm"><span>I alt ekskl. moms</span><span>{formatPrice(amounts.net)}</span></div>
+        <div className="flex justify-between text-sm"><span>{amounts.rate}% moms</span><span>{formatPrice(amounts.vat)}</span></div>
         <div className="flex justify-between font-bold border-t pt-2">
-          <span>Total</span>
+          <span>I alt inkl. moms</span>
           <span>{formatPrice(order.total)}</span>
         </div>
       </section>
