@@ -22,7 +22,8 @@ function fixture() {
   const emails = [];
   let counter = 68;
   const db = {
-    $queryRaw: async () => [{ counter: "OrderNumberCounter", legacy: false }],
+    $queryRaw: async query => query.join('').includes("column_name = 'vatRate'") ? [{ installed: true }] : [{ counter: "OrderNumberCounter", legacy: false }],
+    $executeRaw: async (_query, rate, id) => { records.get(id).vatRate = rate; return 1; },
     order: { aggregate: async () => ({ _max: { orderNumber: 68 } }),
       findUnique: async ({ where }) => ({ ...records.get(where.id) }),
       updateMany: async ({ where }) => {

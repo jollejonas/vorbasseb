@@ -6,6 +6,7 @@ import { fulfillOrder } from "@/lib/fulfillOrder";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { orderVat } from "@/lib/order-vat";
+import { readOrderVatRate } from "@/lib/order-vat-storage";
 import { formatPrice } from "@/lib/utils";
 
 export default async function OrdrebekraefdelsePage({
@@ -24,7 +25,7 @@ export default async function OrdrebekraefdelsePage({
         id: order_id, userId: userSession.user.id, total: 0, status: "PAID", orderNumber: { not: null },
       } });
       orderConfirmed = paymentConfirmed = !!order;
-      if (order) amounts = orderVat(order.total, order.vatRate);
+      if (order) amounts = orderVat(order.total, await readOrderVatRate(prisma, order.id));
     }
   }
 
@@ -41,7 +42,7 @@ export default async function OrdrebekraefdelsePage({
           status: { not: "PENDING" }, orderNumber: { not: null },
         } });
         orderConfirmed = !!order;
-        if (order) amounts = orderVat(order.total, order.vatRate);
+        if (order) amounts = orderVat(order.total, Number(session.metadata?.vatRate ?? await readOrderVatRate(prisma, order.id)));
       }
     } catch (err) {
       console.error("[ordre-bekraeftelse] fulfillOrder failed:", err);

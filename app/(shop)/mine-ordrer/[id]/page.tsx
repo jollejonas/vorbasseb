@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { redirect, notFound } from "next/navigation";
 import { formatPrice } from "@/lib/utils";
 import { orderVat } from "@/lib/order-vat";
+import { readOrderVatRate } from "@/lib/order-vat-storage";
 
 export const metadata: Metadata = { title: "Ordredetaljer" };
 
@@ -56,7 +57,7 @@ export default async function OrderDetailPage({ params }: Params) {
   // Security: order must exist and belong to this user
   if (!order || order.userId !== session.user.id || order.orderNumber === null || order.status === "PENDING") notFound();
 
-  const vatPct = order.vatRate;
+  const vatPct = await readOrderVatRate(prisma, order.id);
   const amounts = orderVat(order.total, vatPct);
   const contactEmail = cfg.find((s) => s.key === "footer_email")?.value ?? "info@vorbassebk.dk";
 
