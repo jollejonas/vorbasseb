@@ -344,6 +344,7 @@ model Order {
   stripeSessionId String?        @unique
   stripePaymentId String?
   total           Int // øre
+  vatRate         Int            @default(25) // rate at checkout; legacy orders use 25%
   discountApplied Int            @default(0) // øre
   shippingFee     Int // øre
   trackingNumber  String?

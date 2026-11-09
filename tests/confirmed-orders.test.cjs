@@ -70,6 +70,15 @@ test('two completed orders receive consecutive numbers, including a free Stripe 
   assert.deepEqual([...f.records.values()].map(o => o.orderNumber).sort(), [69, 70]);
 });
 
+test('fulfillment preserves the checkout VAT rate on both order and confirmation email', async () => {
+  const f = fixture();
+  const session = f.session('one');
+  session.metadata.vatRate = '10';
+  await f.fulfillOrder(session);
+  assert.equal(f.records.get('one').vatRate, 10);
+  assert.equal(f.emails[0].vatRate, 10);
+});
+
 test('a different Stripe session cannot confirm an existing checkout', async () => {
   const f = fixture();
   assert.equal(await f.fulfillOrder({ ...f.session('one'), id: 'wrong-session' }), false);

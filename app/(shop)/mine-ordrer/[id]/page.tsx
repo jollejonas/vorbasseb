@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect, notFound } from "next/navigation";
 import { formatPrice } from "@/lib/utils";
+import { orderVat } from "@/lib/order-vat";
 
 export const metadata: Metadata = { title: "Ordredetaljer" };
 
@@ -48,14 +49,15 @@ export default async function OrderDetailPage({ params }: Params) {
       },
     }),
     prisma.siteSetting
-      .findMany({ where: { key: { in: ["vat_rate", "footer_email"] } } })
+      .findMany({ where: { key: { in: ["footer_email"] } } })
       .catch(() => []),
   ] as const);
 
   // Security: order must exist and belong to this user
   if (!order || order.userId !== session.user.id || order.orderNumber === null || order.status === "PENDING") notFound();
 
-  const vatPct = parseInt(cfg.find((s) => s.key === "vat_rate")?.value ?? "25");
+  const vatPct = order.vatRate;
+  const amounts = orderVat(order.total, vatPct);
   const contactEmail = cfg.find((s) => s.key === "footer_email")?.value ?? "info@vorbassebk.dk";
 
   const date = new Intl.DateTimeFormat("da-DK", {
@@ -189,6 +191,8 @@ export default async function OrderDetailPage({ params }: Params) {
               <span className="tabular-nums">{formatPrice(order.shippingFee)}</span>
             </div>
           )}
+          <div className="flex justify-between"><span>I alt ekskl. moms</span><span>{formatPrice(amounts.net)}</span></div>
+          <div className="flex justify-between"><span>{amounts.rate}% moms</span><span>{formatPrice(amounts.vat)}</span></div>
           <div className="flex justify-between font-semibold text-gray-900 pt-1 border-t border-gray-200">
             <span>Total (inkl. moms)</span>
             <span className="tabular-nums">{formatPrice(order.total)}</span>

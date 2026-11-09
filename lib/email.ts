@@ -1,4 +1,5 @@
 import { sendOrderEmail } from "@/lib/order-email";
+import { orderVat } from "@/lib/order-vat";
 import { Resend } from "resend";
 import { prisma } from "@/lib/prisma";
 
@@ -96,6 +97,7 @@ export async function sendOrderConfirmation({
   to,
   customerName,
   orderTotal,
+  vatRate = 25,
   orderId,
   orderNumber,
   deliveryMethod,
@@ -105,6 +107,7 @@ export async function sendOrderConfirmation({
   to: string;
   customerName?: string | null;
   orderTotal: number;
+  vatRate?: number;
   orderId: string;
   orderNumber?: number;
   deliveryMethod?: string;
@@ -133,6 +136,12 @@ export async function sendOrderConfirmation({
   const delivery = deliveryMethod === "PICKUP" ? "Afhentning ved klubben. Du får besked, når ordren er klar." : "Du får besked, når ordren er afsendt.";
   const hold = groupOrderHoldUntil ? `<p>Samlebestilling: Behandles efter ${new Intl.DateTimeFormat("da-DK", { dateStyle: "long", timeStyle: "short", timeZone: "Europe/Copenhagen" }).format(groupOrderHoldUntil)}.</p>` : "";
 
+  const amounts = orderVat(orderTotal, vatRate);
+  const vatSummary = `<table role="presentation" width="100%" style="margin:20px 0;border-collapse:collapse">
+<tr><td style="padding:6px 0">I alt ekskl. moms</td><td align="right">${formatDKK(amounts.net)}</td></tr>
+<tr><td style="padding:6px 0">${amounts.rate}% moms</td><td align="right">${formatDKK(amounts.vat)}</td></tr>
+<tr><td style="padding:8px 0;border-top:1px solid #172033"><strong>I alt inkl. moms</strong></td><td align="right" style="border-top:1px solid #172033"><strong>${formatDKK(amounts.gross)}</strong></td></tr>
+</table>`;
   const vars = { customerName: escapeHtml(customerName ?? ""), items: itemsHtml, total: formatDKK(orderTotal) };
   await sendOrderEmail({
     orderId, kind: "CONFIRMATION", automatic: true,
@@ -144,7 +153,7 @@ export async function sendOrderConfirmation({
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:24px 12px">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border:1px solid #e2e8f0">
 <tr><td style="padding:24px;background:#142e57;color:#ffffff;border-bottom:4px solid #f4cd35"><strong style="font-size:22px">Vorbasse Boldklub</strong><br /><span style="font-size:13px">SHOP · ORDREBEKRÆFTELSE${orderNumber ? ` · #${orderNumber}` : ""}</span></td></tr>
-<tr><td style="padding:24px">${renderTemplate(bodyTemplate, vars)}<div style="padding:16px;background:#f8fafc;border-top:1px solid #e2e8f0"><strong>Levering</strong><p>${delivery}</p>${hold}</div><p style="font-size:12px;color:#64748b">Alle beløb er inkl. moms.</p></td></tr>
+<tr><td style="padding:24px">${renderTemplate(bodyTemplate, vars)}${vatSummary}<div style="padding:16px;background:#f8fafc;border-top:1px solid #e2e8f0"><strong>Levering</strong><p>${delivery}</p>${hold}</div><p style="font-size:12px;color:#64748b">Momsopgørelsen er beregnet af totalen efter rabat og inklusive eventuel fragt.</p></td></tr>
 <tr><td style="padding:20px 24px;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b">Tak fordi du støtter klubben.<br /><a href="https://shop.vorbasseboldklub.dk" style="color:#142e57">shop.vorbasseboldklub.dk</a></td></tr>
 </table></td></tr></table></body></html>`,
   });

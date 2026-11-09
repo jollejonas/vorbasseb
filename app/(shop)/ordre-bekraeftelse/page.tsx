@@ -5,6 +5,8 @@ import Stripe from "stripe";
 import { fulfillOrder } from "@/lib/fulfillOrder";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { orderVat } from "@/lib/order-vat";
+import { formatPrice } from "@/lib/utils";
 
 export default async function OrdrebekraefdelsePage({
   searchParams,
@@ -14,12 +16,15 @@ export default async function OrdrebekraefdelsePage({
   const { session_id, order_id } = await searchParams;
   let paymentConfirmed = false;
   let orderConfirmed = false;
+  let amounts: ReturnType<typeof orderVat> | undefined;
   if (order_id) {
     const userSession = await auth();
     if (userSession?.user?.id) {
-      orderConfirmed = paymentConfirmed = !!await prisma.order.findFirst({ where: {
+      const order = await prisma.order.findFirst({ where: {
         id: order_id, userId: userSession.user.id, total: 0, status: "PAID", orderNumber: { not: null },
       } });
+      orderConfirmed = paymentConfirmed = !!order;
+      if (order) amounts = orderVat(order.total, order.vatRate);
     }
   }
 
@@ -31,10 +36,12 @@ export default async function OrdrebekraefdelsePage({
       paymentConfirmed = session.mode === "payment" && session.status === "complete" && ["paid", "no_payment_required"].includes(session.payment_status);
       await fulfillOrder(session);
       if (paymentConfirmed && session.metadata?.orderId) {
-        orderConfirmed = !!await prisma.order.findFirst({ where: {
+        const order = await prisma.order.findFirst({ where: {
           id: session.metadata.orderId, stripeSessionId: session.id,
           status: { not: "PENDING" }, orderNumber: { not: null },
         } });
+        orderConfirmed = !!order;
+        if (order) amounts = orderVat(order.total, order.vatRate);
       }
     } catch (err) {
       console.error("[ordre-bekraeftelse] fulfillOrder failed:", err);
@@ -65,6 +72,11 @@ export default async function OrdrebekraefdelsePage({
         <p className="text-gray-500 mb-8">
           Du modtager snart en bekræftelse på e-mail. Vi sender din ordre hurtigst muligt.
         </p>
+        {amounts && <div className="mb-8 rounded-xl border p-5 space-y-2 text-sm">
+          <div className="flex justify-between gap-8"><span>I alt ekskl. moms</span><span>{formatPrice(amounts.net)}</span></div>
+          <div className="flex justify-between gap-8"><span>{amounts.rate}% moms</span><span>{formatPrice(amounts.vat)}</span></div>
+          <div className="flex justify-between gap-8 border-t pt-2 font-bold"><span>I alt inkl. moms</span><span>{formatPrice(amounts.gross)}</span></div>
+        </div>}
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link
             href="/mine-ordrer"
