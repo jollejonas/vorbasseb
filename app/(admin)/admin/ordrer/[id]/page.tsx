@@ -9,6 +9,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/utils";
 import { orderVat } from "@/lib/order-vat";
+import { readOrderVatRate } from "@/lib/order-vat-storage";
 import { AdminOrderActions } from "@/components/admin/AdminOrderActions";
 import { PrintPreviewModal } from "@/components/admin/PrintPreviewModal";
 import { PrintButton } from "@/components/admin/PrintButton";
@@ -59,7 +60,7 @@ export default async function AdminOrderDetailPage({ params }: Params) {
   });
 
   if (!order || order.orderNumber === null || order.status === "PENDING") notFound();
-  const amounts = orderVat(order.total, order.vatRate);
+  const amounts = orderVat(order.total, await readOrderVatRate(prisma, order.id));
 
   const emailHistory = await loadOrderEmailHistory(order.id);
 

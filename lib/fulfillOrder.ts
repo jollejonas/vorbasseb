@@ -1,4 +1,5 @@
 import { orderImage } from "@/lib/order-image";
+import { storeOrderVatRate } from "@/lib/order-vat-storage";
 import Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { sendOrderConfirmation, sendLowStockAlert } from "@/lib/email";
@@ -77,7 +78,6 @@ export async function fulfillOrder(session: Stripe.Checkout.Session): Promise<bo
           stripeSessionId: session.id,
           stripePaymentId: paymentIntentId,
           total: session.amount_total ?? order.total,
-          vatRate,
           discountApplied: session.total_details?.amount_discount ?? order.discountApplied,
           customerName,
           phone,
@@ -85,6 +85,8 @@ export async function fulfillOrder(session: Stripe.Checkout.Session): Promise<bo
           ...(addressId ? { addressId } : {}),
         },
       });
+
+      await storeOrderVatRate(tx, orderId, vatRate);
 
       // Mark any applied grants as USED
       const parsedGrantIds: string[] = grantIds ? JSON.parse(grantIds) : [];

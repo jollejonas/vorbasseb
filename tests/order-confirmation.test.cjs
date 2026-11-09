@@ -84,7 +84,7 @@ test('admin print view renders ordinary and package product photos and pickup de
     '@/components/admin/OrderEmailHistory': { OrderEmailHistory: ({ available }) => React.createElement('p', null, available ? 'Historik klar' : 'Historik utilgængelig') },
     '@/lib/order-image': load('lib/order-image.ts'),
     '@/auth': { auth: async () => ({ user: { role: 'ADMIN' } }) },
-    '@/lib/prisma': { prisma: { order: { findUnique: async () => order }, sKU: { findMany: async () => [sku] } } },
+    '@/lib/prisma': { prisma: { $queryRaw: async () => [{ installed: false }], order: { findUnique: async () => order }, sKU: { findMany: async () => [sku] } } },
     '@/lib/utils': { formatPrice: n => String(n / 100) },
     'next/link': { default: ({ children }) => children, __esModule: true },
     'next/navigation': {},

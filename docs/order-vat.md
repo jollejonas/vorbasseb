@@ -6,6 +6,8 @@ Mailens momsopgørelse vises også, når administratoren har en tilpasset mailsk
 
 ## Udrulning
 
-Kør `npx prisma migrate deploy` mod produktionsdatabasen før den nye kode tages i brug. Migrationen `20261109090000_order_vat_rate` tilføjer ordrens momssats. Eksisterende ordrer får 25 %, som er butikkens hidtidige standardsats og den sats, der er angivet for denne ændring. Eventuelle historiske undtagelser skal kontrolleres før udrulning.
+Koden fungerer både før og efter migrationen `20261109090000_order_vat_rate`. Prisma ignorerer feltet i almindelige ordrelæsninger og -skrivninger, så manglende migration ikke kan få disse til at fejle. Den særskilte lagring af satsen undersøger, om kolonnen findes, før den bruges; ingen manglende-kolonne-fejl skal fanges inde i en PostgreSQL-transaktion.
 
-Nye ordrer gemmer satsen fra checkout. Stripe-bekræftelsen bruger den sats, som blev gemt i betalingssessionen. Ordredetaljer bruger derefter ordrens sats frem for butikkens aktuelle indstilling. Der anvendes én fælles momssats for hele ordren, som i den eksisterende checkout.
+Uden migration bruges 25 % på ordredetaljer. Mail og bekræftelsesside for Stripe bruger betalingssessionens sats. Når migrationen er kørt, gemmes satsen ved betalingsbekræftelse. Ældre rækker får 25 %. Historiske undtagelser og ordrer med andre satser fra tiden før migrationen skal afstemmes med Stripe. Migrationen er fortsat anbefalet til varig lagring, men er ikke en forudsætning for at åbne ordresider eller betale.
+
+Checkout gemmer satsen i betalingssessionen. Efter migrationen gemmer Stripe-bekræftelsen den også på ordren. Ordredetaljer bruger derefter ordrens sats frem for butikkens aktuelle indstilling. Der anvendes én fælles momssats for hele ordren, som i den eksisterende checkout.
