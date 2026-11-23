@@ -13,7 +13,7 @@ export async function GET() {
   const skuFields = { id: true, size: true, itemNumber: true, product: { select: { name: true, images: true } },
     optionValues: { select: { optionValue: { select: { images: true } } } }, colorVariant: { select: { images: true } } } as const;
   const orders = await prisma.order.findMany({ where: activeOrdersWhere, orderBy: { orderNumber: "asc" },
-    include: { shippingAddress: true, user: { select: { name: true, email: true } }, items: { include: { sku: { select: skuFields } } } } });
+    include: { shippingAddress: true, user: { select: { name: true, email: true, customerNumber: true } }, items: { include: { sku: { select: skuFields } } } } });
   const ids = new Set<string>();
   for (const order of orders) for (const item of order.items) {
     const bundle = item.optionSelections as { items?: { skuId?: string }[] } | null;
@@ -27,7 +27,8 @@ export async function GET() {
     const address = order.shippingAddress;
     slips.push({ number: order.orderNumber!, date: order.createdAt.toISOString(), status: order.status,
       customer: order.customerName ?? order.user?.name ?? "", email: order.guestEmail ?? order.user?.email ?? "", phone: order.phone ?? "",
-      delivery: order.deliveryMethod === "PICKUP" ? "Afhentning ved klubben" : ["Forsendelse", address?.name, address?.line1, address?.line2, address?.postcode, address?.city].filter(Boolean).join(" · "),
+      pickup: order.deliveryMethod === "PICKUP", customerNumber: order.user?.customerNumber,
+      address: address ? [address.name, address.line1, address.line2, [address.postcode, address.city].filter(Boolean).join(" "), address.country].filter(Boolean).join("\n") : "",
       hold: order.groupOrderHoldUntil?.toISOString(), shipping: order.shippingFee, discount: order.discountApplied,
       amounts: orderVat(order.total, rates.get(order.id) ?? 25),
       items: order.items.flatMap(item => {

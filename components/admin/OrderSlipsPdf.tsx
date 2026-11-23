@@ -1,13 +1,6 @@
 "use client";
 import { useState } from "react";
-import type { Content, TDocumentDefinitions } from "pdfmake/interfaces";
-
-type Slip = { number: number; date: string; status: string; customer: string; email: string; phone: string; delivery: string; hold?: string;
-  shipping: number; discount: number; amounts: { gross: number; vat: number; rate: number };
-  items: { product: string; bundle?: string; itemNumber: string; size: string; color: string; print: string; quantity: number; amount: number | null; photo?: string }[] };
-const money = (n: number) => (n / 100).toLocaleString("da-DK", { style: "currency", currency: "DKK" });
-const date = (s: string) => new Date(s).toLocaleDateString("da-DK", { timeZone: "Europe/Copenhagen" });
-const statuses: Record<string,string> = { PAID:"Betalt", SHIPPED:"Afsendt", AWAITING_PICKUP:"Afventer afhentning", PICKUP_READY:"Klar til afhentning", DELIVERED:"Leveret" };
+import { orderSlipDocument, type Slip } from "@/lib/order-slip-document";
 
 async function thumbnail(src: string): Promise<string | undefined> {
   try {
@@ -44,23 +37,7 @@ export default function OrderSlipsPdf() {
         const data = await thumbnail(url);
         if (data) { const key = "photo" + (i+j); images[key] = data; names.set(url,key); }
       }));
-      const content: Content[] = [];
-      for (const o of slips) {
-        content.push({text: "VORBASSE BOLDKLUB  /  SHOP", color:"#17335a", bold:true, pageBreak: content.length ? "before" : undefined},
-          {text: "Ordreseddel #" + o.number, fontSize:22, bold:true, margin:[0,6,0,2]},
-          {text: date(o.date) + "   ·   " + (statuses[o.status] ?? o.status), margin:[0,0,0,14]},
-          {text: [o.customer,o.email,o.phone].filter(Boolean).join("   ·   ")}, {text:o.delivery,margin:[0,4,0,8]});
-        if (o.hold) content.push({text:"Samlebestilling · deadline " + date(o.hold), margin:[0,0,0,8]});
-        content.push({table:{headerRows:1,widths:[40,"*",35,65],body:[
-          ["Foto","Produkt / variant / tryk","Antal","Beløb ekskl. moms"].map(text=>({text,bold:true,fillColor:"#edf2f7"})),
-          ...o.items.map(i=>[i.photo && names.has(i.photo) ? {image:names.get(i.photo)!,fit:[36,42] as [number,number]} : "",
-            [i.bundle,i.product,[i.itemNumber,i.size,i.color].filter(Boolean).join(" · "),i.print].filter(Boolean).join("\n"),String(i.quantity),i.amount === null ? "" : money(i.amount)])]},layout:"lightHorizontalLines"});
-        if(o.discount) content.push({text:"Rabat: " + money(o.discount), alignment:"right"});
-        content.push({text:"Fragt: " + money(o.shipping), alignment:"right",margin:[0,8,0,3]},
-          {text:"Heraf moms (" + o.amounts.rate + " %): " + money(o.amounts.vat), alignment:"right"},
-          {text:"I alt inkl. moms: " + money(o.amounts.gross), alignment:"right",bold:true,fontSize:13});
-      }
-      const doc:TDocumentDefinitions = { content,images,pageSize:"A4",defaultStyle:{fontSize:10},info:{title:"VBK – aktive ordresedler"} };
+      const doc = orderSlipDocument(slips, images, names);
       await new Promise<void>(resolve => pdf.createPdf(doc, undefined, undefined, fonts).download("VBK-aktive-ordresedler.pdf", resolve));
     } catch(e) { setError(e instanceof Error ? e.message : "PDF-filen kunne ikke oprettes."); }
     finally { setBusy(false); }
