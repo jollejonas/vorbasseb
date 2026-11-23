@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 type Database = Pick<Prisma.TransactionClient, "$queryRaw" | "$executeRaw">;
 
@@ -20,4 +20,11 @@ export async function readOrderVatRate(db: Database, orderId: string) {
 export async function storeOrderVatRate(db: Database, orderId: string, rate: number) {
   if (!await hasVatColumn(db)) return;
   await db.$executeRaw`UPDATE "Order" SET "vatRate" = ${rate} WHERE id = ${orderId}`;
+}
+
+export async function readOrderVatRates(db: Database, orderIds: string[]) {
+  if (!orderIds.length || !await hasVatColumn(db)) return new Map<string, number>();
+  const rows = await db.$queryRaw<{ id: string; vatRate: number }[]>`
+    SELECT id, "vatRate" FROM "Order" WHERE id IN (${Prisma.join(orderIds)})`;
+  return new Map(rows.map(row => [row.id, row.vatRate]));
 }

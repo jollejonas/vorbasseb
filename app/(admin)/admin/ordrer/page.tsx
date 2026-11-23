@@ -1,3 +1,4 @@
+import OrderSlipsPdf from "@/components/admin/OrderSlipsPdf";
 import { activeOrdersWhere } from "@/lib/active-orders";
 import { ReconcileOrder } from "@/components/admin/ReconcileOrder";
 import { BookkeepingExport } from "@/components/admin/BookkeepingExport";
@@ -67,6 +68,7 @@ export default async function AdminOrdrerPage({ searchParams }: Props) {
           ← Admin
         </a>
         <h1 className="text-3xl font-bold">Ordrer</h1>
+        <OrderSlipsPdf />
         <a href="/api/admin/aktive-ordrer" download className="ml-auto rounded-lg border px-4 py-2 text-sm font-semibold">Eksportér alle aktive ordrer (CSV)</a>
         <Link href="/admin/ordrer/bestillingsliste" className=" rounded-lg bg-secondary px-4 py-2 text-sm font-semibold text-white">Samlet bestillingsliste / eksport</Link>
       </div>
