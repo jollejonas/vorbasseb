@@ -50,7 +50,7 @@ export const bookkeepingHeaders = [
   "Status", "Refusion skal kontrolleres i Stripe", "Samlebestilling", "Stripe betalings-ID", "Stripe checkout-ID", "Internt ordre-ID", "Bemærkning",
 ];
 
-function csvCell(value: string | number) {
+export function csvCell(value: string | number) {
   let text = String(value).replace(/[\r\n\t]/g, " ");
   // User-supplied names must never become spreadsheet formulas.
   if (/^\s*[=+@-]/.test(text)) text = `'${text}`;

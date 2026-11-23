@@ -1,3 +1,4 @@
+import { activeOrdersWhere } from "@/lib/active-orders";
 import { ReconcileOrder } from "@/components/admin/ReconcileOrder";
 import { BookkeepingExport } from "@/components/admin/BookkeepingExport";
 import { Metadata } from "next";
@@ -13,8 +14,7 @@ import type { Prisma } from "@prisma/client";
 
 export const metadata: Metadata = { title: "Ordrer – Admin" };
 
-// Active = not yet in a terminal state
-const ACTIVE_STATUSES = ["PAID", "SHIPPED", "AWAITING_PICKUP", "PICKUP_READY", "DELIVERED"];
+
 
 type Props = {
   searchParams: Promise<{ status?: string; levering?: string; q?: string }>;
@@ -30,7 +30,7 @@ export default async function AdminOrdrerPage({ searchParams }: Props) {
   const where: Prisma.OrderWhereInput = { orderNumber: { not: null }, NOT: { status: "PENDING" } };
 
   if (status === "active") {
-    where.status = { in: ACTIVE_STATUSES as Prisma.EnumOrderStatusFilter["in"] };
+    Object.assign(where, activeOrdersWhere);
   } else if (status) {
     where.status = status as Prisma.EnumOrderStatusFilter;
   }
@@ -62,12 +62,13 @@ export default async function AdminOrdrerPage({ searchParams }: Props) {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10">
-      <div className="flex items-center gap-4 mb-8">
+      <div className="flex flex-wrap items-center gap-4 mb-8">
         <a href="/admin" className="text-sm text-gray-500 hover:text-secondary">
           ← Admin
         </a>
         <h1 className="text-3xl font-bold">Ordrer</h1>
-        <Link href="/admin/ordrer/bestillingsliste" className="ml-auto rounded-lg bg-secondary px-4 py-2 text-sm font-semibold text-white">Samlet bestillingsliste / eksport</Link>
+        <a href="/api/admin/aktive-ordrer" download className="ml-auto rounded-lg border px-4 py-2 text-sm font-semibold">Eksportér alle aktive ordrer (CSV)</a>
+        <Link href="/admin/ordrer/bestillingsliste" className=" rounded-lg bg-secondary px-4 py-2 text-sm font-semibold text-white">Samlet bestillingsliste / eksport</Link>
       </div>
 
       <ReconcileOrder />
