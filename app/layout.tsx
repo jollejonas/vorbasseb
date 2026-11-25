@@ -1,8 +1,9 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import { Share } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { Toaster } from "sonner";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const share = Share({ subsets: ["latin"], weight: ["400", "700"] });
 
@@ -27,6 +28,7 @@ export default function RootLayout({
           {children}
         </Providers>
         <Toaster richColors position="top-right" />
+        <SpeedInsights />
       </body>
     </html>
   );
